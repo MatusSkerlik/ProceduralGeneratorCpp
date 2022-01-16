@@ -1,0 +1,4 @@
+nnoremap <F5> :!make main<CR><CR>
+nnoremap <F6> :!make pcg<CR><CR>
+
+nnoremap <C-s> :w<CR>
