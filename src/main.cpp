@@ -130,18 +130,6 @@ int main(void)
             mouse_y = GetMouseY();
         }
 
-        if (IsMouseButtonDown(1))
-        {
-            PixelArray p;
-            PixelsAroundRect((int) GetMouseX() * 1 / camera.zoom, (int) GetMouseY() * 1 / camera.zoom, 300, 2, p);
-            BeginTextureMode(canvas);
-                for (auto& pixel: p)
-                {
-                    DrawPixel(pixel.x, pixel.y, RED);
-                }
-            EndTextureMode();
-        }
-
         if (IsKeyDown(KEY_SPACE))
         {
             camera.offset.x = 0;
