@@ -14,7 +14,7 @@ PCG_FUNC define_biomes;
 
 void DrawHorizontal(DATA& data)
 {
-    for (auto area: data.HORIZONTAL_AREAS)
+    for (auto& area: data.HORIZONTAL_AREAS)
     {
         auto rect = std::get<0>(area);
         auto color = std::get<1>(area);
@@ -26,13 +26,11 @@ void DrawHorizontal(DATA& data)
 
 void DrawBiomes(DATA& data)
 {
-    for (auto polygon: data.BIOMES)
+    for (auto& biome: data.BIOMES)
     {
-        for (auto& pixel: polygon.pixels)
+        for (auto& p: biome)
         {
-            DrawPixel(pixel.x, pixel.y, (Color) {
-                0, 255, 0, 255
-            });
+            DrawPixel(p.x, p.y, RED);
         }
     }
 }
@@ -66,8 +64,8 @@ void PCGGenThread(DATA* data)
 
 int main(void)
 {
-    int width = 2*820;
-    int height = 2*240;
+    int width = 2 * 820;
+    int height = 2 * 240;
     int map_width = 4200;
     int map_height = 1200;
 
@@ -85,13 +83,19 @@ int main(void)
     data.HEIGHT = map_height;
 
     InitWindow(width, height, "Procedural Terrain Generator");
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
 
+    RenderTexture canvas = LoadRenderTexture(map_width, map_height);
 
     LoadPCG();
     PCGGen(&data);
 
-    while (!WindowShouldClose())    // Detect window close button or ESC key
+    BeginTextureMode(canvas);
+        DrawHorizontal(data);
+        DrawBiomes(data);
+    EndTextureMode();
+
+    while (!WindowShouldClose()) // Detect window close button or ESC key
     {
         if (GetMouseWheelMove() != 0)
         {
@@ -108,6 +112,8 @@ int main(void)
                 camera.zoom = (float) map_width / width;
             if (camera.zoom < 0.25)
                 camera.zoom = 0.25;
+            if (camera.zoom > 1)
+                camera.zoom = 1;
         }
 
         if (IsMouseButtonPressed(0))
@@ -124,6 +130,18 @@ int main(void)
             mouse_y = GetMouseY();
         }
 
+        if (IsMouseButtonDown(1))
+        {
+            PixelArray p;
+            PixelsAroundRect((int) GetMouseX() * 1 / camera.zoom, (int) GetMouseY() * 1 / camera.zoom, 300, 2, p);
+            BeginTextureMode(canvas);
+                for (auto& pixel: p)
+                {
+                    DrawPixel(pixel.x, pixel.y, RED);
+                }
+            EndTextureMode();
+        }
+
         if (IsKeyDown(KEY_SPACE))
         {
             camera.offset.x = 0;
@@ -135,14 +153,18 @@ int main(void)
         {
             ReloadPCG();
             PCGGenThread(&data);
+            BeginTextureMode(canvas);
+                DrawHorizontal(data);
+                DrawBiomes(data);
+            EndTextureMode();
         }
 
         BeginDrawing();
-        BeginMode2D(camera);
-        ClearBackground(RAYWHITE);
-        DrawHorizontal(data);
-        DrawBiomes(data);
-        EndMode2D();
+            ClearBackground(RAYWHITE);
+            BeginMode2D(camera);
+                DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, (float)canvas.texture.width, (float)-canvas.texture.height }, (Vector2) { 0, 0 }, WHITE);        
+            EndMode2D();
+            DrawFPS(0, 0);
         EndDrawing();
     }
 

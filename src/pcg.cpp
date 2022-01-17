@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <utility>
 #include <tuple>
+#include <cstdlib>
 #include "utils.h"
 
 #define EXPORT __declspec(dllexport)
@@ -34,31 +35,25 @@ EXPORT void define_biomes(DATA& data)
 
     int width = data.WIDTH;
     Rect Surface = data.HORIZONTAL_AREAS[1].first;
+    Rect Cavern = data.HORIZONTAL_AREAS[3].first;
 
-    PixelArray v1;
-    v1.add(0, Surface.y);
-    v1.add(250, Surface.y);
-    v1.add(250, Surface.y + Surface.h);
-    v1.add(0, Surface.y + Surface.h);
-    Polygon ocean_left = Polygon(v1);
+    PixelArray ocean_left;
+    PixelsOfRect(0, Surface.y, 250, Surface.h, ocean_left); 
 
-    PixelArray v2;
-    v2.add(width - 250, Surface.y);
-    v2.add(width, Surface.y);
-    v2.add(width, Surface.y + Surface.h);
-    v2.add(width - 250, Surface.y + Surface.h);
-    Polygon ocean_right = Polygon(v2);
+    PixelArray ocean_right;
+    PixelsOfRect(width - 250, Surface.y, 250, Surface.h, ocean_right);
 
-    PixelArray v0;
-    v0.add(100, 100);
-    v0.add(800, 200);
-    v0.add(750, 500);
-    v0.add(50, 150);
-    Polygon ice_biome = Polygon(v0);
+    PixelArray jungle;
+    int jungle_width = 600;
+    int jungle_x = (rand() % (int)(width - (2 * 250) - (jungle_width / 2))) + 250 + jungle_width / 2;
+    for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
+    {
+        PixelsAroundRect(jungle_x, i, jungle_width, 2, jungle);
+    }
 
-    data.BIOMES.push_back(ocean_left);
-    data.BIOMES.push_back(ocean_right);
-    data.BIOMES.push_back(ice_biome);
+    data.BIOMES.push_back(std::move(ocean_left));
+    data.BIOMES.push_back(std::move(ocean_right));
+    data.BIOMES.push_back(std::move(jungle));
 }
 
 }
