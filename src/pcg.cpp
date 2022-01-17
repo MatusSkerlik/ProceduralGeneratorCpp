@@ -3,6 +3,7 @@
 #include <tuple>
 #include <cstdlib>
 #include "utils.h"
+#include "csp.h"
 
 #define EXPORT __declspec(dllexport)
 
