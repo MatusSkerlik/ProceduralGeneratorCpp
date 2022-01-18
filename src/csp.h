@@ -1,6 +1,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 #include <stdexcept>
 
 template <typename V, typename D>
@@ -12,24 +13,43 @@ class Constraint
 };
 
 template <typename V, typename D>
+class BinaryConstraint: public Constraint<V, D>
+{
+    public:
+        std::pair<V, V> pair;
+};
+
+int constraint_hash;
+template<typename V, typename D>
+struct ConstraintHash
+{
+    size_t operator()(const Constraint<V, D>& constraint) const {
+        constraint_hash += 1;
+        return constraint_hash;
+    };
+};
+
+template <typename V, typename D>
 class CSPSolver {
 
     public:
         std::unordered_set<V> variables;
         std::unordered_map<V, std::unordered_set<D>> domains;
-        std::unordered_map<V, std::unordered_set<Constraint<V, D>>> constraints;
+        std::vector<std::unordered_map<V, std::unordered_set<D>>> inferences;
+        std::unordered_map<V, std::vector<std::reference_wrapper<Constraint<V, D>>>> constraints;
 
-        CSPSolver(std::unordered_set<V>& _variables, std::unordered_map<V, D>& _domains)
+        CSPSolver(std::unordered_set<V>& _variables, std::unordered_map<V, std::unordered_set<D>>& _domains)
         {
             variables = _variables;
             domains = _domains;
+            inferences.push_back(_domains); 
         };
 
         void add_constraint(Constraint<V, D>& constraint) 
         {
             for (auto& variable: constraint.variables)
                 if (variables.find(variable) != variables.end())
-                    constraints[variable] = constraint;
+                    constraints[variable].push_back(constraint);
                 else
                     throw std::domain_error("variable not in CSP.");
         };
@@ -37,7 +57,7 @@ class CSPSolver {
         bool consistent(V& variable, std::unordered_map<V, D> assignment)
         {
             for (auto& constraint: constraints[variable])
-                if (!constraint.satisfied(assignment))
+                if (!constraint.get().satisfied(assignment))
                     return false;
             return true; 
         };
