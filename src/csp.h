@@ -25,14 +25,12 @@ class CSPSolver {
     public:
         std::unordered_set<V> variables;
         std::unordered_map<V, std::unordered_set<D>> domains;
-        std::vector<std::unordered_map<V, std::unordered_set<D>>> inferences;
         std::unordered_map<V, std::vector<std::reference_wrapper<Constraint<V, D>>>> constraints;
 
         CSPSolver(std::unordered_set<V>& _variables, std::unordered_map<V, std::unordered_set<D>>& _domains)
         {
             variables = _variables;
             domains = _domains;
-            inferences.push_back(_domains); 
         };
 
         void add_constraint(Constraint<V, D>& constraint) 
@@ -62,17 +60,20 @@ class CSPSolver {
                 if (assignment.find(variable) == assignment.end())
                     unassigned.push_back(variable);
 
-            // TODO heuristics
-            // TODO inference 
-            auto first = unassigned[0];
-            for (auto& value: domains[first]) // TODO domain order heuristics
+           
+            auto variable = unassigned[0];
+            for (auto& value: domains[variable]) 
             {
                 auto local_assignment = assignment;
-                local_assignment[first] = value;
-
-                if (consistent(first, local_assignment))
-                    return backtracking_search(local_assignment);
+                local_assignment[variable] = value;
+                if (consistent(variable, local_assignment))
+                {
+                    auto result = backtracking_search(local_assignment);
+                    if (result.size() != 0)
+                        return result;
+                }
             }
-            throw std::logic_error("No solution available.");
+            
+            return {};
         };
 };
