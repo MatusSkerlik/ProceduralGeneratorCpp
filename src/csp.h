@@ -19,16 +19,6 @@ class BinaryConstraint: public Constraint<V, D>
         std::pair<V, V> pair;
 };
 
-int constraint_hash;
-template<typename V, typename D>
-struct ConstraintHash
-{
-    size_t operator()(const Constraint<V, D>& constraint) const {
-        constraint_hash += 1;
-        return constraint_hash;
-    };
-};
-
 template <typename V, typename D>
 class CSPSolver {
 
@@ -54,7 +44,7 @@ class CSPSolver {
                     throw std::domain_error("variable not in CSP.");
         };
 
-        bool consistent(V& variable, std::unordered_map<V, D> assignment)
+        bool consistent(V& variable, std::unordered_map<V, D>& assignment)
         {
             for (auto& constraint: constraints[variable])
                 if (!constraint.get().satisfied(assignment))
@@ -73,6 +63,7 @@ class CSPSolver {
                     unassigned.push_back(variable);
 
             // TODO heuristics
+            // TODO inference 
             auto first = unassigned[0];
             for (auto& value: domains[first]) // TODO domain order heuristics
             {
@@ -81,7 +72,6 @@ class CSPSolver {
 
                 if (consistent(first, local_assignment))
                     return backtracking_search(local_assignment);
-
             }
             throw std::logic_error("No solution available.");
         };

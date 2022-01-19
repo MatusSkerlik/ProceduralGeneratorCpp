@@ -221,8 +221,10 @@ class DATA {
     public:
         int WIDTH;
         int HEIGHT;
+
         std::vector<std::pair<Rect, RGB>> HORIZONTAL_AREAS;
         std::vector<PixelArray> BIOMES;
+        std::vector<PixelArray> MINI_BIOMES;
 
         DATA(){
             printf("DATA();\n");
@@ -230,7 +232,8 @@ class DATA {
 
         void clear()
         {
-            BIOMES.clear();
             HORIZONTAL_AREAS.clear();
+            BIOMES.clear();
+            MINI_BIOMES.clear();
         };
 };

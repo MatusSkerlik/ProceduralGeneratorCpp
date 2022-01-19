@@ -11,6 +11,7 @@ typedef void (*PCG_FUNC)(DATA&);
 HMODULE module;
 PCG_FUNC define_horizontal;
 PCG_FUNC define_biomes;
+PCG_FUNC define_minibiomes;
 
 void DrawHorizontal(DATA& data)
 {
@@ -33,34 +34,47 @@ void DrawBiomes(DATA& data)
             DrawPixel(p.x, p.y, RED);
         }
     }
-}
+};
+
+void DrawMiniBiomes(DATA& data)
+{
+    for (auto& biome: data.MINI_BIOMES)
+    {
+        for (auto& p: biome)
+        {
+            DrawPixel(p.x, p.y, GREEN);
+        }
+    }
+};
 
 void LoadPCG()
 {
     module = LoadLibrary("pcg.dll");
     define_horizontal = (PCG_FUNC) GetProcAddress(module, "define_horizontal");
     define_biomes = (PCG_FUNC) GetProcAddress(module, "define_biomes");
-}
+    define_minibiomes = (PCG_FUNC) GetProcAddress(module, "define_minibiomes");
+};
 
 void ReloadPCG()
 {
     if (module) FreeLibrary(module);
     system("make pcg");
     LoadPCG();
-}
+};
 
 void PCGGen(DATA* data)
 {
     data->clear();
     define_horizontal(*data);
     define_biomes(*data);
-}
+    define_minibiomes(*data);
+};
 
 void PCGGenThread(DATA* data)
 {
     auto worker = std::thread(std::bind(PCGGen, data));
     worker.join();
-}
+};
 
 int main(void)
 {
@@ -93,6 +107,7 @@ int main(void)
     BeginTextureMode(canvas);
         DrawHorizontal(data);
         DrawBiomes(data);
+        DrawMiniBiomes(data);
     EndTextureMode();
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
@@ -144,6 +159,7 @@ int main(void)
             BeginTextureMode(canvas);
                 DrawHorizontal(data);
                 DrawBiomes(data);
+                DrawMiniBiomes(data);
             EndTextureMode();
         }
 

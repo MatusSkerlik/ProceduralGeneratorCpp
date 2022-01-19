@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <iterator>
 #include <unordered_set>
 #include <unordered_map>
 #include <utility>
@@ -27,16 +28,23 @@ class DistanceConstraint: public BinaryConstraint<V, D>
         {
             this->variables = constraint.variables;
             this->distance = constraint.distance;
+            this->pair = constraint.pair;
         };
 
         virtual bool satisfied(std::unordered_map<V, D>& assignment) const override
         {
-            auto value0 = assignment[this->pair.first];
-            auto value1 = assignment[this->pair.second];
-            
+            if (assignment.find(this->pair.first) == assignment.end())
+                return true;
+            if (assignment.find(this->pair.second) == assignment.end())
+                return true;
+
+            auto value0 = assignment.at(this->pair.first);
+            auto value1 = assignment.at(this->pair.second);
+
             if (abs(value0 - value1) < distance)
                 return false;
-            return true;
+            else
+                return true;
         };
 };
 
@@ -111,5 +119,50 @@ EXPORT void define_biomes(DATA& data)
     data.BIOMES.push_back(std::move(jungle));
     data.BIOMES.push_back(std::move(ice));
 } 
+
+EXPORT void define_minibiomes(DATA& data)
+{
+    int width = data.WIDTH;
+    int ocean_width = 250;
+    int hills_count = 8;
+    int hole_count = 8;
+    int hills_width = 80;
+    int hole_width = 60;
+    Rect Surface = data.HORIZONTAL_AREAS[1].first;
+
+    // DEFINE SURFACE MINIBIOMES
+    std::unordered_set<std::string> variables;
+    for (auto i = 0; i < hills_count; ++i) { variables.insert("hill" + std::to_string(i)); }
+    for (auto i = 0; i < hole_count; ++i) { variables.insert("hole" + std::to_string(i)); }
+    std::unordered_set<int> domain;
+    for (auto i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
+    std::unordered_map<std::string, std::unordered_set<int>> domains;
+    for (auto& var: variables) { domains[var] = domain; }
+    std::vector<DistanceConstraint<std::string, int>> constraints;
+    for (auto it0 = variables.begin(); it0 != variables.end(); it0++)
+    {
+        for (auto it1 = std::next(it0); it1 != variables.end(); it1++)
+        {
+            DistanceConstraint<std::string, int> constraint {make_pair(*it0, *it1), 100 + std::max(hills_width, hole_width)};
+            constraints.push_back(std::move(constraint));
+        }
+    }
+    CSPSolver<std::string, int> solver {variables, domains};
+    for (auto& constraint: constraints) { solver.add_constraint(constraint); }
+    auto result = solver.backtracking_search({});
+    for (auto& var: variables)
+    {
+        PixelArray arr;
+        auto x = result[var];
+        for (int i = Surface.y; i < Surface.y + Surface.h; i++)
+        {
+            if (var.find("hole") != std::string::npos)
+                PixelsAroundRect(x, i, hole_width, 2, arr);
+            else
+                PixelsAroundRect(x, i, hills_width, 2, arr);
+        }
+        data.MINI_BIOMES.push_back(std::move(arr));
+    }
+}
 
 }
