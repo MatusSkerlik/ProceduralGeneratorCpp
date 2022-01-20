@@ -1,4 +1,5 @@
 nnoremap <F5> :!start python serve.py src/main.cpp src/utils.h -x "make main" -r main.exe<CR> :!start python serve.py src/pcg.cpp src/utils.h src/csp.h -x "make pcg"<CR>
 nnoremap <C-s> :w<CR>
+nmap <F1> <plug>(YCMHover)
 
 cd C:\Users\matis-PC\Desktop\ProceduralGeneratorCpp
