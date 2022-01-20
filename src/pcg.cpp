@@ -9,6 +9,7 @@
 #include <algorithm>
 #include "utils.h"
 #include "csp.h"
+#include "spline.h"
 
 #define EXPORT __declspec(dllexport)
 
@@ -46,6 +47,60 @@ class DistanceConstraint: public BinaryConstraint<V, D>
             else
                 return true;
         };
+};
+
+void create_hill(const Rect& rect, PixelArray& arr)
+{
+   double sx = rect.x;
+   double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
+   double ex = rect.x + rect.w;
+   double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3));
+   double ey = sy + (-8 + rand() % 17);
+   double cy = std::min(sy, ey) - (20 + rand() % 40);
+
+   std::vector<double> X = {sx, cx, ex};
+   std::vector<double> Y = {sy, cy, ey};
+
+   tk::spline s;
+   s.set_boundary(tk::spline::first_deriv, -1, tk::spline::first_deriv, 1);
+   s.set_boundary(tk::spline::second_deriv, 0, tk::spline::second_deriv, 0);
+   s.set_points(X, Y, tk::spline::cspline);
+
+   for (int x = rect.x; x < rect.x + rect.w; ++x)
+   {
+       int _y = (int) s(x);
+       for (int y = _y; y < rect.y + rect.h; ++y)
+       {
+            arr.add(x, y);
+       }
+   }
+};
+
+void create_hole(const Rect& rect, PixelArray& arr)
+{
+   double sx = rect.x;
+   double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
+   double ex = rect.x + rect.w;
+   double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3));
+   double ey = sy + (-8 + rand() % 17);
+   double cy = std::max(sy, ey) + (8 + rand() % (int)(rect.y + rect.h - std::max(sy, ey) - 8));
+
+   std::vector<double> X = {sx, cx, ex};
+   std::vector<double> Y = {sy, cy, ey};
+
+   tk::spline s;
+   s.set_boundary(tk::spline::first_deriv, -1, tk::spline::first_deriv, 1);
+   s.set_boundary(tk::spline::second_deriv, 0, tk::spline::second_deriv, 0);
+   s.set_points(X, Y, tk::spline::cspline);
+
+   for (int x = rect.x; x < rect.x + rect.w; ++x)
+   {
+       int _y = (int) s(x);
+       for (int y = _y; y < rect.y + rect.h; ++y)
+       {
+            arr.add(x, y);
+       }
+   }
 };
 
 
@@ -124,15 +179,15 @@ EXPORT void define_minibiomes(DATA& data)
 {
     int width = data.WIDTH;
     int ocean_width = 250;
-    int hills_count = 8;
-    int hole_count = 8;
-    int hills_width = 80;
+    int hill_count = 8;
+    int hole_count = 5;
+    int hill_width = 80;
     int hole_width = 60;
     Rect Surface = data.HORIZONTAL_AREAS[1].first;
 
     // DEFINE SURFACE MINIBIOMES
     std::unordered_set<std::string> variables;
-    for (auto i = 0; i < hills_count; ++i) { variables.insert("hill" + std::to_string(i)); }
+    for (auto i = 0; i < hill_count; ++i) { variables.insert("hill" + std::to_string(i)); }
     for (auto i = 0; i < hole_count; ++i) { variables.insert("hole" + std::to_string(i)); }
     std::unordered_set<int> domain;
     for (auto i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
@@ -143,7 +198,8 @@ EXPORT void define_minibiomes(DATA& data)
     {
         for (auto it1 = std::next(it0); it1 != variables.end(); it1++)
         {
-            DistanceConstraint<std::string, int> constraint {make_pair(*it0, *it1), 100 + std::max(hills_width, hole_width)};
+            int min_d = 20 + rand() % 80;
+            DistanceConstraint<std::string, int> constraint {make_pair(*it0, *it1), min_d + std::max(hill_width, hole_width)};
             constraints.push_back(std::move(constraint));
         }
     }
@@ -154,12 +210,15 @@ EXPORT void define_minibiomes(DATA& data)
     {
         PixelArray arr;
         auto x = result[var];
-        for (int i = Surface.y; i < Surface.y + Surface.h; i++)
+        if (var.find("hole") != std::string::npos)
         {
-            if (var.find("hole") != std::string::npos)
-                PixelsAroundRect(x, i, hole_width, 2, arr);
-            else
-                PixelsAroundRect(x, i, hills_width, 2, arr);
+            Rect hole ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
+            create_hole(hole, arr);
+        }
+        else 
+        {
+            Rect hill ((int) x - hill_width/ 2, Surface.y, hill_width, Surface.h);
+            create_hill(hill, arr);
         }
         data.MINI_BIOMES.push_back(std::move(arr));
     }
