@@ -55,10 +55,14 @@ void LoadPCG()
     define_minibiomes = (PCG_FUNC) GetProcAddress(module, "define_minibiomes");
 };
 
-void ReloadPCG()
+void FreePCG()
 {
     if (module) FreeLibrary(module);
-    system("make pcg");
+}
+
+void ReloadPCG()
+{
+    FreePCG();
     LoadPCG();
 };
 
@@ -103,6 +107,7 @@ int main(void)
 
     LoadPCG();
     PCGGen(&data);
+    FreePCG();
 
     BeginTextureMode(canvas);
         DrawHorizontal(data);
@@ -156,6 +161,7 @@ int main(void)
         {
             ReloadPCG();
             PCGGenThread(&data);
+            FreePCG();
             BeginTextureMode(canvas);
                 DrawHorizontal(data);
                 DrawBiomes(data);
