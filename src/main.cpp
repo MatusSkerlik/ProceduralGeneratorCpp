@@ -13,6 +13,8 @@ PCG_FUNC define_horizontal;
 PCG_FUNC define_biomes;
 PCG_FUNC define_minibiomes;
 
+#define DIRT (Color){151, 107, 75, 255}
+
 void DrawHorizontal(DATA& data)
 {
     for (auto& area: data.HORIZONTAL_AREAS)
@@ -31,7 +33,23 @@ void DrawBiomes(DATA& data)
     {
         for (auto& p: biome)
         {
-            DrawPixel(p.x, p.y, RED);
+            switch (biome.type)
+            {
+                case Biomes::TUNDRA:
+                    DrawPixel(p.x, p.y, (Color){255, 255, 255, 64});
+                    break;
+                case Biomes::JUNGLE:
+                    DrawPixel(p.x, p.y, (Color){92, 68, 73, 64});
+                    break;
+                case Biomes::FOREST:
+                    DrawPixel(p.x, p.y, (Color){0, 255, 0, 64});
+                    break;
+                case Biomes::OCEAN:
+                    DrawPixel(p.x, p.y, (Color){0, 0, 255, 64});
+                    break;
+                default:
+                    break;
+            };
         }
     }
 };
@@ -42,7 +60,20 @@ void DrawMiniBiomes(DATA& data)
     {
         for (auto& p: biome)
         {
-            DrawPixel(p.x, p.y, GREEN);
+            switch (biome.type)
+            {
+                case MiniBiomes::HILL:
+                    DrawPixel(p.x, p.y, RED);
+                    break;
+                case MiniBiomes::HOLE:
+                    DrawPixel(p.x, p.y, BLUE);
+                    break;
+                case MiniBiomes::FLOATING_ISLAND:
+                    DrawPixel(p.x, p.y, YELLOW);
+                    break;
+                default:
+                    break;
+            };
         }
     }
 };

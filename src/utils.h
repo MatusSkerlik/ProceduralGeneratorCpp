@@ -88,6 +88,30 @@ class PixelArray
         };
 };
 
+namespace Biomes {
+
+    enum Type: unsigned short { JUNGLE, TUNDRA, FOREST, OCEAN };
+
+    class Biome: public PixelArray {
+        public:
+            Type type;
+            Biome(){};
+            Biome(Type _t): type{_t} {};
+    };
+};
+
+namespace MiniBiomes {
+    
+    enum Type: unsigned short { HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
+    
+    class Biome: public PixelArray {
+        public:
+            Type type;
+            Biome(){};
+            Biome(Type _t): type{_t} {};
+    };
+};
+
 class Polygon
 {
     int pnpoly(int nvert, float *vertx, float *verty, float testx, float testy)
@@ -137,7 +161,7 @@ class Polygon
                 vertices.push_back(pixel); 
             }; 
             bbox = v.bbox(); 
-            pixels = std::move(_pixels()); 
+            pixels = _pixels(); 
         };
 };
 
@@ -223,8 +247,8 @@ class DATA {
         int HEIGHT;
 
         std::vector<std::pair<Rect, RGB>> HORIZONTAL_AREAS;
-        std::vector<PixelArray> BIOMES;
-        std::vector<PixelArray> MINI_BIOMES;
+        std::vector<Biomes::Biome> BIOMES;
+        std::vector<MiniBiomes::Biome> MINI_BIOMES;
 
         DATA(){
             printf("DATA();\n");

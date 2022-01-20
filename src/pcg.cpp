@@ -13,6 +13,11 @@
 
 #define EXPORT __declspec(dllexport)
 
+bool StrContains(std::string str, std::string pattern)
+{
+    return str.find(pattern) != std::string::npos;
+}
+
 template <typename V, typename D>
 class DistanceConstraint: public BinaryConstraint<V, D>
 {
@@ -49,7 +54,7 @@ class DistanceConstraint: public BinaryConstraint<V, D>
         };
 };
 
-void create_hill(const Rect& rect, PixelArray& arr)
+void CreateHill(const Rect& rect, PixelArray& arr)
 {
    double sx = rect.x;
    double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
@@ -76,21 +81,21 @@ void create_hill(const Rect& rect, PixelArray& arr)
    }
 };
 
-void create_hole(const Rect& rect, PixelArray& arr)
+void CreateHole(const Rect& rect, PixelArray& arr)
 {
    double sx = rect.x;
    double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
    double ex = rect.x + rect.w;
    double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3));
    double ey = sy + (-8 + rand() % 17);
-   double cy = std::max(sy, ey) + (8 + rand() % (int)(rect.y + rect.h - std::max(sy, ey) - 8));
+   double cy = std::min(sy, ey) + (8 + rand() % (int)(rect.y + rect.h - std::max(sy, ey) - 8));
 
    std::vector<double> X = {sx, cx, ex};
    std::vector<double> Y = {sy, cy, ey};
 
    tk::spline s;
-   s.set_boundary(tk::spline::first_deriv, -1, tk::spline::first_deriv, 1);
-   s.set_boundary(tk::spline::second_deriv, 0, tk::spline::second_deriv, 0);
+   s.set_boundary(tk::spline::first_deriv, 0, tk::spline::first_deriv, 0);
+   s.set_boundary(tk::spline::second_deriv, 0.1, tk::spline::second_deriv, 0.1);
    s.set_points(X, Y, tk::spline::cspline);
 
    for (int x = rect.x; x < rect.x + rect.w; ++x)
@@ -138,10 +143,10 @@ EXPORT void define_biomes(DATA& data)
     Rect Surface = data.HORIZONTAL_AREAS[1].first;
     Rect Cavern = data.HORIZONTAL_AREAS[3].first;
 
-    PixelArray ocean_left;
+    Biomes::Biome ocean_left {Biomes::OCEAN};
     PixelsOfRect(0, Surface.y, ocean_width, Surface.h, ocean_left); 
 
-    PixelArray ocean_right;
+    Biomes::Biome ocean_right {Biomes::OCEAN};
     PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, ocean_right);
 
     // USE CSP TO FIND LOCATIONS FOR BIOMES
@@ -156,13 +161,13 @@ EXPORT void define_biomes(DATA& data)
     int jungle_x = result["jungle"];  
     int ice_x = result["ice"];
 
-    PixelArray jungle;
+    Biomes::Biome jungle {Biomes::JUNGLE};
     for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
     {
         PixelsAroundRect(jungle_x, i, jungle_width, 2, jungle);
     }
 
-    PixelArray ice;
+    Biomes::Biome ice {Biomes::TUNDRA};
     for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
     {
         PixelsAroundRect(ice_x, i, ice_width, 2, ice);
@@ -178,17 +183,23 @@ EXPORT void define_biomes(DATA& data)
 EXPORT void define_minibiomes(DATA& data)
 {
     int width = data.WIDTH;
-    int ocean_width = 250;
+    
     int hill_count = 8;
     int hole_count = 5;
+    int floating_island_count = 4;
+
+    int ocean_width = 250;
     int hill_width = 80;
     int hole_width = 60;
+    int floating_island_width = 120;
+
     Rect Surface = data.HORIZONTAL_AREAS[1].first;
 
     // DEFINE SURFACE MINIBIOMES
     std::unordered_set<std::string> variables;
     for (auto i = 0; i < hill_count; ++i) { variables.insert("hill" + std::to_string(i)); }
     for (auto i = 0; i < hole_count; ++i) { variables.insert("hole" + std::to_string(i)); }
+    for (auto i = 0; i < floating_island_count; ++i) { variables.insert("island" + std::to_string(i)); }
     std::unordered_set<int> domain;
     for (auto i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
     std::unordered_map<std::string, std::unordered_set<int>> domains;
@@ -198,9 +209,27 @@ EXPORT void define_minibiomes(DATA& data)
     {
         for (auto it1 = std::next(it0); it1 != variables.end(); it1++)
         {
-            int min_d = 20 + rand() % 80;
-            DistanceConstraint<std::string, int> constraint {make_pair(*it0, *it1), min_d + std::max(hill_width, hole_width)};
-            constraints.push_back(std::move(constraint));
+            auto& var0 = *it0;
+            auto& var1 = *it1;
+
+            if ((StrContains(var0, "hole") || StrContains(var0, "hill")) && (StrContains(var1, "hole") || StrContains(var1, "hill")))
+            {
+                int min_d = 20 + rand() % 80;
+                DistanceConstraint<std::string, int> constraint {make_pair(var0, var1), min_d + std::max(hill_width, hole_width)};
+                constraints.push_back(std::move(constraint));
+            } 
+            else if ((StrContains(var0, "hill") && StrContains(var1, "island")) || (StrContains(var0, "island") && StrContains(var1, "hill")))
+            {
+                int min_d = 20 + rand() % 80;
+                DistanceConstraint<std::string, int> constraint {make_pair(var0, var1), min_d + std::max(hill_width, floating_island_width)};
+                constraints.push_back(std::move(constraint));
+            }
+            else if (StrContains(var0, "island") && StrContains(var1, "island"))
+            {
+                int min_d = 20 + rand() % 80;
+                DistanceConstraint<std::string, int> constraint {make_pair(var0, var1), min_d + floating_island_width};
+                constraints.push_back(std::move(constraint));
+            }
         }
     }
     CSPSolver<std::string, int> solver {variables, domains};
@@ -208,20 +237,30 @@ EXPORT void define_minibiomes(DATA& data)
     auto result = solver.backtracking_search({});
     for (auto& var: variables)
     {
-        PixelArray arr;
+        MiniBiomes::Biome arr;
         auto x = result[var];
         if (var.find("hole") != std::string::npos)
         {
             Rect hole ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
-            create_hole(hole, arr);
+            CreateHole(hole, arr);
+            arr.type = MiniBiomes::HOLE;
         }
-        else 
+        else if (var.find("hill") != std::string::npos) 
         {
             Rect hill ((int) x - hill_width/ 2, Surface.y, hill_width, Surface.h);
-            create_hill(hill, arr);
+            CreateHill(hill, arr);
+            arr.type = MiniBiomes::HILL;
+        }
+        else
+        {
+            Rect island ((int) x - floating_island_width / 2, Surface.y, floating_island_width, 50);
+            PixelsAroundRect(island.x, island.y, island.w, island.h, arr);
+            arr.type = MiniBiomes::FLOATING_ISLAND;
         }
         data.MINI_BIOMES.push_back(std::move(arr));
     }
+
+
 }
 
 }
