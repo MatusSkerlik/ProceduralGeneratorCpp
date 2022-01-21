@@ -6,30 +6,55 @@
 #include "utils.h"
 
 
-typedef void (*PCG_FUNC)(DATA&);
+typedef void (*PCG_FUNC)(Map&);
 
 HMODULE module;
 PCG_FUNC define_horizontal;
 PCG_FUNC define_biomes;
 PCG_FUNC define_minibiomes;
 
-#define DIRT (Color){151, 107, 75, 255}
+#define DIRT            (Color){151, 107, 75, 255}
 
-void DrawHorizontal(DATA& data)
+#define C_SPACE           (Color){51, 102, 153, 255}
+#define C_SURFACE         (Color){155, 209, 255, 255}
+#define C_UNDERGROUND     (Color){151, 107, 75, 255}
+#define C_CAVERN          (Color){128, 128, 128, 255}
+#define C_HELL            (Color){0, 0, 0, 255}
+
+
+void DrawHorizontal(Map& map)
 {
-    for (auto& area: data.HORIZONTAL_AREAS)
+    for (auto& area: map.HorizontalAreas())
     {
-        auto rect = std::get<0>(area);
-        auto color = std::get<1>(area);
-        DrawRectangle(rect.x, rect.y, rect.w, rect.h, (Color) {
-            color.r, color.g, color.b, 255
-        });
+        Rect rect = area->bbox();
+        Color color;
+        switch (area->type)
+        {
+            case HorizontalAreas::SPACE:
+                color = C_SPACE;
+                break;
+            case HorizontalAreas::SURFACE:
+                color = C_SURFACE;
+                break;
+            case HorizontalAreas::UNDERGROUND:
+                color = C_UNDERGROUND;
+                break;
+            case HorizontalAreas::CAVERN:
+                color = C_CAVERN;
+                break;
+            case HorizontalAreas::HELL:
+                color = C_HELL;
+                break;
+            default:
+                break;
+        }
+        DrawRectangle(rect.x, rect.y, rect.w, rect.h, color);
     }
 };
 
-void DrawBiomes(DATA& data)
+void DrawBiomes(Map& map)
 {
-    for (auto& biome: data.BIOMES)
+    for (auto& biome: map.Biomes())
     {
         for (auto& p: biome)
         {
@@ -54,9 +79,9 @@ void DrawBiomes(DATA& data)
     }
 };
 
-void DrawMiniBiomes(DATA& data)
+void DrawMiniBiomes(Map& map)
 {
-    for (auto& biome: data.MINI_BIOMES)
+    for (auto& biome: map.MiniBiomes())
     {
         for (auto& p: biome)
         {
@@ -97,17 +122,17 @@ void ReloadPCG()
     LoadPCG();
 };
 
-void PCGGen(DATA* data)
+void PCGGen(Map* map)
 {
-    data->clear();
-    define_horizontal(*data);
-    define_biomes(*data);
-    define_minibiomes(*data);
+    map->clear();
+    define_horizontal(*map);
+    define_biomes(*map);
+    define_minibiomes(*map);
 };
 
-void PCGGenThread(DATA* data)
+void PCGGenThread(Map* map)
 {
-    auto worker = std::thread(std::bind(PCGGen, data));
+    auto worker = std::thread(std::bind(PCGGen, map));
     worker.join();
 };
 
@@ -127,9 +152,9 @@ int main(void)
     camera.rotation = 0;
     camera.zoom = (float) width / map_width;
 
-    DATA data;
-    data.WIDTH = map_width;
-    data.HEIGHT = map_height;
+    Map map;
+    map.width = map_width;
+    map.height = map_height;
 
     InitWindow(width, height, "Procedural Terrain Generator");
     SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
@@ -137,13 +162,13 @@ int main(void)
     RenderTexture canvas = LoadRenderTexture(map_width, map_height);
 
     LoadPCG();
-    PCGGen(&data);
+    PCGGen(&map);
     FreePCG();
 
     BeginTextureMode(canvas);
-        DrawHorizontal(data);
-        DrawBiomes(data);
-        DrawMiniBiomes(data);
+        DrawHorizontal(map);
+        DrawBiomes(map);
+        DrawMiniBiomes(map);
     EndTextureMode();
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
@@ -191,12 +216,12 @@ int main(void)
         if (IsKeyDown(KEY_R))
         {
             ReloadPCG();
-            PCGGenThread(&data);
+            PCGGenThread(&map);
             FreePCG();
             BeginTextureMode(canvas);
-                DrawHorizontal(data);
-                DrawBiomes(data);
-                DrawMiniBiomes(data);
+                DrawHorizontal(map);
+                DrawBiomes(map);
+                DrawMiniBiomes(map);
             EndTextureMode();
         }
 

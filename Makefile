@@ -1,6 +1,6 @@
 CC=g++
 SRC=src
-CFLAGS=-std=c++14 -Wall -Iinclude -Isrc
+CFLAGS=-std=c++14 -Wall -Iinclude -Isrc -O3
 LDFLAGS=-lraylib -lopengl32 -lgdi32 -lwinmm
 
 pcg:

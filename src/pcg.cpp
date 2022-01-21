@@ -112,36 +112,36 @@ void CreateHole(const Rect& rect, PixelArray& arr)
 extern "C"
 {
 
-EXPORT void define_horizontal(DATA& data)
+EXPORT void define_horizontal(Map& map)
 {
     printf("define horizontal\n");
 
-    int width = data.WIDTH;
-    int height = data.HEIGHT;
+    int width = map.width;
+    int height = map.height;
 
     Rect Space = Rect(0, 0, width, (int) 2 * height / 20);
     Rect Surface = Rect(0, Space.y + Space.h, width, (int) 4 * height / 20);
     Rect Underground = Rect(0, Surface.y + Surface.h, width, (int) 4 * height / 20);
     Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 7 * height / 20);
     Rect Hell = Rect(0, Cavern.y + Cavern.h, width, (int) 3 * height / 20);
-
-    data.HORIZONTAL_AREAS.push_back(std::make_pair(Space, C_SPACE));
-    data.HORIZONTAL_AREAS.push_back(std::make_pair(Surface, C_SURFACE));
-    data.HORIZONTAL_AREAS.push_back(std::make_pair(Underground, C_UNDERGROUND));
-    data.HORIZONTAL_AREAS.push_back(std::make_pair(Cavern, C_CAVERN));
-    data.HORIZONTAL_AREAS.push_back(std::make_pair(Hell, C_HELL));
+    
+    map.Space = HorizontalAreas::FromRect(Space, HorizontalAreas::SPACE);
+    map.Surface = HorizontalAreas::FromRect(Surface, HorizontalAreas::SURFACE);
+    map.Underground = HorizontalAreas::FromRect(Underground, HorizontalAreas::UNDERGROUND);
+    map.Cavern = HorizontalAreas::FromRect(Cavern, HorizontalAreas::CAVERN);
+    map.Hell = HorizontalAreas::FromRect(Hell, HorizontalAreas::HELL);
 }
 
-EXPORT void define_biomes(DATA& data)
+EXPORT void define_biomes(Map& map)
 {
     printf("define biomes\n");
 
-    int width = data.WIDTH;
+    int width = map.width;
     int ocean_width = 250;
-    int ice_width = 600;
+    int tundra_width = 600;
     int jungle_width = 600;
-    Rect Surface = data.HORIZONTAL_AREAS[1].first;
-    Rect Cavern = data.HORIZONTAL_AREAS[3].first;
+    Rect Surface = map.Surface.bbox();
+    Rect Cavern = map.Cavern.bbox();
 
     Biomes::Biome ocean_left {Biomes::OCEAN};
     PixelsOfRect(0, Surface.y, ocean_width, Surface.h, ocean_left); 
@@ -149,17 +149,17 @@ EXPORT void define_biomes(DATA& data)
     Biomes::Biome ocean_right {Biomes::OCEAN};
     PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, ocean_right);
 
-    // USE CSP TO FIND LOCATIONS FOR BIOMES
-    std::unordered_set<std::string> variables {"jungle", "ice"};
+    // USE CSP TO FIND LOCATIONS FOR Biomes
+    std::unordered_set<std::string> variables {"jungle", "tundra"};
     std::unordered_set<int> domain;
     for (int i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
-    std::unordered_map<std::string, std::unordered_set<int>> domains {{"jungle", domain}, {"ice", domain}};
-    DistanceConstraint<std::string, int> c0 {std::make_pair("jungle", "ice"), std::max(ice_width, jungle_width)};
+    std::unordered_map<std::string, std::unordered_set<int>> domains {{"jungle", domain}, {"tundra", domain}};
+    DistanceConstraint<std::string, int> c0 {std::make_pair("jungle", "tundra"), std::max(tundra_width, jungle_width)};
     CSPSolver<std::string, int> solver {variables, domains};
     solver.add_constraint(c0);
     auto result = solver.backtracking_search({}); 
     int jungle_x = result["jungle"];  
-    int ice_x = result["ice"];
+    int tundra_x = result["tundra"];
 
     Biomes::Biome jungle {Biomes::JUNGLE};
     for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
@@ -167,25 +167,24 @@ EXPORT void define_biomes(DATA& data)
         PixelsAroundRect(jungle_x, i, jungle_width, 2, jungle);
     }
 
-    Biomes::Biome ice {Biomes::TUNDRA};
+    Biomes::Biome tundra {Biomes::TUNDRA};
     for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
     {
-        PixelsAroundRect(ice_x, i, ice_width, 2, ice);
+        PixelsAroundRect(tundra_x, i, tundra_width, 2, tundra);
     }
 
-
-    data.BIOMES.push_back(std::move(ocean_left));
-    data.BIOMES.push_back(std::move(ocean_right));
-    data.BIOMES.push_back(std::move(jungle));
-    data.BIOMES.push_back(std::move(ice));
+    map.Biomes(std::move(ocean_left));
+    map.Biomes(std::move(ocean_right));
+    map.Biomes(std::move(jungle));
+    map.Biomes(std::move(tundra));
 } 
 
-EXPORT void define_minibiomes(DATA& data)
+EXPORT void define_minibiomes(Map& map)
 {
-    int width = data.WIDTH;
+    int width = map.width;
     
     int hill_count = 8;
-    int hole_count = 5;
+    int hole_count = 7;
     int floating_island_count = 4;
 
     int ocean_width = 250;
@@ -193,9 +192,9 @@ EXPORT void define_minibiomes(DATA& data)
     int hole_width = 60;
     int floating_island_width = 120;
 
-    Rect Surface = data.HORIZONTAL_AREAS[1].first;
+    Rect Surface = map.Surface.bbox(); 
 
-    // DEFINE SURFACE MINIBIOMES
+    // DEFINE SURFACE MINIBiomes
     std::unordered_set<std::string> variables;
     for (auto i = 0; i < hill_count; ++i) { variables.insert("hill" + std::to_string(i)); }
     for (auto i = 0; i < hole_count; ++i) { variables.insert("hole" + std::to_string(i)); }
@@ -257,7 +256,7 @@ EXPORT void define_minibiomes(DATA& data)
             PixelsAroundRect(island.x, island.y, island.w, island.h, arr);
             arr.type = MiniBiomes::FLOATING_ISLAND;
         }
-        data.MINI_BIOMES.push_back(std::move(arr));
+        map.MiniBiomes(std::move(arr));
     }
 
 

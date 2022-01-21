@@ -26,32 +26,56 @@ struct PixelHash
     size_t operator()(const Pixel& pixel) const { return pixel.x * 1000 + pixel.y; };    
 };
 
-typedef struct RGB {
-    RGB(unsigned char _r, unsigned char _g, unsigned char _b): r{_r}, g{_g}, b{_b} {};
-    unsigned char r;
-    unsigned char g;
-    unsigned char b;
-} RGB;
+class Vector2D
+{
+    public:
+        float x;
+        float y;
+        
+        Vector2D(float _x, float _y): x{_x}, y{_y} {};
+        Vector2D(int _x, int _y): x{(float)_x}, y{(float)_y} {};
+        
+        Vector2D add(const Vector2D& to)
+        {
+            return Vector2D(x + to.x, y + to.y);
+        }
 
-#define C_RED           RGB(255, 0, 0)
-#define C_GREED         RGB(0, 255, 0)
-#define C_BLUE          RGB(0, 0, 255)
+        Vector2D sub(const Vector2D& to)
+        {
+            return Vector2D(x - to.x, y - to.y);
+        }
 
-#define C_SPACE         RGB(51, 102, 153)
-#define C_SURFACE       RGB(155,209, 255)
-#define C_UNDERGROUND   RGB(151, 107, 75)
-#define C_CAVERN        RGB(128, 128, 128)
-#define C_HELL          RGB(0, 0, 0)
+        float dist(const Vector2D& to)
+        {
+            return sqrt(pow(x - to.x, 2) + pow(y - to.y, 2));    
+        }
+    
+};
 
 class PixelArray
 {
-    private:
+    protected:
         std::unordered_set<Pixel, PixelHash> _set_pixels;
         std::vector<Pixel> _vector_pixels;
     public:
-        PixelArray(): _set_pixels{0} {
+        PixelArray()
+        {
             printf("PixelArray();\n");
         };
+        
+        PixelArray(const PixelArray& arr)
+        {
+            printf("PixelArray&();\n");
+            _set_pixels = arr._set_pixels;
+            _vector_pixels = arr._vector_pixels;
+        }
+
+        PixelArray(PixelArray&& arr)
+        {
+            printf("PixelArray&&();\n");
+            _set_pixels = std::move(arr._set_pixels);
+            _vector_pixels = std::move(arr._vector_pixels);
+        }
 
         auto operator[](int index){ return _vector_pixels[index]; };
         auto begin() { return this->_vector_pixels.begin(); };
@@ -88,107 +112,100 @@ class PixelArray
         };
 };
 
+namespace HorizontalAreas
+{
+    enum Type: unsigned short { SPACE, SURFACE, UNDERGROUND, CAVERN, HELL };
+
+    class Biome: public PixelArray
+    {
+        public:
+            Type type;
+            Biome(): PixelArray() {};
+            Biome(Type _t): PixelArray(), type{_t} {};
+
+            Biome(const Biome& biome): PixelArray(biome)
+            {
+                printf("HorizontalAreas::Biome&();\n");
+                type = biome.type;
+            }
+
+            Biome(Biome&& biome): PixelArray(std::move(biome))
+            {
+                printf("HorizontalAreas::Biome&&();\n");
+                type = biome.type;
+            }
+
+            Biome& operator=(Biome&& arr)
+            {
+                printf("HorizontalAreas::operator=&&\n");
+                _set_pixels = std::move(arr._set_pixels);
+                _vector_pixels = std::move(arr._vector_pixels);
+                type = arr.type;
+                return *this;
+            }
+    };
+
+    Biome FromRect(const Rect& rect, Type type)
+    {
+        Biome biome {type};
+        for (int x = rect.x; x < rect.x + rect.w; ++x)
+            for (int y = rect.y; y < rect.y + rect.h; ++y)
+                biome.add(x, y);
+        return biome;
+    }
+}
+
 namespace Biomes {
 
     enum Type: unsigned short { JUNGLE, TUNDRA, FOREST, OCEAN };
 
-    class Biome: public PixelArray {
+    class Biome: public PixelArray 
+    {
         public:
             Type type;
-            Biome(){};
-            Biome(Type _t): type{_t} {};
+            Biome(): PixelArray() {};
+            Biome(Type _t): PixelArray(), type{_t} {};
+    
+            Biome(const Biome& biome): PixelArray(biome)
+            {
+                printf("Biomes::Biome&();\n");
+                type = biome.type;
+            }
+
+            Biome(Biome&& biome): PixelArray(std::move(biome))
+            {
+                printf("Biomes::Biome&&();\n");
+                type = biome.type;
+            }
     };
+
+
 };
 
 namespace MiniBiomes {
     
     enum Type: unsigned short { HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
     
-    class Biome: public PixelArray {
+    class Biome: public PixelArray 
+    {
         public:
             Type type;
-            Biome(){};
-            Biome(Type _t): type{_t} {};
+            Biome(): PixelArray() {};
+            Biome(Type _t): PixelArray(), type{_t} {};
+
+            Biome(const Biome& biome): PixelArray(biome)
+            {
+                printf("MiniBiomes::Biome&();\n");
+                type = biome.type;
+            }
+
+            Biome(Biome&& biome): PixelArray(std::move(biome))
+            {
+                printf("MiniBiomes::Biome&&();\n");
+                type = biome.type;
+            }
+
     };
-};
-
-class Polygon
-{
-    int pnpoly(int nvert, float *vertx, float *verty, float testx, float testy)
-    {
-      int i, j, c = 0;
-      for (i = 0, j = nvert-1; i < nvert; j = i++) {
-        if ( ((verty[i]>testy) != (verty[j]>testy)) &&
-         (testx < (vertx[j]-vertx[i]) * (testy-verty[i]) / (verty[j]-verty[i]) + vertx[i]) )
-           c = !c;
-      }
-      return c;
-    }
-
-    private:
-        PixelArray _pixels(void)
-        {
-            PixelArray p;
-            int size = vertices.size();
-            float vertx[size];
-            float verty[size];
-
-            int i = 0;
-            for (auto pixel: vertices)
-            {
-                vertx[i] = static_cast<float>(pixel.x);
-                verty[i] = static_cast<float>(pixel.y);
-                i++;
-            }
-
-            for (int x = bbox.x; x < bbox.x + bbox.w; x++)
-            {
-                for (int y = bbox.y; y < bbox.y + bbox.h; y++)
-                {
-                    if (pnpoly(size, vertx, verty, (float) x, (float) y)) p.add(x, y);
-                }
-            }
-            return p;
-        }
-
-    public:
-        std::vector<Pixel> vertices;
-        PixelArray pixels;
-        Rect bbox;
-        Polygon(PixelArray& v) { 
-            printf("Polygon();\n");
-            for (auto& pixel: v) { 
-                vertices.push_back(pixel); 
-            }; 
-            bbox = v.bbox(); 
-            pixels = _pixels(); 
-        };
-};
-
-class Vector2D
-{
-    public:
-        float x;
-        float y;
-        
-        Vector2D(float _x, float _y): x{_x}, y{_y} {};
-        Vector2D(int _x, int _y): x{(float)_x}, y{(float)_y} {};
-        
-        Vector2D add(const Vector2D& to)
-        {
-            return Vector2D(x + to.x, y + to.y);
-        }
-
-        Vector2D sub(const Vector2D& to)
-        {
-            return Vector2D(x - to.x, y - to.y);
-        }
-
-        float dist(const Vector2D& to)
-        {
-            return sqrt(pow(x - to.x, 2) + pow(y - to.y, 2));    
-        }
-    
 };
 
 void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
@@ -241,23 +258,52 @@ void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
    }
 }
 
-class DATA {
+class Map {
     public:
-        int WIDTH;
-        int HEIGHT;
+        int width;
+        int height;
+        
+        HorizontalAreas::Biome Space;
+        HorizontalAreas::Biome Surface;
+        HorizontalAreas::Biome Underground;
+        HorizontalAreas::Biome Cavern;
+        HorizontalAreas::Biome Hell;
 
-        std::vector<std::pair<Rect, RGB>> HORIZONTAL_AREAS;
-        std::vector<Biomes::Biome> BIOMES;
-        std::vector<MiniBiomes::Biome> MINI_BIOMES;
+        std::vector<Biomes::Biome> _biomes;
+        std::vector<MiniBiomes::Biome> _mini_biomes;
 
-        DATA(){
-            printf("DATA();\n");
+        Map(){
+            printf("Map();\n");
         };
+
+        std::vector<HorizontalAreas::Biome*> HorizontalAreas()
+        {
+            return {&Space, &Surface, &Underground, &Cavern, &Hell};
+        }
+
+        std::vector<Biomes::Biome>& Biomes()
+        {
+            return _biomes;
+        }
+
+        void Biomes(Biomes::Biome&& biome)
+        {
+            _biomes.push_back(std::move(biome));
+        }
+
+        std::vector<MiniBiomes::Biome>& MiniBiomes()
+        {
+            return _mini_biomes;
+        }
+
+        void MiniBiomes(MiniBiomes::Biome&& minibiome)
+        {
+            _mini_biomes.push_back(std::move(minibiome));
+        }
 
         void clear()
         {
-            HORIZONTAL_AREAS.clear();
-            BIOMES.clear();
-            MINI_BIOMES.clear();
+            _biomes.clear();
+            _mini_biomes.clear();
         };
 };
