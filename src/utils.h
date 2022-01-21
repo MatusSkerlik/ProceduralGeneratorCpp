@@ -123,7 +123,7 @@ PixelArray FloodFill(const Rect& rect, int x, int y, const PixelArray& illegal)
     auto y2 = rect.y + rect.h;
     while (queue.size() > 0)
     {
-        Pixel p = queue[queue.size() - 1];
+        auto p = queue[queue.size() - 1];
         queue.pop_back();
         if (!illegal.contains(p))
         {
@@ -138,12 +138,11 @@ PixelArray FloodFill(const Rect& rect, int x, int y, const PixelArray& illegal)
                 queue.push_back(p0);
             if (p.x < x2 && !result.contains(p1))
                 queue.push_back(p1);
-            if (p.y > rect.y && ! result.contains(p2))
+            if (p.y > rect.y && !result.contains(p2))
                 queue.push_back(p2);
             if (p.y < y2 && !result.contains(p3))
                 queue.push_back(p3);
         }
-
     }
 
     return result;

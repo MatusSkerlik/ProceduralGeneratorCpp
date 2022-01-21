@@ -179,7 +179,7 @@ EXPORT void define_biomes(Map& map)
     for (auto pixel: jungle) { forest_mask.add(pixel); }
     for (auto pixel: tundra) { forest_mask.add(pixel); }
     
-    auto forest = Biomes::Biome(FloodFill(Rect(0, Surface.y, width, Hell.y - Surface.y), 0, Surface.y + Surface.h + 1, forest_mask), Biomes::FOREST);
+    auto forest = Biomes::Biome(FloodFill(Rect(0, Surface.y + 1, width, Hell.y - Surface.y), 0, Surface.y + Surface.h + 1, forest_mask), Biomes::FOREST);
 
     map.Biomes(std::move(forest));
     map.Biomes(std::move(ocean_left));
