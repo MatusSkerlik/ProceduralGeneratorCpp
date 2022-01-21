@@ -18,6 +18,7 @@ typedef struct Rect {
 typedef struct Pixel {
     int x;
     int y;
+    Pixel(int _x, int _y): x{_x}, y{_y} {};
     const bool operator==(const Pixel& p) const { return x == p.x && y == p.y; }
 } Pixel;
 
@@ -77,10 +78,11 @@ class PixelArray
             _vector_pixels = std::move(arr._vector_pixels);
         }
 
-        auto operator[](int index){ return _vector_pixels[index]; };
-        auto begin() { return this->_vector_pixels.begin(); };
-        auto end() { return this->_vector_pixels.end(); };
-        auto size() { return this->_vector_pixels.size(); }
+        auto operator[](int index) const { return _vector_pixels[index]; };
+        auto begin() const { return this->_vector_pixels.begin(); };
+        auto end() const { return this->_vector_pixels.end(); };
+        auto size() const { return this->_vector_pixels.size(); }
+        auto contains(Pixel pixel) const { return this->_set_pixels.find(pixel) != this->_set_pixels.end(); };
 
         void add(Pixel pixel) {
 
@@ -90,7 +92,7 @@ class PixelArray
         };
         void add(int x, int y) { add((Pixel){x, y}); };
 
-        Rect bbox()
+        Rect bbox() const
         {
             if (_vector_pixels.size() == 0)
                 return (Rect){0, 0, 0, 0};
@@ -111,6 +113,41 @@ class PixelArray
             return (Rect){minx, miny, maxx - minx, maxy - miny};
         };
 };
+
+PixelArray FloodFill(const Rect& rect, int x, int y, const PixelArray& illegal)
+{
+    PixelArray result;
+    std::vector<Pixel> queue {Pixel(x, y)};
+    
+    auto x2 = rect.x + rect.w;
+    auto y2 = rect.y + rect.h;
+    while (queue.size() > 0)
+    {
+        Pixel p = queue[queue.size() - 1];
+        queue.pop_back();
+        if (!illegal.contains(p))
+        {
+            result.add(p);
+            
+            Pixel p0 = {p.x - 1, p.y};
+            Pixel p1 = {p.x + 1, p.y};
+            Pixel p2 = {p.x, p.y - 1};
+            Pixel p3 = {p.x, p.y + 1};
+
+            if (p.x > rect.x && !result.contains(p0))
+                queue.push_back(p0);
+            if (p.x < x2 && !result.contains(p1))
+                queue.push_back(p1);
+            if (p.y > rect.y && ! result.contains(p2))
+                queue.push_back(p2);
+            if (p.y < y2 && !result.contains(p3))
+                queue.push_back(p3);
+        }
+
+    }
+
+    return result;
+}
 
 namespace HorizontalAreas
 {
@@ -176,6 +213,11 @@ namespace Biomes {
             {
                 printf("Biomes::Biome&&();\n");
                 type = biome.type;
+            }
+
+            Biome(PixelArray&& arr, Type _type): PixelArray(std::move(arr))
+            {
+                type = _type;
             }
     };
 

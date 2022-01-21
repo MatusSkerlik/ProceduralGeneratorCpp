@@ -141,7 +141,7 @@ EXPORT void define_biomes(Map& map)
     int tundra_width = 600;
     int jungle_width = 600;
     Rect Surface = map.Surface.bbox();
-    Rect Cavern = map.Cavern.bbox();
+    Rect Hell = map.Hell.bbox();
 
     Biomes::Biome ocean_left {Biomes::OCEAN};
     PixelsOfRect(0, Surface.y, ocean_width, Surface.h, ocean_left); 
@@ -162,17 +162,26 @@ EXPORT void define_biomes(Map& map)
     int tundra_x = result["tundra"];
 
     Biomes::Biome jungle {Biomes::JUNGLE};
-    for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
+    for (int i = Surface.y; i < Hell.y - 100; i++)
     {
         PixelsAroundRect(jungle_x, i, jungle_width, 2, jungle);
     }
 
     Biomes::Biome tundra {Biomes::TUNDRA};
-    for (int i = Surface.y; i < Cavern.y + Cavern.h; i++)
+    for (int i = Surface.y; i < Hell.y - 200; i++)
     {
         PixelsAroundRect(tundra_x, i, tundra_width, 2, tundra);
     }
 
+    PixelArray forest_mask;
+    for (auto pixel: ocean_left) { forest_mask.add(pixel); }
+    for (auto pixel: ocean_right) { forest_mask.add(pixel); }
+    for (auto pixel: jungle) { forest_mask.add(pixel); }
+    for (auto pixel: tundra) { forest_mask.add(pixel); }
+    
+    auto forest = Biomes::Biome(FloodFill(Rect(0, Surface.y, width, Hell.y - Surface.y), 0, Surface.y + Surface.h + 1, forest_mask), Biomes::FOREST);
+
+    map.Biomes(std::move(forest));
     map.Biomes(std::move(ocean_left));
     map.Biomes(std::move(ocean_right));
     map.Biomes(std::move(jungle));
