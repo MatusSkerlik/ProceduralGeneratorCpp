@@ -46,10 +46,7 @@ class DistanceConstraint: public Constraint<V, D>
             auto value0 = assignment.at(v0);
             auto value1 = assignment.at(v1);
 
-            if (abs(value0 - value1) < distance)
-                return false;
-            else
-                return true;
+            return (abs(value0 - value1) >= distance);
         };
 };
 
@@ -57,31 +54,32 @@ template <typename V, typename D>
 class CoordsConstraint: public Constraint<V, D>
 {
     protected:
-        V x0, y0, x1, y1;
+        V v0, v1;
         D w0, h0, w1, h1;
+        D width;
     public:
-        CoordsConstraint(V _x0, V _y0, V _x1, V _y1, D _w0, D _h0, D _w1, D _h1): 
-            x0{_x0}, y0{_y0}, x1{_x1}, y1{_y1}, 
-            w0{_w0}, h0{_h0}, w1{_w1}, h1{_h1} 
+        CoordsConstraint(V _v0, V _v1, D _w0, D _h0, D _w1, D _h1, D _width): 
+            v0{_v0}, v1{_v1},
+            w0{_w0}, h0{_h0}, w1{_w1}, h1{_h1},
+            width{_width}
         {
-           this->variables = {x0, y0, x1, y1};
+           this->variables = {v0, v1};
         }
 
         virtual bool satisfied(const std::unordered_map<V, D>& assignment) const override
         {
-            if (assignment.find(x0) == assignment.end())
+            if (assignment.find(v0) == assignment.end())
                 return true;
-            if (assignment.find(y0) == assignment.end())
+            if (assignment.find(v1) == assignment.end())
                 return true;
-            if (assignment.find(x1) == assignment.end())
-                return true;
-            if (assignment.find(y1) == assignment.end())
-                return true;
+            auto _v0 = assignment.at(v0);
+            auto _v1 = assignment.at(v1);
 
-            auto _x0 = assignment.at(x0);
-            auto _x1 = assignment.at(x1);
-            auto _y0 = assignment.at(y0);
-            auto _y1 = assignment.at(y1);
+
+            auto _x0 = _v0 % width;
+            auto _y0 = (int) _v0 / width;
+            auto _x1 = _v1 % width;
+            auto _y1 = (int)_v1 / width;
 
             if ((_x0 <= _x1) && (_x0 + w0) >= (_x1 + w1) && (_y0 <= _y1) && (_y0 + h0) >= (_y1 + h1))
                 return false;
@@ -96,44 +94,6 @@ class CoordsConstraint: public Constraint<V, D>
             //TODO entitlement
             
             return true;
-        };
-};
-
-template <typename V, typename D>
-class InsidePixelArrayConstraint: public Constraint<V, D>
-{
-    protected:
-        V x, y;
-        D w, h;
-        PixelArray& arr;
-
-    public:
-        InsidePixelArrayConstraint(V _x, V _y, D _w, D _h, PixelArray& _arr): 
-            x{_x}, y{_y}, 
-            w{_w}, h{_h}, 
-            arr{_arr} 
-        {
-            this->variables = {x, y};
-        };
-
-        virtual bool satisfied(const std::unordered_map<V, D>& assignment) const override
-        {
-            if (assignment.find(x) == assignment.end())
-                return true;
-            if (assignment.find(y) == assignment.end())
-                return true;
-            
-            auto _x = assignment.at(x);
-            auto _y = assignment.at(y);
-
-            Pixel p0 = {_x, _y};
-            Pixel p1 = {_x + w, _y};
-            Pixel p2 = {_x, _y + h};
-            Pixel p3 = {_x + w, _y + h};
-            
-            if (arr.contains(p0) && arr.contains(p1) && arr.contains(p2) && arr.contains(p3))
-                return true;
-            return false;
         };
 };
 
@@ -233,7 +193,7 @@ EXPORT void define_biomes(Map& map)
 
     int width = map.width;
     int ocean_width = 250;
-    int tundra_width = 600;
+    int tundra_width = 200;
     int jungle_width = 600;
     Rect Surface = map.Surface->bbox();
     Rect Hell = map.Hell->bbox();
@@ -265,7 +225,7 @@ EXPORT void define_biomes(Map& map)
     auto tundra = map.Biome(Biomes::TUNDRA);
     for (int i = Surface.y; i < Hell.y; i++)
     {
-        PixelsAroundRect(tundra_x - i , i, tundra_width, 2, *tundra);
+        PixelsAroundRect(tundra_x - i, i, tundra_width, 2, *tundra);
     }
 
     PixelArray all;
@@ -376,55 +336,47 @@ EXPORT void define_minibiomes(Map& map)
     variables = {};
     domain = {};
     domains = {};
-    constraints = {};
-    std::vector<std::string> variables_x;
-    std::vector<std::string> variables_y;
-    std::unordered_set<int> domain_x;
-    std::unordered_set<int> domain_y;
     std::vector<CoordsConstraint<std::string, int>> constraints_coords;
-    std::vector<InsidePixelArrayConstraint<std::string, int>> constraints_index;
     //DEFINE UNDERGROUND MINIBIOMES
-    int cabin_count = 10;
-    int cabin_width = 60;
-    int cabin_height = 30;
+    int cabin_count = 20;
+    int cabin_width = 80;
+    int cabin_height = 40;
 
     Biomes::Biome* tundra = map.GetBiome(Biomes::TUNDRA);
     assert(tundra != nullptr);  
-
     Rect tundra_rect = tundra->bbox();
-    for (auto i = 0; i < cabin_count; ++i) { variables_x.push_back("cabin" + std::to_string(i) + "_x"); }
-    for (auto i = 0; i < cabin_count; ++i) { variables_y.push_back("cabin" + std::to_string(i) + "_y"); }
-    for (auto i = 0; i < cabin_count; ++i) { variables.insert(variables_x[i]); variables.insert(variables_y[i]); }
-    for (auto x = tundra_rect.x; x < tundra_rect.x + tundra_rect.w; x += 200) { domain_x.insert(x); } 
-    for (auto y = tundra_rect.y; y < tundra_rect.y + tundra_rect.h; y += 200) { domain_y.insert(y); } 
-    for (auto var: variables_x) { domains[var] = domain_x; } 
-    for (auto var: variables_y) { domains[var] = domain_y; } 
+
+    for (auto i = 0; i < cabin_count; ++i) { variables.insert("cabin" + std::to_string(i)); }
+    for (auto v = 0; v < tundra_rect.w * tundra_rect.h; v += 1) { 
+        auto x = (int) tundra_rect.x + (v % tundra_rect.w);
+        auto y = (int) tundra_rect.y + (v / tundra_rect.w);
+        if (tundra->contains((Pixel){x, y}))
+            domain.insert(v);
+    } 
+    for (auto var: variables) { domains[var] = domain; } 
     solver = {variables, domains}; 
-    for (auto i = 0; i < cabin_count; ++i) 
+
+    int o = 1;
+    for (auto i = variables.begin(); i != variables.end(); ++i) 
     {
-        auto var_x = variables_x[i];
-        auto var_y = variables_y[i];
+        auto var0 = *i;
 
-        InsidePixelArrayConstraint<std::string, int> c {var_x, var_y, cabin_width, cabin_height, *tundra};
-        constraints_index.push_back(std::move(c));
-
-        for (auto j = i + 1; j < cabin_count; ++j) 
+        for (auto j = std::next(variables.begin(), o); j != variables.end(); ++j) 
         {
-            auto var_x1 = variables_x[j];
-            auto var_y1 = variables_y[j];
-            CoordsConstraint<std::string, int> c0 {var_x, var_y, var_x1, var_y1, cabin_width, cabin_height, cabin_width, cabin_height};
+            auto var1 = *j;
+            CoordsConstraint<std::string, int> c0 {var0, var1, cabin_width, cabin_height, cabin_width, cabin_height, tundra_rect.w};
             constraints_coords.push_back(std::move(c0));
         }
+        o += 1;
     }
-
-    //for (auto& c: constraints_index) { solver.add_constraint(c); }
     for (auto& c: constraints_coords) { solver.add_constraint(c); }
 
     result = solver.backtracking_search({});
-    for (auto i = 0; i < cabin_count; ++i) 
+    for (auto& var: variables) 
     {
-        auto x = result[variables_x[i]];
-        auto y = result[variables_y[i]];
+        auto v = result[var];
+        auto x = (int) tundra_rect.x + (cabin_width / 2) + (v % tundra_rect.w); 
+        auto y = (int) tundra_rect.y + (v / tundra_rect.w);
 
         auto cabin = map.MiniBiome(MiniBiomes::CABIN); 
         PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, *cabin);
