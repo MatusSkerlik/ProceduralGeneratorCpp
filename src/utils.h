@@ -1,3 +1,4 @@
+#include <memory>
 #include <stdio.h>
 #include <cmath>
 #include <unordered_set>
@@ -57,7 +58,6 @@ class PixelArray
 {
     protected:
         std::unordered_set<Pixel, PixelHash> _set_pixels;
-        std::vector<Pixel> _vector_pixels;
     public:
         PixelArray()
         {
@@ -68,33 +68,33 @@ class PixelArray
         {
             printf("PixelArray&();\n");
             _set_pixels = arr._set_pixels;
-            _vector_pixels = arr._vector_pixels;
         }
 
         PixelArray(PixelArray&& arr)
         {
             printf("PixelArray&&();\n");
             _set_pixels = std::move(arr._set_pixels);
-            _vector_pixels = std::move(arr._vector_pixels);
         }
 
-        auto operator[](int index) const { return _vector_pixels[index]; };
-        auto begin() const { return this->_vector_pixels.begin(); };
-        auto end() const { return this->_vector_pixels.end(); };
-        auto size() const { return this->_vector_pixels.size(); }
+        auto begin() const { return this->_set_pixels.begin(); };
+        auto end() const { return this->_set_pixels.end(); };
+        auto size() const { return this->_set_pixels.size(); }
         auto contains(Pixel pixel) const { return this->_set_pixels.find(pixel) != this->_set_pixels.end(); };
 
         void add(Pixel pixel) {
-
-            auto result = _set_pixels.insert(pixel);
-            if (result.second)
-                _vector_pixels.push_back(pixel);
+            _set_pixels.insert(pixel);
         };
         void add(int x, int y) { add((Pixel){x, y}); };
 
+        void remove(Pixel pixel) { _set_pixels.erase(pixel); };
+
+        void remove(int x, int y) { remove((Pixel){x, y}); };
+
+        void clear() { _set_pixels.clear(); };
+
         Rect bbox() const
         {
-            if (_vector_pixels.size() == 0)
+            if (_set_pixels.size() == 0)
                 return (Rect){0, 0, 0, 0};
 
             int minx = std::numeric_limits<int>::max();
@@ -102,7 +102,7 @@ class PixelArray
             int maxx = std::numeric_limits<int>::min();
             int maxy = std::numeric_limits<int>::min();
 
-            for (auto pixel: _vector_pixels)
+            for (auto pixel: _set_pixels)
             {
                 if (pixel.x < minx) minx = pixel.x;
                 if (pixel.x > maxx) maxx = pixel.x;
@@ -114,38 +114,11 @@ class PixelArray
         };
 };
 
-PixelArray FloodFill(const Rect& rect, int x, int y, const PixelArray& illegal)
+void FillWithRect(const Rect& rect, PixelArray& arr)
 {
-    PixelArray result;
-    std::vector<Pixel> queue {Pixel(x, y)};
-    
-    auto x2 = rect.x + rect.w;
-    auto y2 = rect.y + rect.h;
-    while (queue.size() > 0)
-    {
-        auto p = queue[queue.size() - 1];
-        queue.pop_back();
-        if (!illegal.contains(p))
-        {
-            result.add(p);
-            
-            Pixel p0 = {p.x - 1, p.y};
-            Pixel p1 = {p.x + 1, p.y};
-            Pixel p2 = {p.x, p.y - 1};
-            Pixel p3 = {p.x, p.y + 1};
-
-            if (p.x > rect.x && !result.contains(p0))
-                queue.push_back(p0);
-            if (p.x < x2 && !result.contains(p1))
-                queue.push_back(p1);
-            if (p.y > rect.y && !result.contains(p2))
-                queue.push_back(p2);
-            if (p.y < y2 && !result.contains(p3))
-                queue.push_back(p3);
-        }
-    }
-
-    return result;
+    for (int x = rect.x; x < rect.x + rect.w; ++x)
+        for (int y = rect.y; y < rect.y + rect.h; ++y)
+            arr.add(x, y);
 }
 
 namespace HorizontalAreas
@@ -158,37 +131,8 @@ namespace HorizontalAreas
             Type type;
             Biome(): PixelArray() {};
             Biome(Type _t): PixelArray(), type{_t} {};
-
-            Biome(const Biome& biome): PixelArray(biome)
-            {
-                printf("HorizontalAreas::Biome&();\n");
-                type = biome.type;
-            }
-
-            Biome(Biome&& biome): PixelArray(std::move(biome))
-            {
-                printf("HorizontalAreas::Biome&&();\n");
-                type = biome.type;
-            }
-
-            Biome& operator=(Biome&& arr)
-            {
-                printf("HorizontalAreas::operator=&&\n");
-                _set_pixels = std::move(arr._set_pixels);
-                _vector_pixels = std::move(arr._vector_pixels);
-                type = arr.type;
-                return *this;
-            }
     };
 
-    Biome FromRect(const Rect& rect, Type type)
-    {
-        Biome biome {type};
-        for (int x = rect.x; x < rect.x + rect.w; ++x)
-            for (int y = rect.y; y < rect.y + rect.h; ++y)
-                biome.add(x, y);
-        return biome;
-    }
 }
 
 namespace Biomes {
@@ -201,24 +145,7 @@ namespace Biomes {
             Type type;
             Biome(): PixelArray() {};
             Biome(Type _t): PixelArray(), type{_t} {};
-    
-            Biome(const Biome& biome): PixelArray(biome)
-            {
-                printf("Biomes::Biome&();\n");
-                type = biome.type;
-            }
-
-            Biome(Biome&& biome): PixelArray(std::move(biome))
-            {
-                printf("Biomes::Biome&&();\n");
-                type = biome.type;
-            }
-
-            Biome(PixelArray&& arr, Type _type): PixelArray(std::move(arr))
-            {
-                type = _type;
-            }
-    };
+   };
 
 
 };
@@ -233,21 +160,108 @@ namespace MiniBiomes {
             Type type;
             Biome(): PixelArray() {};
             Biome(Type _t): PixelArray(), type{_t} {};
-
-            Biome(const Biome& biome): PixelArray(biome)
-            {
-                printf("MiniBiomes::Biome&();\n");
-                type = biome.type;
-            }
-
-            Biome(Biome&& biome): PixelArray(std::move(biome))
-            {
-                printf("MiniBiomes::Biome&&();\n");
-                type = biome.type;
-            }
-
-    };
+   };
 };
+
+class Map {
+    public:
+        int width;
+        int height;
+        
+        std::unique_ptr<HorizontalAreas::Biome> Space;
+        std::unique_ptr<HorizontalAreas::Biome> Surface;
+        std::unique_ptr<HorizontalAreas::Biome> Underground;
+        std::unique_ptr<HorizontalAreas::Biome> Cavern;
+        std::unique_ptr<HorizontalAreas::Biome> Hell;
+
+        std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
+        std::vector<std::unique_ptr<MiniBiomes::Biome>> _mini_biomes;
+
+        Map(){
+            printf("Map();\n");
+
+            Space.reset(new HorizontalAreas::Biome(HorizontalAreas::SPACE));
+            Surface.reset(new HorizontalAreas::Biome(HorizontalAreas::SURFACE));
+            Underground.reset(new HorizontalAreas::Biome(HorizontalAreas::UNDERGROUND));
+            Cavern.reset(new HorizontalAreas::Biome(HorizontalAreas::CAVERN));
+            Hell.reset(new HorizontalAreas::Biome(HorizontalAreas::HELL));
+        };
+
+        std::vector<HorizontalAreas::Biome*> HorizontalAreas()
+        {
+            return {Space.get(), Surface.get(), Underground.get(), Cavern.get(), Hell.get()};
+        }
+
+        auto Biome(Biomes::Type type)
+        {
+            _biomes.emplace_back(new Biomes::Biome(type));
+            return _biomes[_biomes.size() - 1].get();
+        }
+
+        Biomes::Biome* GetBiome(Biomes::Type type)
+        {
+            for (auto& biome: _biomes)
+            {
+                if (biome->type == type)
+                    return biome.get();
+            }
+            return nullptr;
+        }
+
+        auto& Biomes()
+        {
+            return _biomes;
+        }
+
+        auto& MiniBiomes()
+        {
+            return _mini_biomes;
+        }
+
+        auto MiniBiome(MiniBiomes::Type type)
+        {
+            _mini_biomes.emplace_back(new MiniBiomes::Biome(type));
+            return _mini_biomes[_mini_biomes.size() - 1].get();
+        }
+
+        void clear()
+        {
+            for (auto& area: HorizontalAreas())
+                area->clear();
+            _biomes.clear();
+            _mini_biomes.clear();
+
+        };
+};
+
+void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
+{
+    std::vector<Pixel> queue {Pixel(x, y)};
+    
+    while (queue.size() > 0)
+    {
+        auto p = queue[queue.size() - 1];
+        queue.pop_back();
+        if (pixels.contains(p))
+        {
+            fill.add(p);
+            
+            Pixel p0 = {p.x - 1, p.y};
+            Pixel p1 = {p.x + 1, p.y};
+            Pixel p2 = {p.x, p.y - 1};
+            Pixel p3 = {p.x, p.y + 1};
+
+            if (!fill.contains(p0))
+                queue.push_back(p0);
+            if (!fill.contains(p1))
+                queue.push_back(p1);
+            if (!fill.contains(p2))
+                queue.push_back(p2);
+            if (!fill.contains(p3))
+                queue.push_back(p3);
+        }
+    }
+}
 
 void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
 {
@@ -298,53 +312,3 @@ void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
         }
    }
 }
-
-class Map {
-    public:
-        int width;
-        int height;
-        
-        HorizontalAreas::Biome Space;
-        HorizontalAreas::Biome Surface;
-        HorizontalAreas::Biome Underground;
-        HorizontalAreas::Biome Cavern;
-        HorizontalAreas::Biome Hell;
-
-        std::vector<Biomes::Biome> _biomes;
-        std::vector<MiniBiomes::Biome> _mini_biomes;
-
-        Map(){
-            printf("Map();\n");
-        };
-
-        std::vector<HorizontalAreas::Biome*> HorizontalAreas()
-        {
-            return {&Space, &Surface, &Underground, &Cavern, &Hell};
-        }
-
-        std::vector<Biomes::Biome>& Biomes()
-        {
-            return _biomes;
-        }
-
-        void Biomes(Biomes::Biome&& biome)
-        {
-            _biomes.push_back(std::move(biome));
-        }
-
-        std::vector<MiniBiomes::Biome>& MiniBiomes()
-        {
-            return _mini_biomes;
-        }
-
-        void MiniBiomes(MiniBiomes::Biome&& minibiome)
-        {
-            _mini_biomes.push_back(std::move(minibiome));
-        }
-
-        void clear()
-        {
-            _biomes.clear();
-            _mini_biomes.clear();
-        };
-};

@@ -56,9 +56,9 @@ void DrawBiomes(Map& map)
 {
     for (auto& biome: map.Biomes())
     {
-        for (auto& p: biome)
+        for (auto& p: *biome)
         {
-            switch (biome.type)
+            switch (biome->type)
             {
                 case Biomes::TUNDRA:
                     DrawPixel(p.x, p.y, (Color){255, 255, 255, 64});
@@ -83,9 +83,9 @@ void DrawMiniBiomes(Map& map)
 {
     for (auto& biome: map.MiniBiomes())
     {
-        for (auto& p: biome)
+        for (auto& p: *biome)
         {
-            switch (biome.type)
+            switch (biome->type)
             {
                 case MiniBiomes::HILL:
                     DrawPixel(p.x, p.y, RED);
@@ -95,6 +95,9 @@ void DrawMiniBiomes(Map& map)
                     break;
                 case MiniBiomes::FLOATING_ISLAND:
                     DrawPixel(p.x, p.y, YELLOW);
+                    break;
+                case MiniBiomes::CABIN:
+                    DrawPixel(p.x, p.y, ORANGE);
                     break;
                 default:
                     break;
