@@ -2,25 +2,26 @@
 #include <thread>
 #include <functional>
 #include "libloaderapi.h"
-#include "raylib.h"
 #include "utils.h"
 
+#include "raylib.h"
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
 
-typedef void (*PCG_FUNC)(Map&);
 
-HMODULE module;
-PCG_FUNC define_horizontal;
-PCG_FUNC define_biomes;
-PCG_FUNC define_minibiomes;
+
+/************************************************
+* 
+* DRAW LOGIC
+*
+*************************************************/
 
 #define DIRT            (Color){151, 107, 75, 255}
-
 #define C_SPACE           (Color){51, 102, 153, 255}
 #define C_SURFACE         (Color){155, 209, 255, 255}
 #define C_UNDERGROUND     (Color){151, 107, 75, 255}
 #define C_CAVERN          (Color){128, 128, 128, 255}
 #define C_HELL            (Color){0, 0, 0, 255}
-
 
 void DrawHorizontal(Map& map)
 {
@@ -106,12 +107,30 @@ void DrawMiniBiomes(Map& map)
     }
 };
 
-void LoadPCG()
+/**************************************************
+*
+* PROCEDURAL GENERATION LOGIC 
+*
+**************************************************/
+typedef void (*PCG_FUNC)(Map&);
+
+HMODULE module;
+PCG_FUNC define_horizontal;
+PCG_FUNC define_biomes;
+PCG_FUNC define_minibiomes;
+
+
+bool LoadPCG()
 {
     module = LoadLibrary("pcg.dll");
-    define_horizontal = (PCG_FUNC) GetProcAddress(module, "define_horizontal");
-    define_biomes = (PCG_FUNC) GetProcAddress(module, "define_biomes");
-    define_minibiomes = (PCG_FUNC) GetProcAddress(module, "define_minibiomes");
+    if (module)
+    {
+        define_horizontal = (PCG_FUNC) GetProcAddress(module, "define_horizontal");
+        define_biomes = (PCG_FUNC) GetProcAddress(module, "define_biomes");
+        define_minibiomes = (PCG_FUNC) GetProcAddress(module, "define_minibiomes");
+        return true;
+    }
+    return false;
 };
 
 void FreePCG()
@@ -119,11 +138,16 @@ void FreePCG()
     if (module) FreeLibrary(module);
 }
 
-void ReloadPCG()
+bool ReloadPCG()
 {
     FreePCG();
-    LoadPCG();
+    return LoadPCG();
 };
+
+bool PCGLoaded()
+{
+    return module != NULL;
+}
 
 void PCGGen(Map* map)
 {
@@ -131,12 +155,6 @@ void PCGGen(Map* map)
     define_horizontal(*map);
     define_biomes(*map);
     define_minibiomes(*map);
-};
-
-void PCGGenThread(Map* map)
-{
-    auto worker = std::thread(std::bind(PCGGen, map));
-    worker.join();
 };
 
 int main(void)
@@ -161,21 +179,23 @@ int main(void)
 
     InitWindow(width, height, "Procedural Terrain Generator");
     SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
-
     RenderTexture canvas = LoadRenderTexture(map_width, map_height);
 
-    LoadPCG();
-    PCGGen(&map);
-    FreePCG();
+    // load and generate map
+    if (LoadPCG()){
+        PCGGen(&map);
+        FreePCG();
 
-    BeginTextureMode(canvas);
-        DrawHorizontal(map);
-        DrawBiomes(map);
-        DrawMiniBiomes(map);
-    EndTextureMode();
+        BeginTextureMode(canvas);
+            DrawHorizontal(map);
+            DrawBiomes(map);
+            DrawMiniBiomes(map);
+        EndTextureMode();
+    }
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
+        // zoom map logic 
         if (GetMouseWheelMove() != 0)
         {
             if (GetMouseWheelMove() > 0)
@@ -194,14 +214,16 @@ int main(void)
             if (camera.zoom > 1)
                 camera.zoom = 1;
         }
-
+            
+        // move map init
         if (IsMouseButtonPressed(0))
         {
             mouse_x = GetMouseX();
             mouse_y = GetMouseY();
         }
 
-        if (IsMouseButtonDown(0))
+        // move map logic 
+        if (IsMouseButtonDown(0)) // left mouse button
         {
             camera.offset.x -= mouse_x - GetMouseX();
             camera.offset.y -= mouse_y - GetMouseY();
@@ -209,6 +231,7 @@ int main(void)
             mouse_y = GetMouseY();
         }
 
+        // reset camera view
         if (IsKeyDown(KEY_SPACE))
         {
             camera.offset.x = 0;
@@ -216,23 +239,38 @@ int main(void)
             camera.zoom = (float) width / map_width;
         }
 
+        // reload pgo.dll
         if (IsKeyDown(KEY_R))
         {
-            ReloadPCG();
-            PCGGenThread(&map);
-            FreePCG();
-            BeginTextureMode(canvas);
-                DrawHorizontal(map);
-                DrawBiomes(map);
-                DrawMiniBiomes(map);
-            EndTextureMode();
+            if (ReloadPCG())
+            {
+                PCGGen(&map);
+                FreePCG();
+
+                BeginTextureMode(canvas);
+                    DrawHorizontal(map);
+                    DrawBiomes(map);
+                    DrawMiniBiomes(map);
+                EndTextureMode();
+            }
         }
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
-            BeginMode2D(camera);
-                DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, (float)canvas.texture.width, (float)-canvas.texture.height }, (Vector2) { 0, 0 }, WHITE);        
-            EndMode2D();
+            if (PCGLoaded())
+            {
+                BeginMode2D(camera);
+                    DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, (float)canvas.texture.width, (float)-canvas.texture.height }, (Vector2) { 0, 0 }, WHITE);        
+                EndMode2D();
+            } 
+            else 
+            {
+                if (GuiMessageBox((Rectangle){(float)(width / 2) - 100, (float)(height / 2) - 100, 200, 100}, "Error", "pcg.dll not found.", "ok") != -1)
+                {
+                    CloseWindow();
+                    return 0;
+                }
+            }
             DrawFPS(0, 0);
         EndDrawing();
     }

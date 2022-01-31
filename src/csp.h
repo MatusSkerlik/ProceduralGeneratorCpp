@@ -9,14 +9,7 @@ class Constraint
 {
     public:
         std::unordered_set<V> variables;
-        virtual bool satisfied(std::unordered_map<V, D>& assignment) const = 0;
-};
-
-template <typename V, typename D>
-class BinaryConstraint: public Constraint<V, D>
-{
-    public:
-        std::pair<V, V> pair;
+        virtual bool satisfied(const std::unordered_map<V, D>& assignment) const = 0;
 };
 
 template <typename V, typename D>

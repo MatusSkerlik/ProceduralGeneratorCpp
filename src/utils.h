@@ -114,13 +114,6 @@ class PixelArray
         };
 };
 
-void FillWithRect(const Rect& rect, PixelArray& arr)
-{
-    for (int x = rect.x; x < rect.x + rect.w; ++x)
-        for (int y = rect.y; y < rect.y + rect.h; ++y)
-            arr.add(x, y);
-}
-
 namespace HorizontalAreas
 {
     enum Type: unsigned short { SPACE, SURFACE, UNDERGROUND, CAVERN, HELL };
@@ -234,6 +227,13 @@ class Map {
         };
 };
 
+void FillWithRect(const Rect& rect, PixelArray& arr)
+{
+    for (int x = rect.x; x < rect.x + rect.w; ++x)
+        for (int y = rect.y; y < rect.y + rect.h; ++y)
+            arr.add(x, y);
+}
+
 void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
 {
     std::vector<Pixel> queue {Pixel(x, y)};
@@ -311,4 +311,4 @@ void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
             array.add(i, j);
         }
    }
-}
+};
