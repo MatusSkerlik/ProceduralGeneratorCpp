@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <thread>
+#include <future>
 #include <functional>
 #include "libloaderapi.h"
 #include "utils.h"
@@ -117,8 +118,17 @@ typedef void (*PCG_FUNC)(Map&);
 HMODULE module;
 PCG_FUNC define_horizontal;
 PCG_FUNC define_biomes;
-PCG_FUNC define_minibiomes;
+PCG_FUNC define_hills_holes_islands;
+PCG_FUNC define_cabins;
 
+bool PCGDrawReady = false;
+bool PCGGenerating = false;
+
+void PCGFunction(PCG_FUNC func, Map* map, std::promise<void>* barrier)
+{
+    func(*map);
+    barrier->set_value();
+};
 
 bool LoadPCG()
 {
@@ -127,7 +137,8 @@ bool LoadPCG()
     {
         define_horizontal = (PCG_FUNC) GetProcAddress(module, "define_horizontal");
         define_biomes = (PCG_FUNC) GetProcAddress(module, "define_biomes");
-        define_minibiomes = (PCG_FUNC) GetProcAddress(module, "define_minibiomes");
+        define_hills_holes_islands = (PCG_FUNC) GetProcAddress(module, "define_hills_holes_islands");
+        define_cabins = (PCG_FUNC) GetProcAddress(module, "define_cabins");
         return true;
     }
     return false;
@@ -136,7 +147,7 @@ bool LoadPCG()
 void FreePCG()
 {
     if (module) FreeLibrary(module);
-}
+};
 
 bool ReloadPCG()
 {
@@ -147,54 +158,73 @@ bool ReloadPCG()
 bool PCGLoaded()
 {
     return module != NULL;
-}
+};
 
-void PCGGen(Map* map)
+void _PCGGen(Map& map)
 {
-    map->clear();
-    define_horizontal(*map);
-    define_biomes(*map);
-    define_minibiomes(*map);
+    // stage 0
+    printf("Stage0\n");
+    auto _0 = std::thread(define_horizontal, std::ref(map));
+    _0.join();
+
+    // stage 1
+    printf("Stage1\n");
+    auto _1 = std::thread(define_biomes, std::ref(map));
+    _1.join();
+
+    //stage 2
+    printf("Stage2\n");
+    auto _2 = std::thread(define_hills_holes_islands, std::ref(map));
+    auto _3 = std::thread(define_cabins, std::ref(map));
+    _2.join();
+    _3.join();
+
+    PCGDrawReady = true;
+    PCGGenerating = false;
+};
+
+void PCGGen(Map& map)
+{
+    PCGGenerating = true;
+    auto thread = std::thread(_PCGGen, std::ref(map));
+    thread.detach();
 };
 
 int main(void)
 {
-    int width = 2 * 820;
-    int height = 2 * 240;
+    int width = 1640;
+    int height = 800;
     int map_width = 4200;
     int map_height = 1200;
 
     int mouse_x, mouse_y;
-    Camera2D camera;
-    camera.offset.x = 0;
-    camera.offset.y = 0;
-    camera.target.x = 0;
-    camera.target.y = 0;
-    camera.rotation = 0;
-    camera.zoom = (float) width / map_width;
+    Camera2D camera {{0, 0}, {0, 0}, 0, (float) width / map_width};
 
     Map map;
-    map.width = map_width;
-    map.height = map_height;
+    map.Width(map_width);
+    map.Height(map_height);
 
     InitWindow(width, height, "Procedural Terrain Generator");
-    SetTargetFPS(60);  // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60); 
     RenderTexture canvas = LoadRenderTexture(map_width, map_height);
+    
+    if (LoadPCG())
+        PCGGen(map);
 
     // load and generate map
-    if (LoadPCG()){
-        PCGGen(&map);
-        FreePCG();
-
-        BeginTextureMode(canvas);
-            DrawHorizontal(map);
-            DrawBiomes(map);
-            DrawMiniBiomes(map);
-        EndTextureMode();
-    }
-
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
+        if (PCGDrawReady)
+        {
+            FreePCG();
+            BeginTextureMode(canvas);
+                DrawHorizontal(map);
+                //DrawBiomes(map);
+                DrawMiniBiomes(map);
+            EndTextureMode();
+
+            PCGDrawReady = false;
+        }
         // zoom map logic 
         if (GetMouseWheelMove() != 0)
         {
@@ -240,20 +270,9 @@ int main(void)
         }
 
         // reload pgo.dll
-        if (IsKeyDown(KEY_R))
-        {
+        if (IsKeyDown(KEY_R) && !PCGGenerating)
             if (ReloadPCG())
-            {
-                PCGGen(&map);
-                FreePCG();
-
-                BeginTextureMode(canvas);
-                    DrawHorizontal(map);
-                    DrawBiomes(map);
-                    DrawMiniBiomes(map);
-                EndTextureMode();
-            }
-        }
+                PCGGen(map);
 
         BeginDrawing();
             ClearBackground(RAYWHITE);

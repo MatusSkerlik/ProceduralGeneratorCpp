@@ -1,5 +1,6 @@
-#include <memory>
 #include <stdio.h>
+#include <mutex>
+#include <memory>
 #include <cmath>
 #include <unordered_set>
 #include <vector>
@@ -157,42 +158,108 @@ namespace MiniBiomes {
 };
 
 class Map {
-    public:
-        int width;
-        int height;
-        
-        std::unique_ptr<HorizontalAreas::Biome> Space;
-        std::unique_ptr<HorizontalAreas::Biome> Surface;
-        std::unique_ptr<HorizontalAreas::Biome> Underground;
-        std::unique_ptr<HorizontalAreas::Biome> Cavern;
-        std::unique_ptr<HorizontalAreas::Biome> Hell;
+    private:
+        int _WIDTH;
+        int _HEIGHT;
+
+        std::mutex mutex;
+
+        std::unique_ptr<HorizontalAreas::Biome> _space;
+        std::unique_ptr<HorizontalAreas::Biome> _surface;
+        std::unique_ptr<HorizontalAreas::Biome> _underground;
+        std::unique_ptr<HorizontalAreas::Biome> _cavern;
+        std::unique_ptr<HorizontalAreas::Biome> _hell;
 
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
         std::vector<std::unique_ptr<MiniBiomes::Biome>> _mini_biomes;
 
+    public:
         Map(){
             printf("Map();\n");
 
-            Space.reset(new HorizontalAreas::Biome(HorizontalAreas::SPACE));
-            Surface.reset(new HorizontalAreas::Biome(HorizontalAreas::SURFACE));
-            Underground.reset(new HorizontalAreas::Biome(HorizontalAreas::UNDERGROUND));
-            Cavern.reset(new HorizontalAreas::Biome(HorizontalAreas::CAVERN));
-            Hell.reset(new HorizontalAreas::Biome(HorizontalAreas::HELL));
+            _space.reset(new HorizontalAreas::Biome(HorizontalAreas::SPACE));
+            _surface.reset(new HorizontalAreas::Biome(HorizontalAreas::SURFACE));
+            _underground.reset(new HorizontalAreas::Biome(HorizontalAreas::UNDERGROUND));
+            _cavern.reset(new HorizontalAreas::Biome(HorizontalAreas::CAVERN));
+            _hell.reset(new HorizontalAreas::Biome(HorizontalAreas::HELL));
+        };
+
+        int Width()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+
+            return _WIDTH;
+        };
+        
+        int Height()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+
+            return _HEIGHT;
+        };
+
+        void Width(int w)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+
+            _WIDTH = w;
+        };
+
+        void Height(int h)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+
+            _HEIGHT = h;
+        };
+
+        HorizontalAreas::Biome& Space()
+        { 
+            const std::lock_guard<std::mutex> lock(mutex);
+            return *_space.get(); 
+        };
+        
+        HorizontalAreas::Biome& Surface()
+        { 
+            const std::lock_guard<std::mutex> lock(mutex);
+            return *_surface.get(); 
+        };
+        
+        HorizontalAreas::Biome& Underground()
+        { 
+            const std::lock_guard<std::mutex> lock(mutex);
+            return *_underground.get(); 
+        };
+        
+        HorizontalAreas::Biome& Cavern()
+        { 
+            const std::lock_guard<std::mutex> lock(mutex);
+            return *_cavern.get(); 
+        };
+        
+        HorizontalAreas::Biome& Hell()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return *_hell.get(); 
         };
 
         std::vector<HorizontalAreas::Biome*> HorizontalAreas()
         {
-            return {Space.get(), Surface.get(), Underground.get(), Cavern.get(), Hell.get()};
+            const std::lock_guard<std::mutex> lock(mutex);
+            return {_space.get(), _surface.get(), _underground.get(), _cavern.get(), _hell.get()};
         }
 
         auto Biome(Biomes::Type type)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
+
             _biomes.emplace_back(new Biomes::Biome(type));
             return _biomes[_biomes.size() - 1].get();
         }
 
         Biomes::Biome* GetBiome(Biomes::Type type)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
+
             for (auto& biome: _biomes)
             {
                 if (biome->type == type)
@@ -203,22 +270,30 @@ class Map {
 
         auto& Biomes()
         {
+            const std::lock_guard<std::mutex> lock(mutex);
+
             return _biomes;
         }
 
         auto& MiniBiomes()
         {
+            const std::lock_guard<std::mutex> lock(mutex);
+
             return _mini_biomes;
         }
 
         auto MiniBiome(MiniBiomes::Type type)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
+
             _mini_biomes.emplace_back(new MiniBiomes::Biome(type));
             return _mini_biomes[_mini_biomes.size() - 1].get();
         }
 
         void clear()
         {
+            const std::lock_guard<std::mutex> lock(mutex);
+
             for (auto& area: HorizontalAreas())
                 area->clear();
             _biomes.clear();
@@ -229,9 +304,11 @@ class Map {
 
 void FillWithRect(const Rect& rect, PixelArray& arr)
 {
+    printf("FillWithRect %d, %d, %d, %d \n", rect.x, rect.y, rect.w, rect.h);
     for (int x = rect.x; x < rect.x + rect.w; ++x)
         for (int y = rect.y; y < rect.y + rect.h; ++y)
             arr.add(x, y);
+    printf("FillWithRectEnd\n");
 }
 
 void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)

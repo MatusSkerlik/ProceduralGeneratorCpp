@@ -168,8 +168,8 @@ EXPORT void define_horizontal(Map& map)
 {
     printf("define horizontal\n");
 
-    int width = map.width;
-    int height = map.height;
+    int width = map.Width();
+    int height = map.Height();
 
     Rect Space = Rect(0, 0, width, (int) 2 * height / 20);
     Rect Surface = Rect(0, Space.y + Space.h, width, (int) 4 * height / 20);
@@ -177,11 +177,16 @@ EXPORT void define_horizontal(Map& map)
     Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 7 * height / 20);
     Rect Hell = Rect(0, Cavern.y + Cavern.h, width, (int) 3 * height / 20);
     
-    FillWithRect(Space, *map.Space);
-    FillWithRect(Surface, *map.Surface);
-    FillWithRect(Underground, *map.Underground);
-    FillWithRect(Cavern, *map.Cavern);
-    FillWithRect(Hell, *map.Hell);
+    printf("Before space\n");
+    FillWithRect(Space, map.Space());
+    printf("Before surface\n");
+    FillWithRect(Surface, map.Surface());
+    printf("Before underground\n");
+    FillWithRect(Underground, map.Underground());
+    printf("Before cavern\n");
+    FillWithRect(Cavern, map.Cavern());
+    printf("Before hell\n");
+    FillWithRect(Hell, map.Hell());
 }
 
 /**
@@ -191,12 +196,12 @@ EXPORT void define_biomes(Map& map)
 {
     printf("define biomes\n");
 
-    int width = map.width;
+    int width = map.Width();
     int ocean_width = 250;
     int tundra_width = 200;
     int jungle_width = 600;
-    Rect Surface = map.Surface->bbox();
-    Rect Hell = map.Hell->bbox();
+    Rect Surface = map.Surface().bbox();
+    Rect Hell = map.Hell().bbox();
 
     auto ocean_left = map.Biome(Biomes::OCEAN);
     PixelsOfRect(0, Surface.y, ocean_width, Surface.h, *ocean_left); 
@@ -249,12 +254,9 @@ EXPORT void define_biomes(Map& map)
 } 
 
 
-/**
- * Create minibiomes inside layers and biomes (TODO)
- */ 
-EXPORT void define_minibiomes(Map& map)
+EXPORT void define_hills_holes_islands(Map& map)
 {
-    int width = map.width;
+    int width = map.Width();
     
     int hill_count = 8;
     int hole_count = 7;
@@ -265,18 +267,25 @@ EXPORT void define_minibiomes(Map& map)
     int hole_width = 60;
     int island_width = 120;
 
-    Rect Surface = map.Surface->bbox(); 
+    Rect Surface = map.Surface().bbox(); 
 
-    // DEFINE SURFACE MINIBiomes
+    // CSP RELATED
+    // DEFINITION OF VARIABLES
     std::unordered_set<std::string> variables;
-    std::unordered_map<std::string, std::unordered_set<int>> domains;
-    std::vector<DistanceConstraint<std::string, int>> constraints;
-    std::unordered_set<int> domain;
     for (auto i = 0; i < hill_count; ++i) { variables.insert("hill" + std::to_string(i)); }
     for (auto i = 0; i < hole_count; ++i) { variables.insert("hole" + std::to_string(i)); }
     for (auto i = 0; i < floating_island_count; ++i) { variables.insert("island" + std::to_string(i)); }
+    
+    // DEFINITION OF DOMAIN
+    std::unordered_set<int> domain;
     for (auto i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
+    
+    // DEFINITION OF DOMAIN FOR EACH VARIABLE
+    std::unordered_map<std::string, std::unordered_set<int>> domains;
     for (auto& var: variables) { domains[var] = domain; }
+
+    // DEFINITION OF CONSTRAINTS
+    std::vector<DistanceConstraint<std::string, int>> constraints;
     for (auto it0 = variables.begin(); it0 != variables.end(); it0++)
     {
         for (auto it1 = std::next(it0); it1 != variables.end(); it1++)
@@ -304,11 +313,17 @@ EXPORT void define_minibiomes(Map& map)
             }
         }
     }
+
+    // CREATION OF SOLVER
     CSPSolver<std::string, int> solver {variables, domains};
+
+    // REGISTRATION OF CONSTRAINTS
     for (auto& constraint: constraints) { solver.add_constraint(constraint); }
+    
+    // SEARCH FOR RESULT
     auto result = solver.backtracking_search({});
 
-    // RESULT
+    // REUSLT HANDLING
     for (auto& var: variables)
     {
         auto x = result[var];
@@ -332,30 +347,41 @@ EXPORT void define_minibiomes(Map& map)
             PixelsAroundRect(island.x, island.y, island.w, island.h, *arr);
         }
     }
-    
-    variables = {};
-    domain = {};
-    domains = {};
-    std::vector<CoordsConstraint<std::string, int>> constraints_coords;
-    //DEFINE UNDERGROUND MINIBIOMES
+ 
+};
+
+/**
+ */ 
+EXPORT void define_cabins(Map& map)
+{
     int cabin_count = 20;
     int cabin_width = 80;
     int cabin_height = 40;
-
+ 
     Biomes::Biome* tundra = map.GetBiome(Biomes::TUNDRA);
     assert(tundra != nullptr);  
     Rect tundra_rect = tundra->bbox();
 
+    // CSP RELATED
+    // DEFINITION OF VARIABLES
+    std::unordered_set<std::string> variables;
     for (auto i = 0; i < cabin_count; ++i) { variables.insert("cabin" + std::to_string(i)); }
+    
+    // DEFINITION OF UNION DOMAIN
+    std::unordered_set<int> domain;
     for (auto v = 0; v < tundra_rect.w * tundra_rect.h; v += 1) { 
         auto x = (int) tundra_rect.x + (v % tundra_rect.w);
         auto y = (int) tundra_rect.y + (v / tundra_rect.w);
         if (tundra->contains((Pixel){x, y}))
             domain.insert(v);
     } 
-    for (auto var: variables) { domains[var] = domain; } 
-    solver = {variables, domains}; 
 
+    // DEFINITION OF DOMAIN FOR EACH VARIABLE
+    std::unordered_map<std::string, std::unordered_set<int>> domains;
+    for (auto var: variables) { domains[var] = domain; } 
+
+    // DEFINITION OF CONSTRAINTS
+    std::vector<CoordsConstraint<std::string, int>> constraints_coords;
     int o = 1;
     for (auto i = variables.begin(); i != variables.end(); ++i) 
     {
@@ -369,9 +395,17 @@ EXPORT void define_minibiomes(Map& map)
         }
         o += 1;
     }
+    
+    // CREATION OF SOLVER
+    CSPSolver<std::string, int> solver {variables, domains};
+
+    // REGISTRATION OF CONSTRAINTS
     for (auto& c: constraints_coords) { solver.add_constraint(c); }
 
-    result = solver.backtracking_search({});
+    // SEARCH FOR RESULT
+    auto result = solver.backtracking_search({});
+    
+    // RESULT HANDLING
     for (auto& var: variables) 
     {
         auto v = result[var];
