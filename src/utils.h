@@ -162,6 +162,19 @@ class Map {
         int _WIDTH;
         int _HEIGHT;
 
+        float _COPPER_FREQUENCY = 0.5;
+        float _COPPER_SIZE = 0.5;
+        float _IRON_FREQUENCY = 0.5;
+        float _IRON_SIZE = 0.5;
+        float _SILVER_FREQUENCY = 0.5;
+        float _SILVER_SIZE = 0.5;
+        float _GOLD_FREQUENCY = 0.5;
+        float _GOLD_SIZE = 0.5;
+
+        float _HILLS_FREQUENCY = 0.5;
+        float _HOLES_FREQUENCY = 0.5;
+        float _CABINS_FREQUENCY = 0.5;
+
         std::mutex mutex;
 
         std::unique_ptr<HorizontalAreas::Biome> _space;
@@ -198,18 +211,213 @@ class Map {
             return _HEIGHT;
         };
 
-        void Width(int w)
+        bool Width(int w)
         {
-            const std::lock_guard<std::mutex> lock(mutex);
-
-            _WIDTH = w;
+            if (_WIDTH != w)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _WIDTH = w;
+                return true;
+            }
+            return false;
         };
 
-        void Height(int h)
+        bool Height(int h)
+        {
+            if (_HEIGHT != h)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _HEIGHT = h;
+                return true;
+            }
+            return false;
+        };
+
+        float CopperFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
+            return _COPPER_FREQUENCY;
+        };
 
-            _HEIGHT = h;
+        bool CopperFrequency(float fq)
+        {
+            if (_COPPER_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _COPPER_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        float CopperSize()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _COPPER_SIZE;
+        };
+
+        bool CopperSize(float s)
+        {
+            if (_COPPER_SIZE != s)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _COPPER_SIZE = s;
+                return true;
+            }
+            return false;
+        };
+
+        float IronFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _IRON_FREQUENCY;
+        };
+
+        bool IronFrequency(float fq)
+        {
+            if (_IRON_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _IRON_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        float IronSize()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _IRON_SIZE;
+        };
+
+        bool IronSize(float s)
+        {
+            if (_IRON_SIZE != s)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _IRON_SIZE = s;
+                return true;
+            }
+            return false;
+        };
+
+        float SilverFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _SILVER_FREQUENCY;
+        };
+
+        bool SilverFrequency(float fq)
+        {
+            if (_SILVER_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _SILVER_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        float SilverSize()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _SILVER_SIZE;
+        };
+
+        bool SilverSize(float s)
+        {
+            if (_SILVER_SIZE != s)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _SILVER_SIZE = s;
+                return true;
+            }
+            return false;
+        };
+
+        float GoldFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _GOLD_FREQUENCY;
+        };
+
+        bool GoldFrequency(float fq)
+        {
+            if (_GOLD_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _GOLD_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        float GoldSize()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _GOLD_SIZE;
+        };
+
+        bool GoldSize(float s)
+        {
+            if (_GOLD_SIZE != s)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _GOLD_SIZE = s;
+                return true;
+            }
+            return false;
+        };
+
+        float HillsFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _HILLS_FREQUENCY;
+        };
+
+        bool HillsFrequency(float fq)
+        {
+            if (_HILLS_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _HILLS_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        float HolesFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _HOLES_FREQUENCY;
+        };
+
+        bool HolesFrequency(float fq)
+        {
+            if (_HOLES_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _HOLES_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        float CabinsFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _CABINS_FREQUENCY;
+        };
+
+        bool CabinsFrequency(float fq)
+        {
+            if (_CABINS_FREQUENCY != fq)
+            {
+                const std::lock_guard<std::mutex> lock(mutex);
+                _CABINS_FREQUENCY = fq;
+                return true;
+            }
+            return false;
         };
 
         HorizontalAreas::Biome& Space()
@@ -293,12 +501,10 @@ class Map {
         void clear()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
-            for (auto& area: HorizontalAreas())
+            for (auto& area: {_space.get(), _surface.get(), _underground.get(), _cavern.get(), _hell.get()})
                 area->clear();
             _biomes.clear();
             _mini_biomes.clear();
-
         };
 };
 

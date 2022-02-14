@@ -122,6 +122,7 @@ PCG_FUNC define_cabins;
 
 bool PCGDrawReady = false;
 bool PCGGenerating = false;
+bool PCGRegenerate = false;
 
 void PCGFunction(PCG_FUNC func, Map* map, std::promise<void>* barrier)
 {
@@ -189,6 +190,11 @@ void PCGGen(Map& map)
     thread.detach();
 };
 
+void PCGReGen()
+{
+    PCGRegenerate = true;  
+};
+
 /**************************************************
 *
 * GUI RELATED 
@@ -205,7 +211,7 @@ int main(void)
 {
     // BASE CONSTANTS
     const int width = 1640;
-    const int height = 800;
+    const int height = 600;
     const int map_width = 4200;
     const int map_height = 1200;
 
@@ -229,24 +235,12 @@ int main(void)
     float map_view_width = width - settings_width - em - em;
     float map_view_height = height - map_view_anchor.y - em; 
 
+    camera.zoom = (float) map_view_width / map_width;
     Rectangle map_view {map_view_anchor.x, map_view_anchor.y, map_view_width, map_view_height};
-
-    
-    camera.target = map_view_anchor;
-    camera.offset = map_view_anchor;
 
     bool SeedTextBoxEditMode = false;
     char SeedTextBoxText[128] = "0";
     int TabActive = 0;
-
-    float SliderCopperFrequency = 0.5;
-    float SliderIronFrequency = 0.5;
-    float SliderGoldFrequency = 0.5;
-    float SliderSilverFrequency = 0.5;
-    float SliderCopperSize = 0.5;
-    float SliderIronSize = 0.5;
-    float SliderSilverSize = 0.5;
-    float SliderGoldSize = 0.5;
 
     Rectangle ScrollView = {0, 0, 0, 0};
     Vector2 ScrollOffset = {0, 0};
@@ -272,101 +266,103 @@ int main(void)
 
             PCGDrawReady = false;
         }
-
-        // ZOOM LOGIC
-        if (GetMouseWheelMove() != 0)
-        {
-            auto zoom_before = camera.zoom;
-            if (GetMouseWheelMove() > 0)
-            {
-                camera.zoom *= 1.15;
-            }
-            else
-            {
-                camera.zoom *= .85;
-            }
-
-            if (camera.zoom * width > map_width)
-                camera.zoom = (float) map_width / width;
-            if (camera.zoom < 0.25)
-                camera.zoom = 0.25;
-            if (camera.zoom > 4)
-                camera.zoom = 4;
-
-            ScrollView.width = camera.zoom * map_width;
-            ScrollView.height = camera.zoom * map_height;
-
-            printf("ScrollOffset %f, %f\n", ScrollOffset.x, ScrollOffset.y);
-            if (ScrollView.width < map_view_width - 14)
-            {
-                camera.target = map_view_anchor;
-                camera.offset = map_view_anchor;
-            }
-            else
-            {
-                camera.target.x = -ScrollOffset.x + GetMouseX(); 
-                camera.offset.x = -ScrollOffset.x + GetMouseX();
-                camera.target.y = -ScrollOffset.y + GetMouseY();
-                camera.offset.y = -ScrollOffset.y + GetMouseY();
-            }
-        }
             
         // RELOAD DLL
         if (IsKeyDown(KEY_R) && !PCGGenerating)
+        {
             if (ReloadPCG())
+            {
+                map.clear();
                 PCGGen(map);
+            }
+        }
 
+        if (PCGRegenerate && !PCGGenerating)
+        {
+            if (ReloadPCG())
+            {
+                map.clear();
+                PCGGen(map);
+                PCGRegenerate = false;
+            }
+        }
+        
         // DRAW LOGIC
         BeginDrawing();
-            ClearBackground((Color){89, 89, 89, 255});
+            ClearBackground((Color){60, 56, 54, 255});
 
             if (PCGLoaded()) // IF DLL LOADED SHOW SETTINGS WITH MAP
             {
-                GuiGroupBox((Rectangle){8, 8, (float)2 * 8 + 300, height - 2 * 8}, "SETTINGS");
+                GuiGroupBox((Rectangle){em, em, (float)2 * em + 300, height - 2 * em}, "SETTINGS");
 
-                if (GuiButton((Rectangle){(float) 2 * 8 + 4 + 92, 2 * 8, 64, 24}, "Seed"))
+                if (GuiButton((Rectangle){(float) 2 * em + im + 92, 2 * em, 64, 24}, "Seed"))
                     ChangeSeed();
 
-                if (GuiTextBox((Rectangle){(float) 2 * 8, 2 * 8, 92, 24}, SeedTextBoxText, 128, SeedTextBoxEditMode))
+                if (GuiTextBox((Rectangle){(float) 2 * em, 2 * em, 92, 24}, SeedTextBoxText, 128, SeedTextBoxEditMode))
                     SeedTextBoxEditMode = !SeedTextBoxEditMode;
 
-                TabActive = GuiToggleGroup((Rectangle){2 * 8, 2 * 8 + 2 * 24, 92, 24}, "SOURCES;ENTITIES;WORLD", TabActive);
+                TabActive = GuiToggleGroup((Rectangle){2 * em, 2 * em + 2 * 24, 92, 24}, "MATERIALS;ENTITIES;WORLD", TabActive);
                 if (TabActive == 0)
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "Sources info");
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 4 * 24, 92, 24}, "COPPER ORE");
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 4 + 5 * 24, 92, 24}, "IRON ORE");
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 2 * 4 + 6 * 24, 92, 24}, "SILVER ORE");
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 3 * 4 + 7 * 24, 92, 24}, "GOLD ORE");
-
-                    SliderCopperFrequency = GuiSliderBar((Rectangle){2 * 8 + 92, 2 * 8 + 4 * 24, 92, 24}, "", "", SliderCopperFrequency, 0.0, 1.0);
-                    SliderIronFrequency = GuiSliderBar((Rectangle){2 * 8 + 92, 2 * 8 + 4 + 5 * 24, 92, 24}, "", "", SliderIronFrequency, 0.0, 1.0);
-                    SliderSilverFrequency = GuiSliderBar((Rectangle){2 * 8 + 92, 2 * 8 + 2 * 4 + 6 * 24, 92, 24}, "", "", SliderSilverFrequency, 0.0, 1.0);
-                    SliderGoldFrequency = GuiSliderBar((Rectangle){2 * 8 + 92, 2 * 8 + 3 * 4 + 7 * 24, 92, 24}, "", "", SliderGoldFrequency, 0.0, 1.0);
-
-                    SliderCopperSize = GuiSliderBar((Rectangle){2 * 8 + 4 + 2 * 92, 2 * 8 + 4 * 24, 92, 24}, "", "", SliderCopperSize, 0.0, 1.0);
-                    SliderIronSize = GuiSliderBar((Rectangle){2 * 8 + 4 + 2 * 92, 2 * 8 + 4 + 5 * 24, 92, 24}, "", "", SliderIronSize, 0.0, 1.0);
-                    SliderSilverSize = GuiSliderBar((Rectangle){2 * 8 + 4 + 2 * 92, 2 * 8 + 2 * 4 + 6 * 24, 92, 24}, "", "", SliderSilverSize, 0.0, 1.0);
-                    SliderGoldSize = GuiSliderBar((Rectangle){2 * 8 + 4 + 2 * 92, 2 * 8 + 3 * 4 + 7 * 24, 92, 24}, "", "", SliderGoldSize, 0.0, 1.0);
+                    GuiLabel((Rectangle){2 * em, 2 * em + 24, (float) width - 4 * 8, 24}, "Settings about materials");
                     
+                    GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
+                    GuiLabel((Rectangle){2 * em + 2 * 92 + im, 5 * em + 2 * 24, 92, 24}, "SIZE");
 
+                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "COPPER ORE");
+                    GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "IRON ORE");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "SILVER ORE");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "GOLD ORE");
+
+                    if (map.CopperFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.IronFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.SilverFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.GoldFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+
+                    if (map.CopperSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperSize(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.IronSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronSize(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.SilverSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverSize(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.GoldSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldSize(), 0.0, 1.0)))
+                        PCGReGen();
                 }
                 else if (TabActive == 1)
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "Entities info");
+                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "Settings about entities in map");
+
+                    GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
+
+                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "HILLS");
+                    GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "HOLES");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "CABINS");
+
+                    if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.HolesFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.HolesFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+                    if (map.CabinsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.CabinsFrequency(), 0.0, 1.0)))
+                        PCGReGen();
+
                 }
                 else
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "World info");
+                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "Lorem ipsum");
                 }
 
                 ScrollView = GuiScrollPanel(map_view, (Rectangle){0, 0, map_width * camera.zoom, map_height * camera.zoom}, &ScrollOffset);
-                
-                    printf("MapViewAnchor %f, %f, Camera.Target %f, %f\n", map_view_anchor.x, map_view_anchor.y, camera.target.x, camera.target.y);
+                DrawRectangleRec(map_view, {40, 40, 40, 255});
+
+                BeginScissorMode(map_view.x, map_view.y, map_view.width, map_view.height);
                     BeginMode2D(camera);
-                        DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {-(camera.target.x - map_view_anchor.x), -(camera.target.y - map_view_anchor.y)}, WHITE);        
+//                        if (!PCGGenerating)
+                            DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {map_view_anchor.x * 1 / camera.zoom, map_view_anchor.y * 1 / camera.zoom}, WHITE);        
                     EndMode2D();
-                BeginScissorMode(map_view.x, map_view.y, map_view.width - 14, map_view.height - 14);
                 EndScissorMode();
             } 
             else // IF NOT, SHOW WARNING

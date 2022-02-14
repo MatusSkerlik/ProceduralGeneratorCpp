@@ -177,15 +177,10 @@ EXPORT void define_horizontal(Map& map)
     Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 7 * height / 20);
     Rect Hell = Rect(0, Cavern.y + Cavern.h, width, (int) 3 * height / 20);
     
-    printf("Before space\n");
     FillWithRect(Space, map.Space());
-    printf("Before surface\n");
     FillWithRect(Surface, map.Surface());
-    printf("Before underground\n");
     FillWithRect(Underground, map.Underground());
-    printf("Before cavern\n");
     FillWithRect(Cavern, map.Cavern());
-    printf("Before hell\n");
     FillWithRect(Hell, map.Hell());
 }
 
@@ -258,8 +253,8 @@ EXPORT void define_hills_holes_islands(Map& map)
 {
     int width = map.Width();
     
-    int hill_count = 8;
-    int hole_count = 7;
+    int hill_count = map.HillsFrequency() * 12;
+    int hole_count = map.HolesFrequency() * 10;
     int floating_island_count = 4;
 
     int ocean_width = 250;
@@ -354,7 +349,7 @@ EXPORT void define_hills_holes_islands(Map& map)
  */ 
 EXPORT void define_cabins(Map& map)
 {
-    int cabin_count = 20;
+    int cabin_count = map.CabinsFrequency() * 20;
     int cabin_width = 80;
     int cabin_height = 40;
  
