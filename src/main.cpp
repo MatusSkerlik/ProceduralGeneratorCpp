@@ -38,7 +38,7 @@ void DrawHorizontal(Map& map)
                 color = C_SURFACE;
                 break;
             case HorizontalAreas::UNDERGROUND:
-                color = C_UNDERGROUND;
+                color = C_CAVERN;
                 break;
             case HorizontalAreas::CAVERN:
                 color = C_CAVERN;
@@ -62,16 +62,16 @@ void DrawBiomes(Map& map)
             switch (biome->type)
             {
                 case Biomes::TUNDRA:
-                    DrawPixel(p.x, p.y, (Color){255, 255, 255, 64});
+                    DrawPixel(p.x, p.y, (Color){255, 255, 255, 32});
                     break;
                 case Biomes::JUNGLE:
-                    DrawPixel(p.x, p.y, (Color){92, 68, 73, 64});
+                    DrawPixel(p.x, p.y, (Color){92, 68, 73, 32});
                     break;
                 case Biomes::FOREST:
-                    DrawPixel(p.x, p.y, (Color){0, 255, 0, 64});
+                    DrawPixel(p.x, p.y, (Color){0, 255, 0, 32});
                     break;
                 case Biomes::OCEAN:
-                    DrawPixel(p.x, p.y, (Color){0, 0, 255, 64});
+                    DrawPixel(p.x, p.y, (Color){0, 0, 255, 32});
                     break;
                 default:
                     break;
@@ -89,10 +89,10 @@ void DrawMiniBiomes(Map& map)
             switch (biome->type)
             {
                 case MiniBiomes::HILL:
-                    DrawPixel(p.x, p.y, RED);
+                    DrawPixel(p.x, p.y, C_UNDERGROUND);
                     break;
                 case MiniBiomes::HOLE:
-                    DrawPixel(p.x, p.y, BLUE);
+                    DrawPixel(p.x, p.y, C_UNDERGROUND);
                     break;
                 case MiniBiomes::FLOATING_ISLAND:
                     DrawPixel(p.x, p.y, YELLOW);
@@ -216,22 +216,20 @@ int main(void)
     const int map_height = 1200;
 
     // RAYLIB INIT
-    InitWindow(width, height, "Procedural Terrain Generator");
+    InitWindow(width, height + 16, "Procedural Terrain Generator");
     SetTargetFPS(60); 
     GuiLoadStyle("style.rgs");
 
     RenderTexture canvas = LoadRenderTexture(map_width, map_height);
     Camera2D camera {{0, 0}, {0, 0}, 0, 1};
    
-    // RAYLIB RELATED
-
     // RAYGUI RELATED
     float em = 8.0; // EXTERNAL MARGIN
     float im = 8.0; // INTERNAL MARGIN
     Vector2 settings_anchor = {em, em};
     Vector2 map_view_anchor = {settings_anchor.x + 300 + im + im + em, settings_anchor.y};
     float settings_width = map_view_anchor.x - settings_anchor.x;
-    float settings_height = height - em - settings_anchor.y;
+    // float settings_height = height - em - settings_anchor.y;
     float map_view_width = width - settings_width - em - em;
     float map_view_height = height - map_view_anchor.y - em; 
 
@@ -260,7 +258,7 @@ int main(void)
             FreePCG();
             BeginTextureMode(canvas);
                 DrawHorizontal(map);
-                //DrawBiomes(map);
+                DrawBiomes(map);
                 DrawMiniBiomes(map);
             EndTextureMode();
 
@@ -360,10 +358,11 @@ int main(void)
 
                 BeginScissorMode(map_view.x, map_view.y, map_view.width, map_view.height);
                     BeginMode2D(camera);
-//                        if (!PCGGenerating)
-                            DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {map_view_anchor.x * 1 / camera.zoom, map_view_anchor.y * 1 / camera.zoom}, WHITE);        
+                        DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {map_view_anchor.x * 1 / camera.zoom, map_view_anchor.y * 1 / camera.zoom}, WHITE);        
                     EndMode2D();
                 EndScissorMode();
+
+                if (PCGGenerating) DrawText("GENERAION IN PROGRESS...", em, height, 8, WHITE);
             } 
             else // IF NOT, SHOW WARNING
             {

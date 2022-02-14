@@ -77,6 +77,7 @@ class CoordsConstraint: public Constraint<V, D>
 
 
             auto _x0 = _v0 % width;
+
             auto _y0 = (int) _v0 / width;
             auto _x1 = _v1 % width;
             auto _y1 = (int)_v1 / width;
@@ -173,7 +174,7 @@ EXPORT void define_horizontal(Map& map)
 
     Rect Space = Rect(0, 0, width, (int) 2 * height / 20);
     Rect Surface = Rect(0, Space.y + Space.h, width, (int) 4 * height / 20);
-    Rect Underground = Rect(0, Surface.y + Surface.h, width, (int) 4 * height / 20);
+    Rect Underground = Rect(0, Surface.y + Surface.h, width, (int) 4 * height / 20 + 1);
     Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 7 * height / 20);
     Rect Hell = Rect(0, Cavern.y + Cavern.h, width, (int) 3 * height / 20);
     
@@ -185,7 +186,7 @@ EXPORT void define_horizontal(Map& map)
 }
 
 /**
- * Define biomes positions and shapes
+ * Define biome positions and shapes
  */
 EXPORT void define_biomes(Map& map)
 {
@@ -204,51 +205,74 @@ EXPORT void define_biomes(Map& map)
     auto ocean_right = map.Biome(Biomes::OCEAN);
     PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, *ocean_right);
 
-    // USE CSP TO FIND LOCATIONS FOR Biomes
+    // USE CSP TO FIND LOCATIONS FOR JUNGLE AND TUNDRA 
+    // DEFINITION OF VARIABLES
     std::unordered_set<std::string> variables {"jungle", "tundra"};
-    std::unordered_set<int> domain;
-    for (int i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
-    std::unordered_map<std::string, std::unordered_set<int>> domains {{"jungle", domain}, {"tundra", domain}};
-    DistanceConstraint<std::string, int> c0 {"jungle", "tundra", std::max(tundra_width, jungle_width)};
-    CSPSolver<std::string, int> solver {variables, domains};
-    solver.add_constraint(c0);
-    auto result = solver.backtracking_search({}); 
-    int jungle_x = result["jungle"];  
-    int tundra_x = result["tundra"];
+    
+    // DEFINITION OF DOMAIN
+    auto domain = Domain(ocean_width + 50, width - 2 * ocean_width - 50, 50);
+    
+    // DEFINITION OF DOMAIN FOR EACH VARIABLE
+    std::unordered_map<std::string, std::unordered_set<int>> domains;
+    for (auto& var: variables) { domains[var] = domain; }
+  
+    // DEFINITION OF CONSTRAINTS
+    std::vector<DistanceConstraint<std::string, int>> constraints;
 
+    Between<std::string>(variables, [&](std::string v0, std::string v1){
+        DistanceConstraint<std::string, int> c {v0, v1, std::max(jungle_width, tundra_width)};
+        constraints.push_back(std::move(c));
+    });
+    
+    // DEFINITION OF SOLVER
+    CSPSolver<std::string, int> solver {variables, domains};
+    for (auto& c: constraints) { solver.add_constraint(c); }
+
+    // SEARCH FOR RESULT
+    auto result = solver.backtracking_search({}); 
+
+    // RESULT HANDLING
+    // DEFINITION OF JUNGLE
+    auto jungle_x = result["jungle"];  
     auto jungle = map.Biome(Biomes::JUNGLE);
     for (int i = Surface.y; i < Hell.y; i++)
     {
         PixelsAroundRect(jungle_x + i, i, jungle_width, 2, *jungle);
     }
 
+    // DEFINITION OF TUNDRA
+    auto tundra_x = result["tundra"];
     auto tundra = map.Biome(Biomes::TUNDRA);
     for (int i = Surface.y; i < Hell.y; i++)
     {
         PixelsAroundRect(tundra_x - i, i, tundra_width, 2, *tundra);
     }
 
-    PixelArray all;
-    FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), all);
-    for (auto pixel: *ocean_left) { all.remove(pixel); }
-    for (auto pixel: *ocean_right) { all.remove(pixel); }
-    for (auto pixel: *jungle) { all.remove(pixel); }
-    for (auto pixel: *tundra) { all.remove(pixel); }
+    // DEFINITION OF FORESTS
+    PixelArray forests;
+    FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), forests);
+    
+    // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
+    for (auto pixel: *ocean_left) { forests.remove(pixel); }
+    for (auto pixel: *ocean_right) { forests.remove(pixel); }
+    for (auto pixel: *jungle) { forests.remove(pixel); }
+    for (auto pixel: *tundra) { forests.remove(pixel); }
 
-    assert(all.size() > 0);
-
-    while (all.size() > 0)
+    assert(forests.size() > 0);
+    while (forests.size() > 0)
     {
-        auto biome = map.Biome(Biomes::FOREST);
-        auto& p = *all.begin(); 
-        UnitedPixelArea(all, p.x, p.y, *biome);
+        auto forest = map.Biome(Biomes::FOREST);
+        auto& p = *forests.begin(); 
+        UnitedPixelArea(forests, p.x, p.y, *forest);
 
-        for (auto& p: *biome)
-            all.remove(p);
+        for (auto& p: *forest) { forests.remove(p); }
     }
-} 
+};
 
 
+/*
+ * Define minibiomes hill, hole, island
+ */ 
 EXPORT void define_hills_holes_islands(Map& map)
 {
     int width = map.Width();
@@ -266,14 +290,13 @@ EXPORT void define_hills_holes_islands(Map& map)
 
     // CSP RELATED
     // DEFINITION OF VARIABLES
-    std::unordered_set<std::string> variables;
-    for (auto i = 0; i < hill_count; ++i) { variables.insert("hill" + std::to_string(i)); }
-    for (auto i = 0; i < hole_count; ++i) { variables.insert("hole" + std::to_string(i)); }
-    for (auto i = 0; i < floating_island_count; ++i) { variables.insert("island" + std::to_string(i)); }
+    auto hills = CreateVariables("hill", 0, hill_count);
+    auto holes = CreateVariables("hole", 0, hole_count);
+    auto islands = CreateVariables("island", 0, floating_island_count);
+    auto variables = JoinVariables(hills, JoinVariables(holes, islands));
     
     // DEFINITION OF DOMAIN
-    std::unordered_set<int> domain;
-    for (auto i = ocean_width + 50; i < width - 2 * ocean_width - 50; i+=50) { domain.insert(i); }
+    auto domain = Domain(ocean_width + 50, width - 2 * ocean_width - 50, 50);
     
     // DEFINITION OF DOMAIN FOR EACH VARIABLE
     std::unordered_map<std::string, std::unordered_set<int>> domains;
@@ -281,34 +304,37 @@ EXPORT void define_hills_holes_islands(Map& map)
 
     // DEFINITION OF CONSTRAINTS
     std::vector<DistanceConstraint<std::string, int>> constraints;
-    for (auto it0 = variables.begin(); it0 != variables.end(); it0++)
-    {
-        for (auto it1 = std::next(it0); it1 != variables.end(); it1++)
-        {
-            auto& var0 = *it0;
-            auto& var1 = *it1;
 
-            if ((StrContains(var0, "hole") || StrContains(var0, "hill")) && (StrContains(var1, "hole") || StrContains(var1, "hill")))
-            {
-                int min_d = 20 + rand() % 80;
-                DistanceConstraint<std::string, int> c{var0, var1, min_d + std::max(hill_width, hole_width)};
-                constraints.push_back(std::move(c));
-            } 
-            else if ((StrContains(var0, "hill") && StrContains(var1, "island")) || (StrContains(var0, "island") && StrContains(var1, "hill")))
-            {
-                int min_d = 20 + rand() % 80;
-                DistanceConstraint<std::string, int> c{var0, var1, min_d + std::max(hill_width, island_width)};
-                constraints.push_back(std::move(c));
-            }
-            else if (StrContains(var0, "island") && StrContains(var1, "island"))
-            {
-                int min_d = 20 + rand() % 80;
-                DistanceConstraint<std::string, int> c{var0, var1, min_d + island_width};
-                constraints.push_back(std::move(c));
-            }
-        }
-    }
+    ForEach<std::string>(holes, hills, [&](std::string v0, std::string v1){
+        int min_d = 20 + rand() % 80;
+        DistanceConstraint<std::string, int> c{v0, v1, min_d + std::max(hill_width, hole_width)};
+        constraints.push_back(std::move(c));
+    });
 
+    Between<std::string>(holes, [&](std::string v0, std::string v1){
+        int min_d = 20 + rand() % 80;
+        DistanceConstraint<std::string, int> c{v0, v1, min_d + hole_width};
+        constraints.push_back(std::move(c));
+    });
+
+    Between<std::string>(hills, [&](std::string v0, std::string v1){
+        int min_d = 20 + rand() % 80;
+        DistanceConstraint<std::string, int> c{v0, v1, min_d + hill_width};
+        constraints.push_back(std::move(c));
+    });
+
+    ForEach<std::string>(hills, islands, [&](std::string v0, std::string v1){
+        int min_d = 20 + rand() % 80;
+        DistanceConstraint<std::string, int> c{v0, v1, min_d + std::max(hill_width, island_width)};
+        constraints.push_back(std::move(c));
+    });
+
+    Between<std::string>(islands, [&](std::string v0, std::string v1){
+        int min_d = 20 + rand() % 80;
+        DistanceConstraint<std::string, int> c{v0, v1, min_d + island_width};
+        constraints.push_back(std::move(c));
+    });
+    
     // CREATION OF SOLVER
     CSPSolver<std::string, int> solver {variables, domains};
 
@@ -319,33 +345,33 @@ EXPORT void define_hills_holes_islands(Map& map)
     auto result = solver.backtracking_search({});
 
     // REUSLT HANDLING
-    for (auto& var: variables)
+    for (auto& var: holes)
     {
         auto x = result[var];
-
-        if (var.find("hole") != std::string::npos)
-        {
-            auto arr = map.MiniBiome(MiniBiomes::HOLE);
-            Rect hole ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
-            CreateHole(hole, *arr);
-        }
-        else if (var.find("hill") != std::string::npos) 
-        {
-            auto arr = map.MiniBiome(MiniBiomes::HILL);
-            Rect hill ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
-            CreateHill(hill, *arr);
-        }
-        else
-        {
-            auto arr = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
-            Rect island ((int) x - island_width / 2, Surface.y, island_width, 50);
-            PixelsAroundRect(island.x, island.y, island.w, island.h, *arr);
-        }
+        auto hole = map.MiniBiome(MiniBiomes::HOLE);
+        Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
+        CreateHole(rect, *hole);
     }
- 
+    
+    for (auto& var: hills)
+    {
+        auto x = result[var];
+        auto hill = map.MiniBiome(MiniBiomes::HILL);
+        Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
+        CreateHill(rect, *hill);
+    }
+
+    for (auto& var: islands)
+    {
+        auto x = result[var];
+        auto island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
+        Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
+        PixelsAroundRect(rect.x, rect.y, rect.w, rect.h, *island);
+    }
 };
 
-/**
+/*
+ * Define underground cabin minibiomes
  */ 
 EXPORT void define_cabins(Map& map)
 {
@@ -359,9 +385,8 @@ EXPORT void define_cabins(Map& map)
 
     // CSP RELATED
     // DEFINITION OF VARIABLES
-    std::unordered_set<std::string> variables;
-    for (auto i = 0; i < cabin_count; ++i) { variables.insert("cabin" + std::to_string(i)); }
-    
+    auto variables = CreateVariables("cabin", 0, cabin_count); 
+
     // DEFINITION OF UNION DOMAIN
     std::unordered_set<int> domain;
     for (auto v = 0; v < tundra_rect.w * tundra_rect.h; v += 1) { 
@@ -376,26 +401,18 @@ EXPORT void define_cabins(Map& map)
     for (auto var: variables) { domains[var] = domain; } 
 
     // DEFINITION OF CONSTRAINTS
-    std::vector<CoordsConstraint<std::string, int>> constraints_coords;
-    int o = 1;
-    for (auto i = variables.begin(); i != variables.end(); ++i) 
-    {
-        auto var0 = *i;
-
-        for (auto j = std::next(variables.begin(), o); j != variables.end(); ++j) 
-        {
-            auto var1 = *j;
-            CoordsConstraint<std::string, int> c0 {var0, var1, cabin_width, cabin_height, cabin_width, cabin_height, tundra_rect.w};
-            constraints_coords.push_back(std::move(c0));
-        }
-        o += 1;
-    }
+    std::vector<CoordsConstraint<std::string, int>> constraints;
     
+    Between<std::string>(variables, [&](std::string v0, std::string v1){
+        CoordsConstraint<std::string, int> c {v0, v1, cabin_width, cabin_height, cabin_width, cabin_height, tundra_rect.w};
+        constraints.push_back(std::move(c));
+    });
+
     // CREATION OF SOLVER
     CSPSolver<std::string, int> solver {variables, domains};
 
     // REGISTRATION OF CONSTRAINTS
-    for (auto& c: constraints_coords) { solver.add_constraint(c); }
+    for (auto& c: constraints) { solver.add_constraint(c); }
 
     // SEARCH FOR RESULT
     auto result = solver.backtracking_search({});
@@ -410,6 +427,6 @@ EXPORT void define_cabins(Map& map)
         auto cabin = map.MiniBiome(MiniBiomes::CABIN); 
         PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, *cabin);
     }
-}
+};
 
 }

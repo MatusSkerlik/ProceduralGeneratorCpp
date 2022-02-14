@@ -508,7 +508,7 @@ class Map {
         };
 };
 
-void FillWithRect(const Rect& rect, PixelArray& arr)
+inline void FillWithRect(const Rect& rect, PixelArray& arr)
 {
     printf("FillWithRect %d, %d, %d, %d \n", rect.x, rect.y, rect.w, rect.h);
     for (int x = rect.x; x < rect.x + rect.w; ++x)
@@ -517,7 +517,7 @@ void FillWithRect(const Rect& rect, PixelArray& arr)
     printf("FillWithRectEnd\n");
 }
 
-void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
+inline void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
 {
     std::vector<Pixel> queue {Pixel(x, y)};
     
@@ -546,7 +546,7 @@ void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
     }
 }
 
-void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
+inline void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
 {
     auto center = Vector2D(x, y);
     auto from = Vector2D(0, 0);
@@ -569,7 +569,7 @@ void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
     }
 };
 
-void PixelsAroundRect(int x, int y, int w, int h, PixelArray& array)
+inline void PixelsAroundRect(int x, int y, int w, int h, PixelArray& array)
 {
     int minx = x - w / 2;
     int maxx = x + w / 2;
@@ -585,7 +585,7 @@ void PixelsAroundRect(int x, int y, int w, int h, PixelArray& array)
     }
 };
 
-void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
+inline void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
 {
    for (int i = x; i < x + w; i++)
    {

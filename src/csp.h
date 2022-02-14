@@ -1,3 +1,4 @@
+#include <string>
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
@@ -69,4 +70,75 @@ class CSPSolver {
             
             return {};
         };
+};
+
+inline std::unordered_set<std::string> CreateVariables(std::string name, int from, int to)
+{
+    std::unordered_set<std::string> variables;
+    for (int i = from; i < to; ++i) { variables.insert(name + std::to_string(i)); }
+    return variables;
+};
+
+inline std::unordered_set<std::string> JoinVariables(std::unordered_set<std::string> vars0, std::unordered_set<std::string> vars1)
+{
+    std::unordered_set<std::string> variables;
+    for (auto var: vars0) { variables.insert(var); }
+    for (auto var: vars1) { variables.insert(var); }
+    return variables;
+}
+
+inline std::unordered_set<int> Domain(int from, int to, int step)
+{
+    std::unordered_set<int> domain;
+    for (int i = from; i < to; i += step){ domain.insert(i); }
+    return domain;
+}
+
+template <typename V>
+void Zip(std::unordered_set<V> v0, std::unordered_set<V> v1, std::function<void(V, V)> func)
+{
+    auto it0 = v0.begin();
+    auto it1 = v1.begin();
+    
+    while (it0 != v0.end() || it1 != v1.end())
+    {
+        func(*it0, *it1);
+        it0 = std::next(it0);
+        it1 = std::next(it1);
+    }
+};
+
+template <typename V>
+void ForEach(std::unordered_set<V> v0, std::unordered_set<V> v1, std::function<void(V, V)> func)
+{
+    auto it0 = v0.begin();
+    while (it0 != v0.end())
+    {
+        auto it1 = v1.begin();
+        while (it1 != v1.end())
+        {
+            if (*it0 != *it1)
+            {
+                func(*it0, *it1);
+            }
+            it1 = std::next(it1);
+        }
+        it0 = std::next(it0);
+    }
+};
+
+template <typename V>
+void Between(std::unordered_set<V> v, std::function<void(V, V)> func)
+{
+    auto it0 = v.begin();
+    while (it0 != v.end())
+    {
+        auto it1 = std::next(it0);
+        while (it1 != v.end())
+        {
+            func(*it0, *it1);
+            it1 = std::next(it1);
+        }
+        it0 = std::next(it0);
+    }
 };
