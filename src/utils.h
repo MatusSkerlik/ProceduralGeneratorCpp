@@ -6,6 +6,7 @@
 #include <vector>
 #include <tuple>
 #include <limits>
+#include <atomic>
 
 typedef struct Rect {
     Rect() = default;
@@ -59,6 +60,8 @@ class PixelArray
 {
     protected:
         std::unordered_set<Pixel, PixelHash> _set_pixels;
+        Rect _bounding_box {0, 0, 0, 0};
+
     public:
         PixelArray()
         {
@@ -79,24 +82,22 @@ class PixelArray
 
         auto begin() const { return this->_set_pixels.begin(); };
         auto end() const { return this->_set_pixels.end(); };
-        auto size() const { return this->_set_pixels.size(); }
+        auto size() const { return this->_set_pixels.size(); };
         auto contains(Pixel pixel) const { return this->_set_pixels.find(pixel) != this->_set_pixels.end(); };
-
-        void add(Pixel pixel) {
-            _set_pixels.insert(pixel);
-        };
+        void add(Pixel pixel) { _set_pixels.insert(pixel); };
         void add(int x, int y) { add((Pixel){x, y}); };
-
         void remove(Pixel pixel) { _set_pixels.erase(pixel); };
-
         void remove(int x, int y) { remove((Pixel){x, y}); };
-
         void clear() { _set_pixels.clear(); };
+        void bbox(Rect rect) { _bounding_box = rect; };
 
-        Rect bbox() const
+        Rect bbox()
         {
             if (_set_pixels.size() == 0)
                 return (Rect){0, 0, 0, 0};
+
+            if ((_bounding_box.w > 0) && (_bounding_box.h > 0))
+                return _bounding_box;
 
             int minx = std::numeric_limits<int>::max();
             int miny = std::numeric_limits<int>::max();
@@ -111,7 +112,8 @@ class PixelArray
                 if (pixel.y > maxy) maxy = pixel.y;
             }
 
-            return (Rect){minx, miny, maxx - minx, maxy - miny};
+            _bounding_box = {minx, miny, maxx - minx, maxy - miny};
+            return _bounding_box;
         };
 };
 
@@ -174,7 +176,12 @@ class Map {
         float _HILLS_FREQUENCY = 0.5;
         float _HOLES_FREQUENCY = 0.5;
         float _CABINS_FREQUENCY = 0.5;
+        float _ISLANDS_FREQUENCY = 0.5;
 
+        std::atomic_bool _force_stop {false };
+        std::atomic_bool _generating { false };
+        std::atomic_int _thread_count { 0 };
+        std::string _generation_message;
         std::mutex mutex;
 
         std::unique_ptr<HorizontalAreas::Biome> _space;
@@ -185,6 +192,7 @@ class Map {
 
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
         std::vector<std::unique_ptr<MiniBiomes::Biome>> _mini_biomes;
+        std::vector<std::string> _errors;
 
     public:
         Map(){
@@ -197,227 +205,289 @@ class Map {
             _hell.reset(new HorizontalAreas::Biome(HorizontalAreas::HELL));
         };
 
-        int Width()
+        auto Width()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
             return _WIDTH;
         };
         
-        int Height()
+        auto Height()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
             return _HEIGHT;
         };
 
-        bool Width(int w)
+        auto Width(int w)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_WIDTH != w)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _WIDTH = w;
                 return true;
             }
             return false;
         };
 
-        bool Height(int h)
+        auto Height(int h)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_HEIGHT != h)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _HEIGHT = h;
                 return true;
             }
             return false;
         };
 
-        float CopperFrequency()
+        auto CopperFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _COPPER_FREQUENCY;
         };
 
-        bool CopperFrequency(float fq)
+        auto CopperFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_COPPER_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _COPPER_FREQUENCY = fq;
                 return true;
             }
             return false;
         };
 
-        float CopperSize()
+        auto CopperSize()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _COPPER_SIZE;
         };
 
-        bool CopperSize(float s)
+        auto CopperSize(float s)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_COPPER_SIZE != s)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _COPPER_SIZE = s;
                 return true;
             }
             return false;
         };
 
-        float IronFrequency()
+        auto IronFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _IRON_FREQUENCY;
         };
 
-        bool IronFrequency(float fq)
+        auto IronFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_IRON_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _IRON_FREQUENCY = fq;
                 return true;
             }
             return false;
         };
 
-        float IronSize()
+        auto IronSize()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _IRON_SIZE;
         };
 
-        bool IronSize(float s)
+        auto IronSize(float s)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_IRON_SIZE != s)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _IRON_SIZE = s;
                 return true;
             }
             return false;
         };
 
-        float SilverFrequency()
+        auto SilverFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _SILVER_FREQUENCY;
         };
 
-        bool SilverFrequency(float fq)
+        auto SilverFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_SILVER_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _SILVER_FREQUENCY = fq;
                 return true;
             }
             return false;
         };
 
-        float SilverSize()
+        auto SilverSize()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _SILVER_SIZE;
         };
 
-        bool SilverSize(float s)
+        auto SilverSize(float s)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_SILVER_SIZE != s)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _SILVER_SIZE = s;
                 return true;
             }
             return false;
         };
 
-        float GoldFrequency()
+        auto GoldFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _GOLD_FREQUENCY;
         };
 
-        bool GoldFrequency(float fq)
+        auto GoldFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_GOLD_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _GOLD_FREQUENCY = fq;
                 return true;
             }
             return false;
         };
 
-        float GoldSize()
+        auto GoldSize()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _GOLD_SIZE;
         };
 
-        bool GoldSize(float s)
+        auto GoldSize(float s)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_GOLD_SIZE != s)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _GOLD_SIZE = s;
                 return true;
             }
             return false;
         };
 
-        float HillsFrequency()
+        auto HillsFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _HILLS_FREQUENCY;
         };
 
-        bool HillsFrequency(float fq)
+        auto HillsFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_HILLS_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _HILLS_FREQUENCY = fq;
                 return true;
             }
             return false;
         };
 
-        float HolesFrequency()
+        auto HolesFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _HOLES_FREQUENCY;
         };
 
-        bool HolesFrequency(float fq)
+        auto HolesFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_HOLES_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _HOLES_FREQUENCY = fq;
                 return true;
             }
             return false;
         };
 
-        float CabinsFrequency()
+        auto CabinsFrequency()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _CABINS_FREQUENCY;
         };
 
-        bool CabinsFrequency(float fq)
+        auto CabinsFrequency(float fq)
         {
+            const std::lock_guard<std::mutex> lock(mutex);
             if (_CABINS_FREQUENCY != fq)
             {
-                const std::lock_guard<std::mutex> lock(mutex);
                 _CABINS_FREQUENCY = fq;
                 return true;
             }
             return false;
+        };
+
+        auto IslandsFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _ISLANDS_FREQUENCY;
+        };
+
+        auto IslandsFrequency(float fq)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_ISLANDS_FREQUENCY != fq)
+            {
+                _ISLANDS_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        auto IsGenerating()
+        {
+            return _generating.load();
+        };
+
+        void SetGenerating(bool value)
+        {
+            _generating.store(value);
+        };
+
+        void ThreadIncrement()
+        {
+            _thread_count += 1;
+        };
+
+        void ThreadDecrement()
+        {
+            _thread_count -= 1;
+        };
+
+        auto ThreadCount()
+        {
+            return _thread_count.load();
+        };
+        
+        void ForceStop(bool value)
+        {
+            _force_stop.store(value);
+        };
+
+        auto ForceStop()
+        {
+            return _force_stop.load();
+        };
+
+        void SetGenerationMessage(std::string msg)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _generation_message = msg;
+        };
+
+        auto GetGenerationMessage()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _generation_message;
         };
 
         HorizontalAreas::Biome& Space()
@@ -467,33 +537,27 @@ class Map {
         Biomes::Biome* GetBiome(Biomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
             for (auto& biome: _biomes)
-            {
                 if (biome->type == type)
                     return biome.get();
-            }
             return nullptr;
         }
 
         auto& Biomes()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
             return _biomes;
         }
 
         auto& MiniBiomes()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
             return _mini_biomes;
         }
 
         auto MiniBiome(MiniBiomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
             _mini_biomes.emplace_back(new MiniBiomes::Biome(type));
             return _mini_biomes[_mini_biomes.size() - 1].get();
         }
@@ -505,16 +569,42 @@ class Map {
                 area->clear();
             _biomes.clear();
             _mini_biomes.clear();
+            _errors.clear();
+        };
+
+        void Error(std::string msg)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _errors.push_back(msg);
+        };
+
+        auto Error()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _errors.back();
+        };
+
+        bool HasError()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _errors.size() > 0;
+        };
+
+        auto PopError()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            auto msg = _errors.back();
+            _errors.pop_back();
+            return msg;
         };
 };
 
 inline void FillWithRect(const Rect& rect, PixelArray& arr)
 {
-    printf("FillWithRect %d, %d, %d, %d \n", rect.x, rect.y, rect.w, rect.h);
     for (int x = rect.x; x < rect.x + rect.w; ++x)
         for (int y = rect.y; y < rect.y + rect.h; ++y)
             arr.add(x, y);
-    printf("FillWithRectEnd\n");
+    arr.bbox(rect);
 }
 
 inline void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
@@ -577,21 +667,13 @@ inline void PixelsAroundRect(int x, int y, int w, int h, PixelArray& array)
     int maxy = y + h / 2;
 
     for (int i = minx; i < maxx; i++)
-    {
         for (int j = miny; j < maxy; j++)
-        {
             array.add(i, j);
-        }
-    }
 };
 
 inline void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
 {
    for (int i = x; i < x + w; i++)
-   {
         for (int j = y; j < y + h; j++)
-        {
             array.add(i, j);
-        }
-   }
 };

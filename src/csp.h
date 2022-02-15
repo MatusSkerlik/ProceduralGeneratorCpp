@@ -44,8 +44,10 @@ class CSPSolver {
             return true; 
         };
 
-        std::unordered_map<V, D> backtracking_search(std::unordered_map<V, D> assignment)
-        {
+        std::unordered_map<V, D> backtracking_search(
+                std::unordered_map<V, D> assignment, 
+                std::function<bool(void)> continue_search = [](){ return true; }
+        ){
            if (assignment.size() == variables.size())
                return assignment;
 
@@ -58,11 +60,14 @@ class CSPSolver {
             auto variable = unassigned[0];
             for (auto& value: domains[variable]) 
             {
+                if (!continue_search())
+                    return assignment;
+
                 auto local_assignment = assignment;
                 local_assignment[variable] = value;
                 if (consistent(variable, local_assignment))
                 {
-                    auto result = backtracking_search(local_assignment);
+                    auto result = backtracking_search(local_assignment, continue_search);
                     if (result.size() != 0)
                         return result;
                 }

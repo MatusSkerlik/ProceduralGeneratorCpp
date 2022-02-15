@@ -229,46 +229,54 @@ EXPORT void define_biomes(Map& map)
     for (auto& c: constraints) { solver.add_constraint(c); }
 
     // SEARCH FOR RESULT
-    auto result = solver.backtracking_search({}); 
-
-    // RESULT HANDLING
-    // DEFINITION OF JUNGLE
-    auto jungle_x = result["jungle"];  
-    auto jungle = map.Biome(Biomes::JUNGLE);
-    for (int i = Surface.y; i < Hell.y; i++)
-    {
-        PixelsAroundRect(jungle_x + i, i, jungle_width, 2, *jungle);
-    }
-
-    // DEFINITION OF TUNDRA
-    auto tundra_x = result["tundra"];
-    auto tundra = map.Biome(Biomes::TUNDRA);
-    for (int i = Surface.y; i < Hell.y; i++)
-    {
-        PixelsAroundRect(tundra_x - i, i, tundra_width, 2, *tundra);
-    }
-
-    // DEFINITION OF FORESTS
-    PixelArray forests;
-    FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), forests);
+    auto result = solver.backtracking_search({}, [&](){ return !map.ForceStop(); });
+    if (map.ForceStop())
+        return;
     
-    // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
-    for (auto pixel: *ocean_left) { forests.remove(pixel); }
-    for (auto pixel: *ocean_right) { forests.remove(pixel); }
-    for (auto pixel: *jungle) { forests.remove(pixel); }
-    for (auto pixel: *tundra) { forests.remove(pixel); }
-
-    assert(forests.size() > 0);
-    while (forests.size() > 0)
+    if (result.size() < variables.size())
     {
-        auto forest = map.Biome(Biomes::FOREST);
-        auto& p = *forests.begin(); 
-        UnitedPixelArea(forests, p.x, p.y, *forest);
+        map.Error("COULD NOT FIND SOLUTION FOR BIOME PLACEMENT");
+        return;
+    } 
+    else 
+    {
+        // RESULT HANDLING
+        // DEFINITION OF JUNGLE
+        auto jungle_x = result["jungle"];  
+        auto jungle = map.Biome(Biomes::JUNGLE);
+        for (int i = Surface.y; i < Hell.y; i++)
+        {
+            PixelsAroundRect(jungle_x + i, i, jungle_width, 2, *jungle);
+        }
 
-        for (auto& p: *forest) { forests.remove(p); }
+        // DEFINITION OF TUNDRA
+        auto tundra_x = result["tundra"];
+        auto tundra = map.Biome(Biomes::TUNDRA);
+        for (int i = Surface.y; i < Hell.y; i++)
+        {
+            PixelsAroundRect(tundra_x - i, i, tundra_width, 2, *tundra);
+        }
+
+        // DEFINITION OF FORESTS
+        PixelArray forests;
+        FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), forests);
+        
+        // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
+        for (auto pixel: *ocean_left) { forests.remove(pixel); }
+        for (auto pixel: *ocean_right) { forests.remove(pixel); }
+        for (auto pixel: *jungle) { forests.remove(pixel); }
+        for (auto pixel: *tundra) { forests.remove(pixel); }
+
+        assert(forests.size() > 0);
+        while (forests.size() > 0)
+        {
+            auto forest = map.Biome(Biomes::FOREST);
+            auto& p = *forests.begin(); 
+            UnitedPixelArea(forests, p.x, p.y, *forest);
+            for (auto& p: *forest) { forests.remove(p); }
+        }
     }
 };
-
 
 /*
  * Define minibiomes hill, hole, island
@@ -279,7 +287,7 @@ EXPORT void define_hills_holes_islands(Map& map)
     
     int hill_count = map.HillsFrequency() * 12;
     int hole_count = map.HolesFrequency() * 10;
-    int floating_island_count = 4;
+    int floating_island_count = map.IslandsFrequency() * 8;
 
     int ocean_width = 250;
     int hill_width = 80;
@@ -342,31 +350,41 @@ EXPORT void define_hills_holes_islands(Map& map)
     for (auto& constraint: constraints) { solver.add_constraint(constraint); }
     
     // SEARCH FOR RESULT
-    auto result = solver.backtracking_search({});
+    auto result = solver.backtracking_search({}, [&](){ return !map.ForceStop(); });
+    if (map.ForceStop())
+        return;
 
-    // REUSLT HANDLING
-    for (auto& var: holes)
+    if (result.size() < variables.size())
     {
-        auto x = result[var];
-        auto hole = map.MiniBiome(MiniBiomes::HOLE);
-        Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
-        CreateHole(rect, *hole);
+        map.Error("COULD NOT FIND SOLUTION TO HILL, HOLE, ISLAND PLACEMENT");
+        return;
     }
-    
-    for (auto& var: hills)
+    else
     {
-        auto x = result[var];
-        auto hill = map.MiniBiome(MiniBiomes::HILL);
-        Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
-        CreateHill(rect, *hill);
-    }
+        // REUSLT HANDLING
+        for (auto& var: holes)
+        {
+            auto x = result[var];
+            auto hole = map.MiniBiome(MiniBiomes::HOLE);
+            Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
+            CreateHole(rect, *hole);
+        }
+        
+        for (auto& var: hills)
+        {
+            auto x = result[var];
+            auto hill = map.MiniBiome(MiniBiomes::HILL);
+            Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
+            CreateHill(rect, *hill);
+        }
 
-    for (auto& var: islands)
-    {
-        auto x = result[var];
-        auto island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
-        Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
-        PixelsAroundRect(rect.x, rect.y, rect.w, rect.h, *island);
+        for (auto& var: islands)
+        {
+            auto x = result[var];
+            auto island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
+            Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
+            PixelsAroundRect(rect.x, rect.y, rect.w, rect.h, *island);
+        }
     }
 };
 
@@ -415,17 +433,26 @@ EXPORT void define_cabins(Map& map)
     for (auto& c: constraints) { solver.add_constraint(c); }
 
     // SEARCH FOR RESULT
-    auto result = solver.backtracking_search({});
-    
-    // RESULT HANDLING
-    for (auto& var: variables) 
-    {
-        auto v = result[var];
-        auto x = (int) tundra_rect.x + (cabin_width / 2) + (v % tundra_rect.w); 
-        auto y = (int) tundra_rect.y + (v / tundra_rect.w);
+    auto result = solver.backtracking_search({}, [&](){ return !map.ForceStop(); });
+    if (map.ForceStop())
+        return;
 
-        auto cabin = map.MiniBiome(MiniBiomes::CABIN); 
-        PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, *cabin);
+    if (result.size() < variables.size())
+    {
+        map.Error("COULD NOT FIND SOLUTION FOR CABIN PLACEMENT.");
+        return;
+    }
+    else 
+    {
+        for (auto& var: variables) 
+        {
+            auto v = result[var];
+            auto x = (int) tundra_rect.x + (cabin_width / 2) + (v % tundra_rect.w); 
+            auto y = (int) tundra_rect.y + (v / tundra_rect.w);
+
+            auto cabin = map.MiniBiome(MiniBiomes::CABIN); 
+            PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, *cabin);
+        }
     }
 };
 

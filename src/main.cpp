@@ -2,6 +2,7 @@
 #include <thread>
 #include <future>
 #include <functional>
+#include <assert.h>
 #include "libloaderapi.h"
 #include "utils.h"
 
@@ -120,9 +121,11 @@ PCG_FUNC define_biomes;
 PCG_FUNC define_hills_holes_islands;
 PCG_FUNC define_cabins;
 
-bool PCGDrawReady = false;
-bool PCGGenerating = false;
-bool PCGRegenerate = false;
+std::atomic_bool PCGRegenerate { false };
+std::atomic_bool DrawStage0 { false };
+std::atomic_bool DrawStage1 { false };
+std::atomic_bool DrawStage2 { false };
+
 
 void PCGFunction(PCG_FUNC func, Map* map, std::promise<void>* barrier)
 {
@@ -162,36 +165,70 @@ bool PCGLoaded()
 
 void _PCGGen(Map& map)
 {
-    // stage 0
-    printf("Stage0\n");
-    auto _0 = std::thread(define_horizontal, std::ref(map));
-    _0.join();
+    LoadPCG();
+    if (!map.ForceStop())
+    {
+        // stage 0
+        map.ThreadIncrement();
+            auto _0 = std::thread(define_horizontal, std::ref(map));
+            map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
+            _0.join();
+        map.ThreadDecrement();
+        DrawStage0 = true;
+    }
 
-    // stage 1
-    printf("Stage1\n");
-    auto _1 = std::thread(define_biomes, std::ref(map));
-    _1.join();
+    if (!map.ForceStop())
+    {
+        // stage 1
+        map.ThreadIncrement();
+            auto _1 = std::thread(define_biomes, std::ref(map));
+            map.SetGenerationMessage("DEFINITION OF BIOMES...");
+            _1.join();
+        map.ThreadDecrement();
+        DrawStage1 = true;
+    }
 
-    //stage 2
-    printf("Stage2\n");
-    auto _2 = std::thread(define_hills_holes_islands, std::ref(map));
-    auto _3 = std::thread(define_cabins, std::ref(map));
-    _2.join();
-    _3.join();
+    if (!map.ForceStop())
+    {
+        //stage 2
+        map.ThreadIncrement();
+            auto _2 = std::thread(define_hills_holes_islands, std::ref(map));
 
-    PCGDrawReady = true;
-    PCGGenerating = false;
+            map.ThreadIncrement();
+                auto _3 = std::thread(define_cabins, std::ref(map));
+                map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
+                _2.join();
+            map.ThreadDecrement();
+            
+            map.SetGenerationMessage("DEFINITION OF UNDERGROUND CABINS...");
+            _3.join();
+        map.ThreadDecrement();
+        DrawStage2 = true;
+    }
+
+    assert(map.ThreadCount() == 0);
+    map.SetGenerationMessage("");
+    map.ForceStop(false);
+    map.SetGenerating(false);
+    FreePCG();
 };
 
 void PCGGen(Map& map)
 {
-    PCGGenerating = true;
+    PCGRegenerate = false;
+    DrawStage0 = false;
+    DrawStage1 = false;
+    DrawStage2 = false;
+    map.SetGenerationMessage("");
+    map.ForceStop(false);
+    map.SetGenerating(true); 
     auto thread = std::thread(_PCGGen, std::ref(map));
     thread.detach();
 };
 
-void PCGReGen()
+void PCGReGen(Map& map)
 {
+    map.ForceStop(true);
     PCGRegenerate = true;  
 };
 
@@ -210,10 +247,10 @@ void ChangeSeed()
 int main(void)
 {
     // BASE CONSTANTS
-    const int width = 1640;
-    const int height = 600;
-    const int map_width = 4200;
-    const int map_height = 1200;
+    const float width = 1640;
+    const float height = 600;
+    const float map_width = 4200;
+    const float map_height = 1200;
 
     // RAYLIB INIT
     InitWindow(width, height + 16, "Procedural Terrain Generator");
@@ -233,7 +270,7 @@ int main(void)
     float map_view_width = width - settings_width - em - em;
     float map_view_height = height - map_view_anchor.y - em; 
 
-    camera.zoom = (float) map_view_width / map_width;
+    camera.zoom = map_view_width / map_width;
     Rectangle map_view {map_view_anchor.x, map_view_anchor.y, map_view_width, map_view_height};
 
     bool SeedTextBoxEditMode = false;
@@ -248,41 +285,49 @@ int main(void)
     map.Width(map_width);
     map.Height(map_height);
 
-    if (LoadPCG())
-        PCGGen(map);
+    PCGGen(map);
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
-        if (PCGDrawReady)
+        if (DrawStage0)
         {
-            FreePCG();
             BeginTextureMode(canvas);
                 DrawHorizontal(map);
+            EndTextureMode();
+
+            DrawStage0 = false;
+        }
+        
+        if (DrawStage1)
+        {
+            BeginTextureMode(canvas);
                 DrawBiomes(map);
+            EndTextureMode();
+
+            DrawStage1 = false;
+        }
+   
+        if (DrawStage2)
+        {
+            BeginTextureMode(canvas);
                 DrawMiniBiomes(map);
             EndTextureMode();
 
-            PCGDrawReady = false;
-        }
-            
-        // RELOAD DLL
-        if (IsKeyDown(KEY_R) && !PCGGenerating)
-        {
-            if (ReloadPCG())
-            {
-                map.clear();
-                PCGGen(map);
-            }
+            DrawStage2 = false;
         }
 
-        if (PCGRegenerate && !PCGGenerating)
+        // RELOAD DLL
+        if (IsKeyDown(KEY_R) && !map.IsGenerating())
         {
-            if (ReloadPCG())
-            {
-                map.clear();
-                PCGGen(map);
-                PCGRegenerate = false;
-            }
+            map.clear();
+            PCGGen(map);
+        }
+
+        if (PCGRegenerate && !map.IsGenerating())
+        {
+            PCGRegenerate = false;
+            map.clear();
+            PCGGen(map);
         }
         
         // DRAW LOGIC
@@ -291,18 +336,18 @@ int main(void)
 
             if (PCGLoaded()) // IF DLL LOADED SHOW SETTINGS WITH MAP
             {
-                GuiGroupBox((Rectangle){em, em, (float)2 * em + 300, height - 2 * em}, "SETTINGS");
+                GuiGroupBox((Rectangle){em, em, 2 * em + 300, height - 2 * em}, "SETTINGS");
 
-                if (GuiButton((Rectangle){(float) 2 * em + im + 92, 2 * em, 64, 24}, "Seed"))
+                if (GuiButton((Rectangle){2 * em + im + 92, 2 * em, 64, 24}, "Seed"))
                     ChangeSeed();
 
-                if (GuiTextBox((Rectangle){(float) 2 * em, 2 * em, 92, 24}, SeedTextBoxText, 128, SeedTextBoxEditMode))
+                if (GuiTextBox((Rectangle){ 2 * em, 2 * em, 92, 24}, SeedTextBoxText, 128, SeedTextBoxEditMode))
                     SeedTextBoxEditMode = !SeedTextBoxEditMode;
 
                 TabActive = GuiToggleGroup((Rectangle){2 * em, 2 * em + 2 * 24, 92, 24}, "MATERIALS;ENTITIES;WORLD", TabActive);
                 if (TabActive == 0)
                 {
-                    GuiLabel((Rectangle){2 * em, 2 * em + 24, (float) width - 4 * 8, 24}, "Settings about materials");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 24, width - 4 * 8, 24}, "Settings about materials");
                     
                     GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
                     GuiLabel((Rectangle){2 * em + 2 * 92 + im, 5 * em + 2 * 24, 92, 24}, "SIZE");
@@ -313,44 +358,47 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "GOLD ORE");
 
                     if (map.CopperFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.IronFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.SilverFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.GoldFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
 
                     if (map.CopperSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperSize(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.IronSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronSize(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.SilverSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverSize(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.GoldSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldSize(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                 }
                 else if (TabActive == 1)
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "Settings about entities in map");
+                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "Settings about entities in map");
 
                     GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
 
                     GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "HILLS");
                     GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "HOLES");
                     GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "CABINS");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
 
                     if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.HolesFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.HolesFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
                     if (map.CabinsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.CabinsFrequency(), 0.0, 1.0)))
-                        PCGReGen();
+                        PCGReGen(map);
+                    if (map.IslandsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.IslandsFrequency(), 0.0, 1.0)))
+                        PCGReGen(map);
 
                 }
                 else
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, (float) width - 4 * 8, 24}, "Lorem ipsum");
+                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "Lorem ipsum");
                 }
 
                 ScrollView = GuiScrollPanel(map_view, (Rectangle){0, 0, map_width * camera.zoom, map_height * camera.zoom}, &ScrollOffset);
@@ -362,11 +410,25 @@ int main(void)
                     EndMode2D();
                 EndScissorMode();
 
-                if (PCGGenerating) DrawText("GENERAION IN PROGRESS...", em, height, 8, WHITE);
+                if (map.IsGenerating())
+                { 
+                    DrawText(map.GetGenerationMessage().c_str(), em, height, 8, WHITE);
+                }
+                else if (map.HasError()) 
+                { 
+                    auto error = map.Error();
+                    auto error_width = (float) (error.size() * 4.8 + 2 * em);
+                    if (error_width < 100) error_width = 100;
+
+                    if (GuiMessageBox((Rectangle){width / 2 - error_width / 2, height / 2 - 50, error_width, 100}, "ERROR", error.c_str(), "OK") != -1)
+                    {
+                        map.PopError();    
+                    }
+                };
             } 
             else // IF NOT, SHOW WARNING
             {
-                if (GuiMessageBox((Rectangle){(float)(width / 2) - 100, (float)(height / 2) - 100, 200, 100}, "Error", "pcg.dll not found.", "ok") != -1)
+                if (GuiMessageBox((Rectangle){(width / 2) - 100, height / 2 - 100, 200, 100}, "ERROR", "PCG.DLL NOT FOUND", "OK") != -1)
                 {
                     CloseWindow();
                     return 0;
