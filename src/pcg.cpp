@@ -199,11 +199,11 @@ EXPORT void define_biomes(Map& map)
     Rect Surface = map.Surface().bbox();
     Rect Hell = map.Hell().bbox();
 
-    auto ocean_left = map.Biome(Biomes::OCEAN);
-    PixelsOfRect(0, Surface.y, ocean_width, Surface.h, *ocean_left); 
+    auto& ocean_left = map.Biome(Biomes::OCEAN);
+    PixelsOfRect(0, Surface.y, ocean_width, Surface.h, ocean_left); 
 
-    auto ocean_right = map.Biome(Biomes::OCEAN);
-    PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, *ocean_right);
+    auto& ocean_right = map.Biome(Biomes::OCEAN);
+    PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, ocean_right);
 
     // USE CSP TO FIND LOCATIONS FOR JUNGLE AND TUNDRA 
     // DEFINITION OF VARIABLES
@@ -243,18 +243,18 @@ EXPORT void define_biomes(Map& map)
         // RESULT HANDLING
         // DEFINITION OF JUNGLE
         auto jungle_x = result["jungle"];  
-        auto jungle = map.Biome(Biomes::JUNGLE);
+        auto& jungle = map.Biome(Biomes::JUNGLE);
         for (int i = Surface.y; i < Hell.y; i++)
         {
-            PixelsAroundRect(jungle_x + i, i, jungle_width, 2, *jungle);
+            PixelsAroundRect(jungle_x + i, i, jungle_width, 2, jungle);
         }
 
         // DEFINITION OF TUNDRA
         auto tundra_x = result["tundra"];
-        auto tundra = map.Biome(Biomes::TUNDRA);
+        auto& tundra = map.Biome(Biomes::TUNDRA);
         for (int i = Surface.y; i < Hell.y; i++)
         {
-            PixelsAroundRect(tundra_x - i, i, tundra_width, 2, *tundra);
+            PixelsAroundRect(tundra_x - i, i, tundra_width, 2, tundra);
         }
 
         // DEFINITION OF FORESTS
@@ -262,18 +262,18 @@ EXPORT void define_biomes(Map& map)
         FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), forests);
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
-        for (auto pixel: *ocean_left) { forests.remove(pixel); }
-        for (auto pixel: *ocean_right) { forests.remove(pixel); }
-        for (auto pixel: *jungle) { forests.remove(pixel); }
-        for (auto pixel: *tundra) { forests.remove(pixel); }
+        for (auto& pixel: ocean_left) { forests.remove(pixel); }
+        for (auto& pixel: ocean_right) { forests.remove(pixel); }
+        for (auto& pixel: jungle) { forests.remove(pixel); }
+        for (auto& pixel: tundra) { forests.remove(pixel); }
 
         assert(forests.size() > 0);
         while (forests.size() > 0)
         {
-            auto forest = map.Biome(Biomes::FOREST);
+            auto& forest = map.Biome(Biomes::FOREST);
             auto& p = *forests.begin(); 
-            UnitedPixelArea(forests, p.x, p.y, *forest);
-            for (auto& p: *forest) { forests.remove(p); }
+            UnitedPixelArea(forests, p.x, p.y, forest);
+            for (auto& p: forest) { forests.remove(p); }
         }
     }
 };
@@ -283,6 +283,8 @@ EXPORT void define_biomes(Map& map)
  */ 
 EXPORT void define_hills_holes_islands(Map& map)
 {
+    printf("define hills, holes, islands\n");
+
     int width = map.Width();
     
     int hill_count = map.HillsFrequency() * 12;
@@ -365,25 +367,28 @@ EXPORT void define_hills_holes_islands(Map& map)
         for (auto& var: holes)
         {
             auto x = result[var];
-            auto hole = map.MiniBiome(MiniBiomes::HOLE);
+            printf("Creating hole at x: %d\n", x);
+            auto& hole = map.MiniBiome(MiniBiomes::HOLE);
             Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
-            CreateHole(rect, *hole);
+            CreateHole(rect, hole);
         }
         
         for (auto& var: hills)
         {
+            printf("Creating hill\n");
             auto x = result[var];
-            auto hill = map.MiniBiome(MiniBiomes::HILL);
+            auto& hill = map.MiniBiome(MiniBiomes::HILL);
             Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
-            CreateHill(rect, *hill);
+            CreateHill(rect, hill);
         }
 
         for (auto& var: islands)
         {
+            printf("Creating island\n");
             auto x = result[var];
-            auto island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
+            auto& island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
             Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
-            PixelsAroundRect(rect.x, rect.y, rect.w, rect.h, *island);
+            PixelsAroundRect(rect.x, rect.y, rect.w, rect.h, island);
         }
     }
 };
@@ -393,6 +398,8 @@ EXPORT void define_hills_holes_islands(Map& map)
  */ 
 EXPORT void define_cabins(Map& map)
 {
+    printf("define cabins\n");
+
     int cabin_count = map.CabinsFrequency() * 20;
     int cabin_width = 80;
     int cabin_height = 40;
@@ -446,12 +453,13 @@ EXPORT void define_cabins(Map& map)
     {
         for (auto& var: variables) 
         {
+            printf("Creating cabin\n");
             auto v = result[var];
             auto x = (int) tundra_rect.x + (cabin_width / 2) + (v % tundra_rect.w); 
             auto y = (int) tundra_rect.y + (v / tundra_rect.w);
 
-            auto cabin = map.MiniBiome(MiniBiomes::CABIN); 
-            PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, *cabin);
+            auto& cabin = map.MiniBiome(MiniBiomes::CABIN); 
+            PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, cabin);
         }
     }
 };

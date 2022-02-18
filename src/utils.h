@@ -1,3 +1,4 @@
+#include <functional>
 #include <stdio.h>
 #include <mutex>
 #include <memory>
@@ -127,6 +128,13 @@ namespace HorizontalAreas
             Type type;
             Biome(): PixelArray() {};
             Biome(Type _t): PixelArray(), type{_t} {};
+
+            auto operator=(Biome&& biome)
+            {
+               this->type = std::move(biome.type);
+               this->_set_pixels = std::move(_set_pixels);
+               this->_bounding_box = std::move(biome._bounding_box);
+            };
     };
 
 }
@@ -184,26 +192,18 @@ class Map {
         std::string _generation_message;
         std::mutex mutex;
 
-        std::unique_ptr<HorizontalAreas::Biome> _space;
-        std::unique_ptr<HorizontalAreas::Biome> _surface;
-        std::unique_ptr<HorizontalAreas::Biome> _underground;
-        std::unique_ptr<HorizontalAreas::Biome> _cavern;
-        std::unique_ptr<HorizontalAreas::Biome> _hell;
+        HorizontalAreas::Biome _space {HorizontalAreas::SPACE};
+        HorizontalAreas::Biome _surface {HorizontalAreas::SURFACE};
+        HorizontalAreas::Biome _underground {HorizontalAreas::UNDERGROUND};
+        HorizontalAreas::Biome _cavern {HorizontalAreas::CAVERN};
+        HorizontalAreas::Biome _hell {HorizontalAreas::HELL};
 
-        std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
-        std::vector<std::unique_ptr<MiniBiomes::Biome>> _mini_biomes;
+        std::vector<Biomes::Biome> _biomes;
+        std::vector<MiniBiomes::Biome> _mini_biomes;
         std::vector<std::string> _errors;
 
     public:
-        Map(){
-            printf("Map();\n");
-
-            _space.reset(new HorizontalAreas::Biome(HorizontalAreas::SPACE));
-            _surface.reset(new HorizontalAreas::Biome(HorizontalAreas::SURFACE));
-            _underground.reset(new HorizontalAreas::Biome(HorizontalAreas::UNDERGROUND));
-            _cavern.reset(new HorizontalAreas::Biome(HorizontalAreas::CAVERN));
-            _hell.reset(new HorizontalAreas::Biome(HorizontalAreas::HELL));
-        };
+        Map(){ printf("Map();\n"); };
 
         auto Width()
         {
@@ -490,56 +490,55 @@ class Map {
             return _generation_message;
         };
 
-        HorizontalAreas::Biome& Space()
+        auto& Space()
         { 
             const std::lock_guard<std::mutex> lock(mutex);
-            return *_space.get(); 
+            return _space; 
         };
         
-        HorizontalAreas::Biome& Surface()
+        auto& Surface()
         { 
             const std::lock_guard<std::mutex> lock(mutex);
-            return *_surface.get(); 
+            return _surface; 
         };
         
-        HorizontalAreas::Biome& Underground()
+        auto& Underground()
         { 
             const std::lock_guard<std::mutex> lock(mutex);
-            return *_underground.get(); 
+            return _underground; 
         };
         
-        HorizontalAreas::Biome& Cavern()
+        auto& Cavern()
         { 
             const std::lock_guard<std::mutex> lock(mutex);
-            return *_cavern.get(); 
+            return _cavern; 
         };
         
-        HorizontalAreas::Biome& Hell()
+        auto& Hell()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            return *_hell.get(); 
+            return _hell; 
         };
 
-        std::vector<HorizontalAreas::Biome*> HorizontalAreas()
+        std::vector<std::reference_wrapper<HorizontalAreas::Biome>> HorizontalAreas()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            return {_space.get(), _surface.get(), _underground.get(), _cavern.get(), _hell.get()};
+            return {_space, _surface, _underground, _cavern, _hell};
         }
 
-        auto Biome(Biomes::Type type)
+        auto& Biome(Biomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-
-            _biomes.emplace_back(new Biomes::Biome(type));
-            return _biomes[_biomes.size() - 1].get();
+            _biomes.emplace_back(type);
+            return _biomes[_biomes.size() - 1];
         }
 
         Biomes::Biome* GetBiome(Biomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             for (auto& biome: _biomes)
-                if (biome->type == type)
-                    return biome.get();
+                if (biome.type == type)
+                    return &biome;
             return nullptr;
         }
 
@@ -555,21 +554,40 @@ class Map {
             return _mini_biomes;
         }
 
-        auto MiniBiome(MiniBiomes::Type type)
+        auto& MiniBiome(MiniBiomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _mini_biomes.emplace_back(new MiniBiomes::Biome(type));
-            return _mini_biomes[_mini_biomes.size() - 1].get();
+            _mini_biomes.emplace_back(type);
+            return _mini_biomes[_mini_biomes.size() - 1];
         }
 
-        void clear()
+        void ClearStage0()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            for (auto& area: {_space.get(), _surface.get(), _underground.get(), _cavern.get(), _hell.get()})
-                area->clear();
+            _space.clear();
+            _surface.clear();
+            _underground.clear();
+            _cavern.clear();
+            _hell.clear();
+        };
+
+        void ClearStage1()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
             _biomes.clear();
+        };
+
+        void ClearStage2()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
             _mini_biomes.clear();
-            _errors.clear();
+        };
+
+        void ClearAll()
+        {
+            ClearStage0();
+            ClearStage1();
+            ClearStage2();
         };
 
         void Error(std::string msg)

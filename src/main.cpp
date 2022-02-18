@@ -1,3 +1,5 @@
+#include <atomic>
+#include <mutex>
 #include <stdio.h>
 #include <thread>
 #include <future>
@@ -27,11 +29,12 @@ using namespace std::chrono_literals;
 
 void DrawHorizontal(Map& map)
 {
-    for (auto& area: map.HorizontalAreas())
+    for (auto& ref: map.HorizontalAreas())
     {
-        Rect rect = area->bbox();
+        auto& area = ref.get();
+        Rect rect = area.bbox();
         Color color;
-        switch (area->type)
+        switch (area.type)
         {
             case HorizontalAreas::SPACE:
                 color = C_SPACE;
@@ -59,9 +62,9 @@ void DrawBiomes(Map& map)
 {
     for (auto& biome: map.Biomes())
     {
-        for (auto& p: *biome)
+        for (auto& p: biome)
         {
-            switch (biome->type)
+            switch (biome.type)
             {
                 case Biomes::TUNDRA:
                     DrawPixel(p.x, p.y, (Color){255, 255, 255, 32});
@@ -86,9 +89,9 @@ void DrawMiniBiomes(Map& map)
 {
     for (auto& biome: map.MiniBiomes())
     {
-        for (auto& p: *biome)
+        for (auto& p: biome)
         {
-            switch (biome->type)
+            switch (biome.type)
             {
                 case MiniBiomes::HILL:
                     DrawPixel(p.x, p.y, C_UNDERGROUND);
@@ -116,22 +119,28 @@ void DrawMiniBiomes(Map& map)
 **************************************************/
 typedef void (*PCG_FUNC)(Map&);
 
+
 HMODULE module;
 PCG_FUNC define_horizontal;
 PCG_FUNC define_biomes;
 PCG_FUNC define_hills_holes_islands;
 PCG_FUNC define_cabins;
 
-std::atomic_bool PCGRegenerate { false };
+std::atomic_bool GenerateStage0 { false };
+std::atomic_bool GenerateStage1 { false };
+std::atomic_bool GenerateStage2 { false };
 std::atomic_bool DrawStage0 { false };
 std::atomic_bool DrawStage1 { false };
 std::atomic_bool DrawStage2 { false };
 
+std::atomic_bool GenerationScheduled { false };
+std::atomic_bool ScheduleThreadRunning { false };
 
-void PCGFunction(PCG_FUNC func, Map* map, std::promise<void>* barrier)
+void PCGFunction(PCG_FUNC func, Map& map)
 {
-    func(*map);
-    barrier->set_value();
+    map.ThreadIncrement();
+    func(std::ref(map));
+    map.ThreadDecrement();
 };
 
 bool LoadPCG()
@@ -167,86 +176,132 @@ bool PCGLoaded()
 void _PCGGen(Map& map)
 {
     LoadPCG();
-    if (!map.ShouldForceStop())
+    printf("Dll load\n");
+
+    // STAGE 0
+    if (!map.ShouldForceStop() && GenerateStage0)
     {
-        // stage 0
-        map.ThreadIncrement();
-            auto define_horizontal_future = std::async(std::launch::async, define_horizontal, std::ref(map));
-            map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
-            if (define_horizontal_future.wait_for(1s) == std::future_status::timeout)
-            {
-                map.SetForceStop(true);
-                map.Error("DEFINITION OF HORIZONTAL AREAS INFEASIBLE");
-            }
-        map.ThreadDecrement();
-        DrawStage0 = true;
+        map.ClearStage0();
+     
+        auto define_horizontal_future = std::async(std::launch::async, PCGFunction, define_horizontal, std::ref(map));
+
+        map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
+        if (define_horizontal_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF HORIZONTAL AREAS INFEASIBLE");
+        }
     }
+    DrawStage0 = true;
+
+    // STAGE 1
+    if (!map.ShouldForceStop() && GenerateStage1)
+    {
+        map.ClearStage1();
+
+        auto define_biomes_future = std::async(std::launch::async, PCGFunction, define_biomes, std::ref(map));
+
+        map.SetGenerationMessage("DEFINITION OF BIOMES...");
+        if (define_biomes_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF BIOMES INFEASIBLE");
+        }
+    }
+    DrawStage1 = true;
+
+    // STAGE 2
+    if (!map.ShouldForceStop() && GenerateStage2)
+    {
+        map.ClearStage2();
+
+        auto define_minibiomes_future = std::async(std::launch::async, PCGFunction, define_hills_holes_islands, std::ref(map));
+        auto define_cabins_future = std::async(std::launch::async, PCGFunction, define_cabins, std::ref(map));
+
+        map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
+        if (define_minibiomes_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF HILLS, HOLES, ISLANDS INFEASIBLE");
+        }
+        
+        map.SetGenerationMessage("DEFINITION OF UNDERGROUND CABINS...");
+        if (define_cabins_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF UNDERGROUND CABINS INFEASIBLE");
+        }
+    }
+    DrawStage2 = true;
 
     if (!map.ShouldForceStop())
     {
-        // stage 1
-        map.ThreadIncrement();
-            auto define_biomes_future = std::async(std::launch::async, define_biomes, std::ref(map));
-            map.SetGenerationMessage("DEFINITION OF BIOMES...");
-            if (define_biomes_future.wait_for(4s) == std::future_status::timeout)
-            {
-                map.SetForceStop(true);
-                map.Error("DEFINITION OF BIOMES INFEASIBLE");
-            }
-        map.ThreadDecrement();
-        DrawStage1 = true;
+        GenerateStage0 = false;
+        GenerateStage1 = false;
+        GenerateStage2 = false;
     }
 
-    if (!map.ShouldForceStop())
-    {
-        //stage 2
-        map.ThreadIncrement();
-            auto define_minibiomes_future = std::async(std::launch::async, define_hills_holes_islands, std::ref(map));
-            
-            map.ThreadIncrement();
-                auto define_cabins_future = std::async(std::launch::async, define_cabins, std::ref(map));
-                map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
-                if (define_minibiomes_future.wait_for(4s) == std::future_status::timeout)
-                {
-                    map.SetForceStop(true);
-                    map.Error("DEFINITION OF HILLS, HOLES, ISLANDS INFEASIBLE");
-                }
-            map.ThreadDecrement();
-            
-            map.SetGenerationMessage("DEFINITION OF UNDERGROUND CABINS...");
-            if (define_cabins_future.wait_for(4s) == std::future_status::timeout)
-            {
-                map.SetForceStop(true);
-                map.Error("DEFINITION OF UNDERGROUND CABINS INFEASIBLE");
-            }
-        map.ThreadDecrement();
-        DrawStage2 = true;
-    }
-
-    assert(map.ThreadCount() == 0);
+    // FINALIZE
+    while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
     map.SetGenerationMessage("");
     map.SetGenerating(false);
+
     FreePCG();
+    printf("Free DLL\n");
 };
 
 void PCGGen(Map& map)
 {
-    PCGRegenerate = false;
-    DrawStage0 = false;
-    DrawStage1 = false;
-    DrawStage2 = false;
-    map.SetGenerationMessage("");
-    map.SetForceStop(false);
     map.SetGenerating(true); 
+    map.SetForceStop(false);
+
     auto thread = std::thread(_PCGGen, std::ref(map));
     thread.detach();
 };
 
-void PCGReGen(Map& map)
+void ScheduleGeneration(Map& map)
 {
-    map.SetForceStop(true);
-    PCGRegenerate = true;  
+    GenerationScheduled = true;
+    if (!ScheduleThreadRunning)
+    {
+        ScheduleThreadRunning = true;
+        auto _ = std::thread([&](){
+            while (GenerationScheduled || map.IsGenerating())
+            {
+                if (map.IsGenerating() && !map.ShouldForceStop())
+                    map.SetForceStop(true);
+                GenerationScheduled = false;
+                std::this_thread::sleep_for(0.5s);
+            }
+            // HERE WE ARE SURE THAT LAST GENERATION EXITED
+            PCGGen(std::ref(map));
+            ScheduleThreadRunning = false;
+        });
+        _.detach();
+    }
 };
+
+void PCGRegenerateHorizontalAreas(Map& map)
+{
+    GenerateStage0 = true;
+    GenerateStage1 = true;
+    GenerateStage2 = true;
+    ScheduleGeneration(map);
+};
+
+void PCGRegenerateBiomes(Map& map)
+{
+    GenerateStage1 = true;
+    GenerateStage2 = true;
+    ScheduleGeneration(map);
+};
+
+void PCGRegenerateMinibiomes(Map& map)
+{
+    GenerateStage2 = true;
+    ScheduleGeneration(map);
+};
+
 
 /**************************************************
 *
@@ -259,6 +314,7 @@ void ChangeSeed()
 
 };
 
+void Pass(){};
 
 int main(void)
 {
@@ -301,7 +357,10 @@ int main(void)
     map.Width(map_width);
     map.Height(map_height);
 
-    PCGGen(map);
+    GenerateStage0 = true;
+    GenerateStage1 = true;
+    GenerateStage2 = true;
+    ScheduleGeneration(map);
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
@@ -335,17 +394,10 @@ int main(void)
         // RELOAD DLL
         if (IsKeyDown(KEY_R) && !map.IsGenerating())
         {
-            map.clear();
-            PCGGen(map);
+            map.ClearAll();
+            ScheduleGeneration(map);
         }
 
-        if (PCGRegenerate && !map.IsGenerating())
-        {
-            PCGRegenerate = false;
-            map.clear();
-            PCGGen(map);
-        }
-        
         // DRAW LOGIC
         BeginDrawing();
             ClearBackground((Color){60, 56, 54, 255});
@@ -374,22 +426,22 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "GOLD ORE");
 
                     if (map.CopperFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                     if (map.IronFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                     if (map.SilverFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                     if (map.GoldFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
 
                     if (map.CopperSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperSize(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                     if (map.IronSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronSize(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                     if (map.SilverSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverSize(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                     if (map.GoldSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldSize(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        Pass();
                 }
                 else if (TabActive == 1)
                 {
@@ -403,13 +455,13 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
 
                     if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        PCGRegenerateMinibiomes(map);
                     if (map.HolesFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.HolesFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        PCGRegenerateMinibiomes(map);
                     if (map.CabinsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.CabinsFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        PCGRegenerateMinibiomes(map);
                     if (map.IslandsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.IslandsFrequency(), 0.0, 1.0)))
-                        PCGReGen(map);
+                        PCGRegenerateMinibiomes(map);
 
                 }
                 else
