@@ -468,12 +468,12 @@ class Map {
             return _thread_count.load();
         };
         
-        void ForceStop(bool value)
+        void SetForceStop(bool value)
         {
             _force_stop.store(value);
         };
 
-        auto ForceStop()
+        auto ShouldForceStop()
         {
             return _force_stop.load();
         };

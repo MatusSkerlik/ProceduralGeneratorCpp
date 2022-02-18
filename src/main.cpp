@@ -2,6 +2,7 @@
 #include <thread>
 #include <future>
 #include <functional>
+#include <chrono>
 #include <assert.h>
 #include "libloaderapi.h"
 #include "utils.h"
@@ -10,7 +11,7 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-
+using namespace std::chrono_literals;
 /************************************************
 * 
 * DRAW LOGIC
@@ -166,49 +167,64 @@ bool PCGLoaded()
 void _PCGGen(Map& map)
 {
     LoadPCG();
-    if (!map.ForceStop())
+    if (!map.ShouldForceStop())
     {
         // stage 0
         map.ThreadIncrement();
-            auto _0 = std::thread(define_horizontal, std::ref(map));
+            auto define_horizontal_future = std::async(std::launch::async, define_horizontal, std::ref(map));
             map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
-            _0.join();
+            if (define_horizontal_future.wait_for(1s) == std::future_status::timeout)
+            {
+                map.SetForceStop(true);
+                map.Error("DEFINITION OF HORIZONTAL AREAS INFEASIBLE");
+            }
         map.ThreadDecrement();
         DrawStage0 = true;
     }
 
-    if (!map.ForceStop())
+    if (!map.ShouldForceStop())
     {
         // stage 1
         map.ThreadIncrement();
-            auto _1 = std::thread(define_biomes, std::ref(map));
+            auto define_biomes_future = std::async(std::launch::async, define_biomes, std::ref(map));
             map.SetGenerationMessage("DEFINITION OF BIOMES...");
-            _1.join();
+            if (define_biomes_future.wait_for(4s) == std::future_status::timeout)
+            {
+                map.SetForceStop(true);
+                map.Error("DEFINITION OF BIOMES INFEASIBLE");
+            }
         map.ThreadDecrement();
         DrawStage1 = true;
     }
 
-    if (!map.ForceStop())
+    if (!map.ShouldForceStop())
     {
         //stage 2
         map.ThreadIncrement();
-            auto _2 = std::thread(define_hills_holes_islands, std::ref(map));
-
+            auto define_minibiomes_future = std::async(std::launch::async, define_hills_holes_islands, std::ref(map));
+            
             map.ThreadIncrement();
-                auto _3 = std::thread(define_cabins, std::ref(map));
+                auto define_cabins_future = std::async(std::launch::async, define_cabins, std::ref(map));
                 map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
-                _2.join();
+                if (define_minibiomes_future.wait_for(4s) == std::future_status::timeout)
+                {
+                    map.SetForceStop(true);
+                    map.Error("DEFINITION OF HILLS, HOLES, ISLANDS INFEASIBLE");
+                }
             map.ThreadDecrement();
             
             map.SetGenerationMessage("DEFINITION OF UNDERGROUND CABINS...");
-            _3.join();
+            if (define_cabins_future.wait_for(4s) == std::future_status::timeout)
+            {
+                map.SetForceStop(true);
+                map.Error("DEFINITION OF UNDERGROUND CABINS INFEASIBLE");
+            }
         map.ThreadDecrement();
         DrawStage2 = true;
     }
 
     assert(map.ThreadCount() == 0);
     map.SetGenerationMessage("");
-    map.ForceStop(false);
     map.SetGenerating(false);
     FreePCG();
 };
@@ -220,7 +236,7 @@ void PCGGen(Map& map)
     DrawStage1 = false;
     DrawStage2 = false;
     map.SetGenerationMessage("");
-    map.ForceStop(false);
+    map.SetForceStop(false);
     map.SetGenerating(true); 
     auto thread = std::thread(_PCGGen, std::ref(map));
     thread.detach();
@@ -228,7 +244,7 @@ void PCGGen(Map& map)
 
 void PCGReGen(Map& map)
 {
-    map.ForceStop(true);
+    map.SetForceStop(true);
     PCGRegenerate = true;  
 };
 
@@ -417,7 +433,7 @@ int main(void)
                 else if (map.HasError()) 
                 { 
                     auto error = map.Error();
-                    auto error_width = (float) (error.size() * 4.8 + 2 * em);
+                    auto error_width = (float) (error.size() * 6 + 2 * em);
                     if (error_width < 100) error_width = 100;
 
                     if (GuiMessageBox((Rectangle){width / 2 - error_width / 2, height / 2 - 50, error_width, 100}, "ERROR", error.c_str(), "OK") != -1)

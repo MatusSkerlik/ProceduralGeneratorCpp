@@ -229,8 +229,8 @@ EXPORT void define_biomes(Map& map)
     for (auto& c: constraints) { solver.add_constraint(c); }
 
     // SEARCH FOR RESULT
-    auto result = solver.backtracking_search({}, [&](){ return !map.ForceStop(); });
-    if (map.ForceStop())
+    auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
+    if (map.ShouldForceStop())
         return;
     
     if (result.size() < variables.size())
@@ -350,8 +350,8 @@ EXPORT void define_hills_holes_islands(Map& map)
     for (auto& constraint: constraints) { solver.add_constraint(constraint); }
     
     // SEARCH FOR RESULT
-    auto result = solver.backtracking_search({}, [&](){ return !map.ForceStop(); });
-    if (map.ForceStop())
+    auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
+    if (map.ShouldForceStop())
         return;
 
     if (result.size() < variables.size())
@@ -433,8 +433,8 @@ EXPORT void define_cabins(Map& map)
     for (auto& c: constraints) { solver.add_constraint(c); }
 
     // SEARCH FOR RESULT
-    auto result = solver.backtracking_search({}, [&](){ return !map.ForceStop(); });
-    if (map.ForceStop())
+    auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
+    if (map.ShouldForceStop())
         return;
 
     if (result.size() < variables.size())
