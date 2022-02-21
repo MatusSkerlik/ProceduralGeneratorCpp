@@ -1,17 +1,33 @@
 #include <atomic>
 #include <mutex>
 #include <stdio.h>
+#include <string>
 #include <thread>
 #include <future>
 #include <functional>
 #include <chrono>
 #include <assert.h>
 #include "libloaderapi.h"
-#include "utils.h"
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
+
+#define PCG_AS_DLL false 
+
+#if (PCG_AS_DLL)
+HMODULE module;
+PCG_FUNC define_horizontal;
+PCG_FUNC define_biomes;
+PCG_FUNC define_hills_holes_islands;
+PCG_FUNC define_cabins;
+PCG_FUNC define_castles;
+#include "utils.h"
+
+#else
+#include "pcg.h"
+#endif
+
 
 using namespace std::chrono_literals;
 /************************************************
@@ -62,9 +78,9 @@ void DrawBiomes(Map& map)
 {
     for (auto& biome: map.Biomes())
     {
-        for (auto& p: biome)
+        for (auto& p: *biome)
         {
-            switch (biome.type)
+            switch (biome->type)
             {
                 case Biomes::TUNDRA:
                     DrawPixel(p.x, p.y, (Color){255, 255, 255, 32});
@@ -89,9 +105,9 @@ void DrawMiniBiomes(Map& map)
 {
     for (auto& biome: map.MiniBiomes())
     {
-        for (auto& p: biome)
+        for (auto& p: *biome)
         {
-            switch (biome.type)
+            switch (biome->type)
             {
                 case MiniBiomes::HILL:
                     DrawPixel(p.x, p.y, C_UNDERGROUND);
@@ -104,6 +120,9 @@ void DrawMiniBiomes(Map& map)
                     break;
                 case MiniBiomes::CABIN:
                     DrawPixel(p.x, p.y, ORANGE);
+                    break;
+                case MiniBiomes::CASTLE:
+                    DrawPixel(p.x, p.y, RED);
                     break;
                 default:
                     break;
@@ -119,13 +138,6 @@ void DrawMiniBiomes(Map& map)
 **************************************************/
 typedef void (*PCG_FUNC)(Map&);
 
-
-HMODULE module;
-PCG_FUNC define_horizontal;
-PCG_FUNC define_biomes;
-PCG_FUNC define_hills_holes_islands;
-PCG_FUNC define_cabins;
-
 std::atomic_bool GenerateStage0 { false };
 std::atomic_bool GenerateStage1 { false };
 std::atomic_bool GenerateStage2 { false };
@@ -136,6 +148,7 @@ std::atomic_bool DrawStage2 { false };
 std::atomic_bool GenerationScheduled { false };
 std::atomic_bool ScheduleThreadRunning { false };
 
+#if (PCG_AS_DLL)
 void PCGFunction(PCG_FUNC func, Map& map)
 {
     map.ThreadIncrement();
@@ -152,6 +165,7 @@ bool LoadPCG()
         define_biomes = (PCG_FUNC) GetProcAddress(module, "define_biomes");
         define_hills_holes_islands = (PCG_FUNC) GetProcAddress(module, "define_hills_holes_islands");
         define_cabins = (PCG_FUNC) GetProcAddress(module, "define_cabins");
+        define_castles = (PCG_FUNC) GetProcAddress(module, "define_castles");
         return true;
     }
     return false;
@@ -172,6 +186,21 @@ bool PCGLoaded()
 {
     return module != NULL;
 };
+#else
+
+
+void PCGFunction(PCG_FUNC func, Map& map)
+{
+    map.ThreadIncrement();
+    func(std::ref(map));
+    map.ThreadDecrement();
+};
+bool LoadPCG() { return true; };
+void FreePCG() {};
+bool ReloadPCG() { return true; };
+bool PCGLoaded() { return true; }
+
+#endif
 
 void _PCGGen(Map& map)
 {
@@ -186,7 +215,7 @@ void _PCGGen(Map& map)
         auto define_horizontal_future = std::async(std::launch::async, PCGFunction, define_horizontal, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
-        if (define_horizontal_future.wait_for(5s) == std::future_status::timeout)
+        if (define_horizontal_future.wait_for(50s) == std::future_status::timeout)
         {
             map.SetForceStop(true);
             map.Error("DEFINITION OF HORIZONTAL AREAS INFEASIBLE");
@@ -202,7 +231,7 @@ void _PCGGen(Map& map)
         auto define_biomes_future = std::async(std::launch::async, PCGFunction, define_biomes, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF BIOMES...");
-        if (define_biomes_future.wait_for(5s) == std::future_status::timeout)
+        if (define_biomes_future.wait_for(50s) == std::future_status::timeout)
         {
             map.SetForceStop(true);
             map.Error("DEFINITION OF BIOMES INFEASIBLE");
@@ -217,6 +246,7 @@ void _PCGGen(Map& map)
 
         auto define_minibiomes_future = std::async(std::launch::async, PCGFunction, define_hills_holes_islands, std::ref(map));
         auto define_cabins_future = std::async(std::launch::async, PCGFunction, define_cabins, std::ref(map));
+        auto define_castles_future = std::async(std::launch::async, PCGFunction, define_castles, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
         if (define_minibiomes_future.wait_for(5s) == std::future_status::timeout)
@@ -231,6 +261,13 @@ void _PCGGen(Map& map)
             map.SetForceStop(true);
             map.Error("DEFINITION OF UNDERGROUND CABINS INFEASIBLE");
         }
+
+        map.SetGenerationMessage("DEFINITION OF UNDERGROUND CASTLES...");
+        if (define_castles_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF UNDERGROUND CASTLES INFEASIBLE");
+        }
     }
     DrawStage2 = true;
 
@@ -243,11 +280,12 @@ void _PCGGen(Map& map)
 
     // FINALIZE
     while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
-    map.SetGenerationMessage("");
-    map.SetGenerating(false);
 
     FreePCG();
     printf("Free DLL\n");
+
+    map.SetGenerationMessage("");
+    map.SetGenerating(false);
 };
 
 void PCGGen(Map& map)
@@ -268,13 +306,13 @@ void ScheduleGeneration(Map& map)
         auto _ = std::thread([&](){
             while (GenerationScheduled || map.IsGenerating())
             {
-                if (map.IsGenerating() && !map.ShouldForceStop())
+                if (map.IsGenerating())
                     map.SetForceStop(true);
                 GenerationScheduled = false;
-                std::this_thread::sleep_for(0.5s);
+                std::this_thread::sleep_for(0.25s);
             }
             // HERE WE ARE SURE THAT LAST GENERATION EXITED
-            PCGGen(std::ref(map));
+            PCGGen(map);
             ScheduleThreadRunning = false;
         });
         _.detach();
@@ -477,6 +515,21 @@ int main(void)
                         DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {map_view_anchor.x * 1 / camera.zoom, map_view_anchor.y * 1 / camera.zoom}, WHITE);        
                     EndMode2D();
                 EndScissorMode();
+
+                auto mx = GetMouseX();
+                auto my = GetMouseY();
+
+                if ((mx > map_view.x) && (mx < map_view.x + map_view.width) && (my > map_view.y) && (my < map_view.y + map_view.height))
+                {
+                    auto x = (mx - map_view.x) * 1 / camera.zoom;
+                    auto y = (my - map_view.y) * 1 / camera.zoom;
+                    std::string t = "[";
+                    t += std::to_string((int)x);
+                    t += ":";
+                    t += std::to_string((int)y);
+                    t += "]";
+                    DrawText(t.c_str(), mx, my - 16, 16, WHITE);
+                }
 
                 if (map.IsGenerating())
                 { 

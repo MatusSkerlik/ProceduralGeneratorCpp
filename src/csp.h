@@ -1,3 +1,4 @@
+#include <initializer_list>
 #include <string>
 #include <unordered_set>
 #include <unordered_map>
@@ -82,6 +83,13 @@ inline std::unordered_set<std::string> CreateVariables(std::string name, int fro
     for (int i = from; i < to; ++i) { variables.insert(name + std::to_string(i)); }
     return variables;
 };
+
+inline std::unordered_set<std::string> CreateVariables(std::initializer_list<std::string> names)
+{
+    std::unordered_set<std::string> variables;
+    for (auto name: names) { variables.insert(name); };
+    return variables;
+}
 
 inline std::unordered_set<std::string> JoinVariables(std::unordered_set<std::string> vars0, std::unordered_set<std::string> vars1)
 {

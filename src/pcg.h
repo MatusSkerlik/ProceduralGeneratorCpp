@@ -50,15 +50,18 @@ class DistanceConstraint: public Constraint<V, D>
         };
 };
 
+/**
+ * Constraint that ensures that object will not intercept with each other
+ */
 template <typename V, typename D>
-class CoordsConstraint: public Constraint<V, D>
+class NonIntersectionConstraint2D: public Constraint<V, D>
 {
     protected:
         V v0, v1;
         D w0, h0, w1, h1;
         D width;
     public:
-        CoordsConstraint(V _v0, V _v1, D _w0, D _h0, D _w1, D _h1, D _width): 
+        NonIntersectionConstraint2D(V _v0, V _v1, D _w0, D _h0, D _w1, D _h1, D _width): 
             v0{_v0}, v1{_v1},
             w0{_w0}, h0{_h0}, w1{_w1}, h1{_h1},
             width{_width}
@@ -72,15 +75,14 @@ class CoordsConstraint: public Constraint<V, D>
                 return true;
             if (assignment.find(v1) == assignment.end())
                 return true;
+
             auto _v0 = assignment.at(v0);
             auto _v1 = assignment.at(v1);
 
-
-            auto _x0 = _v0 % width;
-
+            auto _x0 = (int) _v0 % width;
             auto _y0 = (int) _v0 / width;
-            auto _x1 = _v1 % width;
-            auto _y1 = (int)_v1 / width;
+            auto _x1 = (int) _v1 % width;
+            auto _y1 = (int) _v1 / width;
 
             if ((_x0 <= _x1) && (_x0 + w0) >= (_x1 + w1) && (_y0 <= _y1) && (_y0 + h0) >= (_y1 + h1))
                 return false;
@@ -99,9 +101,55 @@ class CoordsConstraint: public Constraint<V, D>
 };
 
 /**
+ * Constraint that ensures that object will be inside PixelArray 
+ */
+template <typename V, typename D>
+class InsidePixelArrayConstraint2D: public Constraint<V, D>
+{
+    protected:
+        V v0;
+        D w, h;
+        const PixelArray& arr;
+        Rect rect;
+
+    public:
+        InsidePixelArrayConstraint2D(V _v0, D _w, D _h, PixelArray& _arr, Rect _rect): 
+            v0{_v0},
+            w{_w}, h{_h},
+            arr{_arr},
+            rect{_rect} 
+        {
+           this->variables = {v0, };
+        };
+
+        virtual bool satisfied(const std::unordered_map<V, D>& assignment) const override
+        {
+            if (assignment.find(v0) == assignment.end())
+                return true;
+
+            auto _v0 = assignment.at(v0);
+
+            auto _x = (int) rect.x + _v0 % rect.w;
+            auto _y = (int) rect.y + _v0 / rect.w;
+
+            if (!arr.contains((Pixel){_x, _y}))
+                return false;
+            if (!arr.contains((Pixel){_x + w, _y}))
+                return false;
+            if (!arr.contains((Pixel){_x, _y + h}))
+                return false;
+            if (!arr.contains((Pixel){_x + w, _y + h}))
+                return false;
+           
+            return true;
+        };
+};
+
+
+/**
  * Create hill inside rect and fill array with pixels
  */
-void CreateHill(const Rect& rect, PixelArray& arr)
+inline void CreateHill(const Rect& rect, PixelArray& arr)
 {
    double sx = rect.x;
    double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
@@ -131,31 +179,43 @@ void CreateHill(const Rect& rect, PixelArray& arr)
 /**
  * Create hole inside rect and fill array with pixels
  */
-void CreateHole(const Rect& rect, PixelArray& arr)
+inline void CreateHole(const Rect& rect, PixelArray& arr)
 {
-   double sx = rect.x;
-   double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
-   double ex = rect.x + rect.w;
-   double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3));
-   double ey = sy + (-8 + rand() % 17);
-   double cy = std::min(sy, ey) + (8 + rand() % (int)(rect.y + rect.h - std::max(sy, ey) - 8));
+    double sx = rect.x;
+    double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
+    double ex = rect.x + rect.w;
+    double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3)) - 32;
+    double ey = sy + -8 + (rand() % 17);
+    double cy = std::max(sy, ey) + (rand() % (int)(std::max(sy, ey) - rect.y - rect.h));
 
-   std::vector<double> X = {sx, cx, ex};
-   std::vector<double> Y = {sy, cy, ey};
+    std::vector<double> X = {sx, cx, ex};
+    std::vector<double> Y = {sy, cy, ey};
 
-   tk::spline s;
-   s.set_boundary(tk::spline::first_deriv, 0, tk::spline::first_deriv, 0);
-   s.set_boundary(tk::spline::second_deriv, 0.1, tk::spline::second_deriv, 0.1);
-   s.set_points(X, Y, tk::spline::cspline);
+    tk::spline s;
+    s.set_boundary(tk::spline::first_deriv, 0, tk::spline::first_deriv, 0);
+    s.set_boundary(tk::spline::second_deriv, 0.1, tk::spline::second_deriv, 0.1);
+    s.set_points(X, Y, tk::spline::cspline);
 
-   for (int x = rect.x; x < rect.x + rect.w; ++x)
-   {
+    for (int x = rect.x; x < rect.x + rect.w; ++x)
+    {
        int _y = (int) s(x);
        for (int y = _y; y < rect.y + rect.h; ++y)
        {
             arr.add(x, y);
        }
-   }
+    }
+};
+
+inline std::unordered_set<int> DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
+{
+    std::unordered_set<int> domain;
+    for (auto v = 0; v < rect.w * rect.h; v += step)
+    { 
+        auto x = (int) rect.x + (v % rect.w);
+        auto y = (int) rect.y + (v / rect.w);
+        if (arr.contains({x, y})) domain.insert(v);
+    } 
+    return domain;
 };
 
 
@@ -194,8 +254,8 @@ EXPORT void define_biomes(Map& map)
 
     int width = map.Width();
     int ocean_width = 250;
-    int tundra_width = 200;
-    int jungle_width = 600;
+    int tundra_width = 500;
+    int jungle_width = 500;
     Rect Surface = map.Surface().bbox();
     Rect Hell = map.Hell().bbox();
 
@@ -262,18 +322,17 @@ EXPORT void define_biomes(Map& map)
         FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), forests);
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
-        for (auto& pixel: ocean_left) { forests.remove(pixel); }
-        for (auto& pixel: ocean_right) { forests.remove(pixel); }
-        for (auto& pixel: jungle) { forests.remove(pixel); }
-        for (auto& pixel: tundra) { forests.remove(pixel); }
+        for (auto pixel: ocean_left) { forests.remove(pixel); }
+        for (auto pixel: ocean_right) { forests.remove(pixel); }
+        for (auto pixel: jungle) { forests.remove(pixel); }
+        for (auto pixel: tundra) { forests.remove(pixel); }
 
-        assert(forests.size() > 0);
         while (forests.size() > 0)
         {
             auto& forest = map.Biome(Biomes::FOREST);
-            auto& p = *forests.begin(); 
+            auto p = *forests.begin(); 
             UnitedPixelArea(forests, p.x, p.y, forest);
-            for (auto& p: forest) { forests.remove(p); }
+            for (auto p: forest) { forests.remove(p); }
         }
     }
 };
@@ -369,6 +428,7 @@ EXPORT void define_hills_holes_islands(Map& map)
             auto x = result[var];
             printf("Creating hole at x: %d\n", x);
             auto& hole = map.MiniBiome(MiniBiomes::HOLE);
+            printf("After creating hole\n");
             Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
             CreateHole(rect, hole);
         }
@@ -400,44 +460,49 @@ EXPORT void define_cabins(Map& map)
 {
     printf("define cabins\n");
 
-    int cabin_count = map.CabinsFrequency() * 20;
+    int cabin_count = map.CabinsFrequency() * 60;
     int cabin_width = 80;
     int cabin_height = 40;
- 
-    Biomes::Biome* tundra = map.GetBiome(Biomes::TUNDRA);
-    assert(tundra != nullptr);  
-    Rect tundra_rect = tundra->bbox();
+
+    auto& Underground = map.Underground();
+    auto& Cavern = map.Cavern(); 
+    auto UCRect = RectUnion(Underground.bbox(), Cavern.bbox());
+
+    auto& tundra = *map.GetBiome(Biomes::TUNDRA);
+    // CABINS ALLOWED ONLY IN UNDERGROUND AND CAVERN
+    auto tundra_rect = RectIntersection(UCRect, tundra.bbox());
 
     // CSP RELATED
     // DEFINITION OF VARIABLES
     auto variables = CreateVariables("cabin", 0, cabin_count); 
 
     // DEFINITION OF UNION DOMAIN
-    std::unordered_set<int> domain;
-    for (auto v = 0; v < tundra_rect.w * tundra_rect.h; v += 1) { 
-        auto x = (int) tundra_rect.x + (v % tundra_rect.w);
-        auto y = (int) tundra_rect.y + (v / tundra_rect.w);
-        if (tundra->contains((Pixel){x, y}))
-            domain.insert(v);
-    } 
-
+    auto domain = DomainInsidePixelArray(tundra_rect, tundra, 20);
+    
     // DEFINITION OF DOMAIN FOR EACH VARIABLE
     std::unordered_map<std::string, std::unordered_set<int>> domains;
     for (auto var: variables) { domains[var] = domain; } 
 
     // DEFINITION OF CONSTRAINTS
-    std::vector<CoordsConstraint<std::string, int>> constraints;
-    
+    std::vector<NonIntersectionConstraint2D<std::string, int>> non_intersect_constraints;
     Between<std::string>(variables, [&](std::string v0, std::string v1){
-        CoordsConstraint<std::string, int> c {v0, v1, cabin_width, cabin_height, cabin_width, cabin_height, tundra_rect.w};
-        constraints.push_back(std::move(c));
+        NonIntersectionConstraint2D<std::string, int> c (v0, v1, cabin_width, cabin_height, cabin_width, cabin_height, tundra_rect.w);
+        non_intersect_constraints.push_back(std::move(c));
     });
+
+    std::vector<InsidePixelArrayConstraint2D<std::string, int>> inside_pixelarray_constraints;
+    for (auto& var: variables) 
+    {
+        InsidePixelArrayConstraint2D<std::string, int> c (var, cabin_width, cabin_height, tundra, tundra_rect);
+        inside_pixelarray_constraints.push_back(std::move(c));
+    }
 
     // CREATION OF SOLVER
     CSPSolver<std::string, int> solver {variables, domains};
 
     // REGISTRATION OF CONSTRAINTS
-    for (auto& c: constraints) { solver.add_constraint(c); }
+    for (auto& c: non_intersect_constraints) { solver.add_constraint(c); }
+    for (auto& c: inside_pixelarray_constraints) { solver.add_constraint(c); }
 
     // SEARCH FOR RESULT
     auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
@@ -455,13 +520,106 @@ EXPORT void define_cabins(Map& map)
         {
             printf("Creating cabin\n");
             auto v = result[var];
-            auto x = (int) tundra_rect.x + (cabin_width / 2) + (v % tundra_rect.w); 
-            auto y = (int) tundra_rect.y + (v / tundra_rect.w);
+            auto x = (int) tundra_rect.x + + cabin_width / 2 + (v % tundra_rect.w); 
+            auto y = (int) tundra_rect.y + cabin_height / 2 + (v / tundra_rect.w);
 
             auto& cabin = map.MiniBiome(MiniBiomes::CABIN); 
-            PixelsAroundRect(x - (int)(cabin_width / 2), y - (int)(cabin_height / 2), cabin_width, cabin_height, cabin);
+            PixelsAroundRect(x, y, cabin_width, cabin_height, cabin);
         }
     }
 };
 
-}
+/**
+ * Definition of castles for each biome
+ */
+EXPORT void define_castles(Map& map)
+{
+    printf("define castles\n");
+
+    auto castle_width = 250;
+    auto castle_height = 200;
+
+    auto& Underground = map.Underground();
+    auto& Cavern = map.Cavern(); 
+    auto UCRect = RectUnion(Underground.bbox(), Cavern.bbox());
+
+    auto& forest = *map.GetBiome(Biomes::FOREST);
+    auto forest_rect = RectIntersection(UCRect, forest.bbox());
+
+    auto& tundra = *map.GetBiome(Biomes::TUNDRA);
+    auto tundra_rect = RectIntersection(UCRect, tundra.bbox());
+    
+    auto& jungle = *map.GetBiome(Biomes::JUNGLE);
+    auto jungle_rect = RectIntersection(UCRect, jungle.bbox());
+
+    printf("forest rect %d, %d, %d, %d\n", forest_rect.x, forest_rect.y, forest_rect.w, forest_rect.h);
+    printf("jungle rect %d, %d, %d, %d\n", jungle_rect.x, jungle_rect.y, jungle_rect.w, jungle_rect.h);
+    printf("tundra rect %d, %d, %d, %d\n", tundra_rect.x, tundra_rect.y, tundra_rect.w, tundra_rect.h);
+    
+    auto variables = CreateVariables({"forest_castle", "jungle_castle", "tundra_castle"});
+
+    // DEFINITION OF UNION DOMAIN
+    auto forest_domain = DomainInsidePixelArray(forest_rect, forest, 10);
+    auto jungle_domain = DomainInsidePixelArray(jungle_rect, jungle, 10);
+    auto tundra_domain = DomainInsidePixelArray(tundra_rect, tundra, 10);
+
+    std::unordered_map<std::string, std::unordered_set<int>> domains;
+    domains["forest_castle"] = forest_domain;
+    domains["jungle_castle"] = jungle_domain;
+    domains["tundra_castle"] = tundra_domain;
+
+    // DEFINITION OF CONSTRAINTS
+    InsidePixelArrayConstraint2D<std::string, int> c0 ("forest_castle", castle_width, castle_height, forest, forest_rect);
+    InsidePixelArrayConstraint2D<std::string, int> c1 ("jungle_castle", castle_width, castle_height, jungle, jungle_rect);
+    InsidePixelArrayConstraint2D<std::string, int> c2 ("tundra_castle", castle_width, castle_height, tundra, tundra_rect);
+
+    // CREATION OF SOLVER
+    CSPSolver<std::string, int> solver {variables, domains};
+
+    // REGISTRATION OF CONSTRAINTS
+    solver.add_constraint(c0);
+    solver.add_constraint(c1);
+    solver.add_constraint(c2);
+        
+    // SEARCH FOR SOLUTION
+    auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
+    if (map.ShouldForceStop())
+        return;
+
+    if (result.size() < variables.size())
+    {
+        map.Error("COULD NOT FIND SOLUTION FOR CASTLE PLACEMENT.");
+        return;
+    }
+    else 
+    {
+        // RESULT HANDLING
+        auto forest_v = result["forest_castle"];
+        printf("forest_v: %d\n", forest_v);
+        auto f_x = forest_rect.x + castle_width / 2 + (forest_v % forest_rect.w);
+        auto f_y = forest_rect.y + castle_height / 2 + (forest_v / forest_rect.w);
+        auto& forest_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        PixelsAroundRect(f_x, f_y, castle_width, castle_height, forest_castle);
+
+        auto tundra_v = result["tundra_castle"];
+        printf("tundra_v: %d\n", tundra_v);
+        auto t_x = tundra_rect.x + castle_width / 2 + (tundra_v % tundra_rect.w);
+        auto t_y = tundra_rect.y + castle_height / 2 + (tundra_v / tundra_rect.w);
+        auto& tundra_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        PixelsAroundRect(t_x, t_y, castle_width, castle_height, tundra_castle);
+
+        auto jungle_v = result["jungle_castle"];
+        printf("jungle_v: %d\n", jungle_v);
+        auto j_x = jungle_rect.x + castle_width / 2 + (jungle_v % jungle_rect.w);
+        auto j_y = jungle_rect.y + castle_height / 2 + (jungle_v / jungle_rect.w);
+        auto& jungle_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        PixelsAroundRect(j_x, j_y, castle_width, castle_height, jungle_castle);
+
+
+        printf("forest castle %d:%d\n", f_x, f_y);
+        printf("tundra castle %d:%d\n", t_x, t_y);
+        printf("jungle castle %d:%d\n", j_x, j_y);
+    }
+};
+
+};

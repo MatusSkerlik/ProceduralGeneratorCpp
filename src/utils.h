@@ -19,6 +19,26 @@ typedef struct Rect {
     int h;
 } Rect;
 
+inline auto RectIntersection(const Rect& r0, const Rect& r1)
+{
+    auto x0 = std::max(r0.x, r1.x);
+    auto y0 = std::max(r0.y, r0.y);
+    auto x1 = std::min(r0.x + r0.w, r1.x + r1.w);
+    auto y1 = std::min(r0.y + r0.h, r1.y + r1.h);
+
+    return (Rect){x0, y0, x1 - x0, y1 - y0};
+};
+
+inline auto RectUnion(const Rect& r0, const Rect& r1)
+{
+    auto x0 = std::min(r0.x, r1.x);
+    auto y0 = std::min(r0.y, r0.y);
+    auto x1 = std::max(r0.x + r0.w, r1.x + r1.w);
+    auto y1 = std::max(r0.y + r0.h, r1.y + r1.h);
+
+    return (Rect){x0, y0, x1 - x0, y1 - y0};
+};
+
 typedef struct Pixel {
     int x;
     int y;
@@ -28,7 +48,7 @@ typedef struct Pixel {
 
 struct PixelHash
 {
-    size_t operator()(const Pixel& pixel) const { return pixel.x * 1000 + pixel.y; };    
+    size_t operator()(const Pixel& pixel) const { return pixel.x * 4200 + pixel.y; };    
 };
 
 class Vector2D
@@ -73,13 +93,17 @@ class PixelArray
         {
             printf("PixelArray&();\n");
             _set_pixels = arr._set_pixels;
+            _bounding_box = arr._bounding_box;
         }
 
         PixelArray(PixelArray&& arr)
         {
             printf("PixelArray&&();\n");
             _set_pixels = std::move(arr._set_pixels);
+            _bounding_box = std::move(arr._bounding_box);
         }
+
+        ~PixelArray(){ printf("~PixelArray();\n"); };
 
         auto begin() const { return this->_set_pixels.begin(); };
         auto end() const { return this->_set_pixels.end(); };
@@ -94,12 +118,15 @@ class PixelArray
 
         Rect bbox()
         {
-            if (_set_pixels.size() == 0)
-                return (Rect){0, 0, 0, 0};
-
-            if ((_bounding_box.w > 0) && (_bounding_box.h > 0))
+        /*    if (_set_pixels.size() == 0)
+            {
+                _bounding_box = {0, 0, 0, 0};
                 return _bounding_box;
+            }
 
+            if ((_bounding_box.x >= 0) && (_bounding_box.y >= 0) && (_bounding_box.w > 0) && (_bounding_box.h > 0))
+                return _bounding_box;
+        */
             int minx = std::numeric_limits<int>::max();
             int miny = std::numeric_limits<int>::max();
             int maxx = std::numeric_limits<int>::min();
@@ -198,8 +225,8 @@ class Map {
         HorizontalAreas::Biome _cavern {HorizontalAreas::CAVERN};
         HorizontalAreas::Biome _hell {HorizontalAreas::HELL};
 
-        std::vector<Biomes::Biome> _biomes;
-        std::vector<MiniBiomes::Biome> _mini_biomes;
+        std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
+        std::vector<std::unique_ptr<MiniBiomes::Biome>> _mini_biomes;
         std::vector<std::string> _errors;
 
     public:
@@ -526,19 +553,19 @@ class Map {
             return {_space, _surface, _underground, _cavern, _hell};
         }
 
-        auto& Biome(Biomes::Type type)
+        Biomes::Biome& Biome(Biomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _biomes.emplace_back(type);
-            return _biomes[_biomes.size() - 1];
+            _biomes.emplace_back(new Biomes::Biome(type));
+            return *_biomes[_biomes.size() - 1];
         }
 
         Biomes::Biome* GetBiome(Biomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             for (auto& biome: _biomes)
-                if (biome.type == type)
-                    return &biome;
+                if (biome->type == type)
+                    return &*biome;
             return nullptr;
         }
 
@@ -554,11 +581,11 @@ class Map {
             return _mini_biomes;
         }
 
-        auto& MiniBiome(MiniBiomes::Type type)
+        MiniBiomes::Biome& MiniBiome(MiniBiomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _mini_biomes.emplace_back(type);
-            return _mini_biomes[_mini_biomes.size() - 1];
+            _mini_biomes.emplace_back(new MiniBiomes::Biome(type));
+            return *_mini_biomes[_mini_biomes.size() - 1];
         }
 
         void ClearStage0()
