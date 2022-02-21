@@ -306,7 +306,7 @@ EXPORT void define_biomes(Map& map)
         auto& jungle = map.Biome(Biomes::JUNGLE);
         for (int i = Surface.y; i < Hell.y; i++)
         {
-            PixelsAroundRect(jungle_x + i, i, jungle_width, 2, jungle);
+            PixelsAroundRect(jungle_x - i, i, jungle_width, 2, jungle);
         }
 
         // DEFINITION OF TUNDRA
@@ -537,7 +537,7 @@ EXPORT void define_castles(Map& map)
     printf("define castles\n");
 
     auto castle_width = 250;
-    auto castle_height = 200;
+    auto castle_height = 150;
 
     auto& Underground = map.Underground();
     auto& Cavern = map.Cavern(); 
@@ -552,26 +552,29 @@ EXPORT void define_castles(Map& map)
     auto& jungle = *map.GetBiome(Biomes::JUNGLE);
     auto jungle_rect = RectIntersection(UCRect, jungle.bbox());
 
-    printf("forest rect %d, %d, %d, %d\n", forest_rect.x, forest_rect.y, forest_rect.w, forest_rect.h);
-    printf("jungle rect %d, %d, %d, %d\n", jungle_rect.x, jungle_rect.y, jungle_rect.w, jungle_rect.h);
-    printf("tundra rect %d, %d, %d, %d\n", tundra_rect.x, tundra_rect.y, tundra_rect.w, tundra_rect.h);
-    
-    auto variables = CreateVariables({"forest_castle", "jungle_castle", "tundra_castle"});
+
+    auto& hell = map.Hell();
+    auto hell_rect = hell.bbox();
+
+    auto variables = CreateVariables({"forest_castle", "jungle_castle", "tundra_castle", "hell_castle"});
 
     // DEFINITION OF UNION DOMAIN
     auto forest_domain = DomainInsidePixelArray(forest_rect, forest, 10);
     auto jungle_domain = DomainInsidePixelArray(jungle_rect, jungle, 10);
     auto tundra_domain = DomainInsidePixelArray(tundra_rect, tundra, 10);
+    auto hell_domain =   DomainInsidePixelArray(hell_rect, hell, 10); 
 
     std::unordered_map<std::string, std::unordered_set<int>> domains;
     domains["forest_castle"] = forest_domain;
     domains["jungle_castle"] = jungle_domain;
     domains["tundra_castle"] = tundra_domain;
+    domains["hell_castle"] = hell_domain;
 
     // DEFINITION OF CONSTRAINTS
     InsidePixelArrayConstraint2D<std::string, int> c0 ("forest_castle", castle_width, castle_height, forest, forest_rect);
     InsidePixelArrayConstraint2D<std::string, int> c1 ("jungle_castle", castle_width, castle_height, jungle, jungle_rect);
     InsidePixelArrayConstraint2D<std::string, int> c2 ("tundra_castle", castle_width, castle_height, tundra, tundra_rect);
+    InsidePixelArrayConstraint2D<std::string, int> c3 ("hell_castle", castle_width, castle_height, hell, hell_rect);
 
     // CREATION OF SOLVER
     CSPSolver<std::string, int> solver {variables, domains};
@@ -580,6 +583,7 @@ EXPORT void define_castles(Map& map)
     solver.add_constraint(c0);
     solver.add_constraint(c1);
     solver.add_constraint(c2);
+    solver.add_constraint(c3);
         
     // SEARCH FOR SOLUTION
     auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
@@ -595,30 +599,28 @@ EXPORT void define_castles(Map& map)
     {
         // RESULT HANDLING
         auto forest_v = result["forest_castle"];
-        printf("forest_v: %d\n", forest_v);
         auto f_x = forest_rect.x + castle_width / 2 + (forest_v % forest_rect.w);
         auto f_y = forest_rect.y + castle_height / 2 + (forest_v / forest_rect.w);
         auto& forest_castle = map.MiniBiome(MiniBiomes::CASTLE);
         PixelsAroundRect(f_x, f_y, castle_width, castle_height, forest_castle);
 
         auto tundra_v = result["tundra_castle"];
-        printf("tundra_v: %d\n", tundra_v);
         auto t_x = tundra_rect.x + castle_width / 2 + (tundra_v % tundra_rect.w);
         auto t_y = tundra_rect.y + castle_height / 2 + (tundra_v / tundra_rect.w);
         auto& tundra_castle = map.MiniBiome(MiniBiomes::CASTLE);
         PixelsAroundRect(t_x, t_y, castle_width, castle_height, tundra_castle);
 
         auto jungle_v = result["jungle_castle"];
-        printf("jungle_v: %d\n", jungle_v);
         auto j_x = jungle_rect.x + castle_width / 2 + (jungle_v % jungle_rect.w);
         auto j_y = jungle_rect.y + castle_height / 2 + (jungle_v / jungle_rect.w);
         auto& jungle_castle = map.MiniBiome(MiniBiomes::CASTLE);
         PixelsAroundRect(j_x, j_y, castle_width, castle_height, jungle_castle);
 
-
-        printf("forest castle %d:%d\n", f_x, f_y);
-        printf("tundra castle %d:%d\n", t_x, t_y);
-        printf("jungle castle %d:%d\n", j_x, j_y);
+        auto hell_v = result["hell_castle"];
+        auto h_x = hell_rect.x + castle_width / 2 + (hell_v % hell_rect.w);
+        auto h_y = hell_rect.y + castle_height / 2 + (hell_v / hell_rect.w);
+        auto& hell_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        PixelsAroundRect(h_x, h_y, castle_width, castle_height, hell_castle);
     }
 };
 
