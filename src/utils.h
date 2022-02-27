@@ -149,19 +149,15 @@ namespace HorizontalAreas
 {
     enum Type: unsigned short { SPACE, SURFACE, UNDERGROUND, CAVERN, HELL };
 
-    class Biome: public PixelArray
+    class Area: public PixelArray
     {
-        public:
+        protected:
             Type type;
-            Biome(): PixelArray() {};
-            Biome(Type _t): PixelArray(), type{_t} {};
+        public:
+            Area(): PixelArray() {};
+            Area(Type _t): PixelArray(), type{_t} {};
 
-            auto operator=(Biome&& biome)
-            {
-               this->type = std::move(biome.type);
-               this->_set_pixels = std::move(_set_pixels);
-               this->_bounding_box = std::move(biome._bounding_box);
-            };
+            auto GetType(){ return type; }
     };
 
 }
@@ -172,10 +168,13 @@ namespace Biomes {
 
     class Biome: public PixelArray 
     {
-        public:
+        protected:
             Type type;
+        public:
             Biome(): PixelArray() {};
             Biome(Type _t): PixelArray(), type{_t} {};
+
+            auto GetType(){ return type; }
    };
 
 
@@ -183,15 +182,54 @@ namespace Biomes {
 
 namespace MiniBiomes {
     
-    enum Type: unsigned short { HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
+    enum Type: unsigned short { SURFACE_PART, HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
     
     class Biome: public PixelArray 
     {
-        public:
+        protected:
             Type type;
+        public:
             Biome(): PixelArray() {};
             Biome(Type _t): PixelArray(), type{_t} {};
+
+            auto GetType(){ return type; }
    };
+ 
+    class SurfacePart: public Biome 
+    {
+        protected:
+            int sx {0}; // START X
+            int ex {0}; // END X 
+            int sy {0}; // START Y
+            int ey {0}; // END Y
+            int by {0}; // BASE Y
+
+            SurfacePart* before {nullptr};
+            SurfacePart* next {nullptr};
+            std::vector<int> ypsilons;
+
+        public:
+            SurfacePart(int _sx, int _ex, int _sy, int _ey, int _by, SurfacePart* _before, SurfacePart* _next): Biome(SURFACE_PART),
+            sx{_sx}, ex{_ex}, sy{_sy}, ey{_ey}, by{_by}, 
+            before{_before}, next{_next} 
+            {};
+
+            auto StartX() { return sx; };
+            auto EndX() { return ex; };
+            auto StartY() { return sy; };
+            auto EndY() { return ey; };
+            auto BaseY() { return by; };
+
+            auto Before() { return before; };
+            void SetBefore(SurfacePart* _before) { before = _before; };
+            auto Next() { return next; };
+            void SetNext(SurfacePart* _next) { next = _next; };
+
+            void AddY(int y) { ypsilons.push_back(y); };
+            auto GetY(int x) { return ypsilons.at(x - sx); };
+            auto GetYpsilons() { return ypsilons; };
+   };
+
 };
 
 class Map {
@@ -219,14 +257,15 @@ class Map {
         std::string _generation_message;
         std::mutex mutex;
 
-        HorizontalAreas::Biome _space {HorizontalAreas::SPACE};
-        HorizontalAreas::Biome _surface {HorizontalAreas::SURFACE};
-        HorizontalAreas::Biome _underground {HorizontalAreas::UNDERGROUND};
-        HorizontalAreas::Biome _cavern {HorizontalAreas::CAVERN};
-        HorizontalAreas::Biome _hell {HorizontalAreas::HELL};
+        HorizontalAreas::Area _space {HorizontalAreas::SPACE};
+        HorizontalAreas::Area _surface {HorizontalAreas::SURFACE};
+        HorizontalAreas::Area _underground {HorizontalAreas::UNDERGROUND};
+        HorizontalAreas::Area _cavern {HorizontalAreas::CAVERN};
+        HorizontalAreas::Area _hell {HorizontalAreas::HELL};
 
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
         std::vector<std::unique_ptr<MiniBiomes::Biome>> _mini_biomes;
+        std::vector<std::unique_ptr<MiniBiomes::Biome>> _surface_mini_biomes;
         std::vector<std::string> _errors;
 
     public:
@@ -547,7 +586,7 @@ class Map {
             return _hell; 
         };
 
-        std::vector<std::reference_wrapper<HorizontalAreas::Biome>> HorizontalAreas()
+        std::vector<std::reference_wrapper<HorizontalAreas::Area>> HorizontalAreas()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return {_space, _surface, _underground, _cavern, _hell};
@@ -564,7 +603,7 @@ class Map {
         {
             const std::lock_guard<std::mutex> lock(mutex);
             for (auto& biome: _biomes)
-                if (biome->type == type)
+                if (biome->GetType() == type)
                     return &*biome;
             return nullptr;
         }
@@ -588,6 +627,26 @@ class Map {
             return *_mini_biomes[_mini_biomes.size() - 1];
         }
 
+        auto& SurfaceMiniBiomes()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _surface_mini_biomes;
+        }
+
+        MiniBiomes::Biome& SurfaceMiniBiome(MiniBiomes::Type type)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _surface_mini_biomes.emplace_back(new MiniBiomes::Biome(type));
+            return *_surface_mini_biomes[_surface_mini_biomes.size() - 1];
+        }
+        
+        MiniBiomes::SurfacePart& SurfacePart(int sx, int ex, int sy, int ey, int by)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _surface_mini_biomes.emplace_back(new MiniBiomes::SurfacePart(sx, ex, sy, ey, by, nullptr, nullptr));
+            return static_cast<MiniBiomes::SurfacePart&>(*_surface_mini_biomes[_surface_mini_biomes.size() - 1]);
+        };
+
         void ClearStage0()
         {
             const std::lock_guard<std::mutex> lock(mutex);
@@ -608,6 +667,12 @@ class Map {
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _mini_biomes.clear();
+        };
+
+        void ClearStage3()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _surface_mini_biomes.clear();
         };
 
         void ClearAll()

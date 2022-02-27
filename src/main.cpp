@@ -22,6 +22,7 @@ PCG_FUNC define_biomes;
 PCG_FUNC define_hills_holes_islands;
 PCG_FUNC define_cabins;
 PCG_FUNC define_castles;
+PCG_FUNC define_surface;
 #include "utils.h"
 
 #else
@@ -50,7 +51,7 @@ void DrawHorizontal(Map& map)
         auto& area = ref.get();
         Rect rect = area.bbox();
         Color color;
-        switch (area.type)
+        switch (area.GetType())
         {
             case HorizontalAreas::SPACE:
                 color = C_SPACE;
@@ -80,7 +81,7 @@ void DrawBiomes(Map& map)
     {
         for (auto& p: *biome)
         {
-            switch (biome->type)
+            switch (biome->GetType())
             {
                 case Biomes::TUNDRA:
                     DrawPixel(p.x, p.y, (Color){255, 255, 255, 32});
@@ -107,7 +108,7 @@ void DrawMiniBiomes(Map& map)
     {
         for (auto& p: *biome)
         {
-            switch (biome->type)
+            switch (biome->GetType())
             {
                 case MiniBiomes::HILL:
                     DrawPixel(p.x, p.y, C_UNDERGROUND);
@@ -131,6 +132,25 @@ void DrawMiniBiomes(Map& map)
     }
 };
 
+void DrawSurfaceMiniBiomes(Map& map)
+{
+    for (auto& biome: map.SurfaceMiniBiomes())
+    {
+        for (auto& p: *biome)
+        {
+            switch (biome->GetType())
+            {
+                case MiniBiomes::SURFACE_PART:
+                    DrawPixel(p.x, p.y, C_UNDERGROUND);
+                    break;
+                default:
+                    break;
+            };
+        }
+    }
+};
+
+
 /**************************************************
 *
 * PROCEDURAL GENERATION LOGIC 
@@ -141,9 +161,11 @@ typedef void (*PCG_FUNC)(Map&);
 std::atomic_bool GenerateStage0 { false };
 std::atomic_bool GenerateStage1 { false };
 std::atomic_bool GenerateStage2 { false };
+std::atomic_bool GenerateStage3 { false };
 std::atomic_bool DrawStage0 { false };
 std::atomic_bool DrawStage1 { false };
 std::atomic_bool DrawStage2 { false };
+std::atomic_bool DrawStage3 { false };
 
 std::atomic_bool GenerationScheduled { false };
 std::atomic_bool ScheduleThreadRunning { false };
@@ -166,6 +188,7 @@ bool LoadPCG()
         define_hills_holes_islands = (PCG_FUNC) GetProcAddress(module, "define_hills_holes_islands");
         define_cabins = (PCG_FUNC) GetProcAddress(module, "define_cabins");
         define_castles = (PCG_FUNC) GetProcAddress(module, "define_castles");
+        define_surface = (PCG_FUNC) GetProcAddress(module, "define_surface");
         return true;
     }
     return false;
@@ -271,11 +294,28 @@ void _PCGGen(Map& map)
     }
     DrawStage2 = true;
 
+    if (!map.ShouldForceStop() && GenerateStage2)
+    {
+        map.ClearStage3();
+
+        auto define_surface_future = std::async(std::launch::async, PCGFunction, define_surface, std::ref(map));
+        
+        map.SetGenerationMessage("DEFINITION OF SURFACE");
+        if (define_surface_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF SURFACE INFEASIBLE");
+        }
+    }
+    DrawStage3 = true;
+
+
     if (!map.ShouldForceStop())
     {
         GenerateStage0 = false;
         GenerateStage1 = false;
         GenerateStage2 = false;
+        GenerateStage3 = false;
     }
 
     // FINALIZE
@@ -398,6 +438,7 @@ int main(void)
     GenerateStage0 = true;
     GenerateStage1 = true;
     GenerateStage2 = true;
+    GenerateStage3 = true;
     ScheduleGeneration(map);
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
@@ -428,6 +469,16 @@ int main(void)
 
             DrawStage2 = false;
         }
+
+        if (DrawStage3)
+        {
+            BeginTextureMode(canvas);
+                DrawSurfaceMiniBiomes(map);
+            EndTextureMode();
+
+            DrawStage3 = false;
+        }
+
 
         // RELOAD DLL
         if (IsKeyDown(KEY_R) && !map.IsGenerating())

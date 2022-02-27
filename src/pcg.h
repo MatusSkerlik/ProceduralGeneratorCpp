@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <cassert>
 #include <iterator>
+#include <stdlib.h>
+#include <tuple>
 #include <unordered_set>
 #include <unordered_map>
 #include <utility>
@@ -13,7 +15,13 @@
 
 #define EXPORT __declspec(dllexport)
 
-bool StrContains(std::string str, std::string pattern)
+inline float cerp(float v0, float v1, float t)
+{
+    auto mu2 = (1 - cos(t * 3.14159)) / 2;
+    return v0 * (1 - mu2) + v1 * mu2;
+};
+
+inline bool StrContains(std::string str, std::string pattern)
 {
     return str.find(pattern) != std::string::npos;
 }
@@ -225,7 +233,7 @@ extern "C"
 /**
  * Define horizonal areas
  */
-EXPORT void define_horizontal(Map& map)
+EXPORT inline void define_horizontal(Map& map)
 {
     printf("define horizontal\n");
 
@@ -248,7 +256,7 @@ EXPORT void define_horizontal(Map& map)
 /**
  * Define biome positions and shapes
  */
-EXPORT void define_biomes(Map& map)
+EXPORT inline void define_biomes(Map& map)
 {
     printf("define biomes\n");
 
@@ -340,7 +348,7 @@ EXPORT void define_biomes(Map& map)
 /*
  * Define minibiomes hill, hole, island
  */ 
-EXPORT void define_hills_holes_islands(Map& map)
+EXPORT inline void define_hills_holes_islands(Map& map)
 {
     printf("define hills, holes, islands\n");
 
@@ -456,7 +464,7 @@ EXPORT void define_hills_holes_islands(Map& map)
 /*
  * Define underground cabin minibiomes
  */ 
-EXPORT void define_cabins(Map& map)
+EXPORT inline void define_cabins(Map& map)
 {
     printf("define cabins\n");
 
@@ -532,7 +540,7 @@ EXPORT void define_cabins(Map& map)
 /**
  * Definition of castles for each biome
  */
-EXPORT void define_castles(Map& map)
+EXPORT inline void define_castles(Map& map)
 {
     printf("define castles\n");
 
@@ -621,6 +629,135 @@ EXPORT void define_castles(Map& map)
         auto h_y = hell_rect.y + castle_height / 2 + (hell_v / hell_rect.w);
         auto& hell_castle = map.MiniBiome(MiniBiomes::CASTLE);
         PixelsAroundRect(h_x, h_y, castle_width, castle_height, hell_castle);
+    }
+};
+
+EXPORT inline void define_surface(Map& map)
+{
+    printf("define surface\n");
+
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+    auto width = map.Width();
+
+    auto left_ocean_width = 250;
+    auto right_ocean_widht = 250;
+    auto surface_parts = 10;
+    auto octaves = 3;
+    auto fq = 50;
+
+    auto surface_x = left_ocean_width;
+    auto surface_y = surface_rect.y + surface_rect.h;
+    auto surface_width = width - left_ocean_width - right_ocean_widht;
+    auto surface_height = surface_rect.h;
+
+    auto tmp_x = surface_x;
+    auto tmp_avg_part_width = surface_width / surface_parts;
+    auto tmp_parts = surface_parts;
+    auto tmp_surface_width = surface_width;
+
+    auto parts = std::vector<std::pair<int, int>>();
+
+    for (auto i = 0; i < surface_parts; ++i)
+    {
+        tmp_parts = surface_parts - i;
+        tmp_avg_part_width = tmp_surface_width / tmp_parts;
+
+        auto w = (int) tmp_avg_part_width / 2 + (rand() % (int)(tmp_avg_part_width / 2));
+        auto h = (int) surface_height / 4 + (rand() % (int)(surface_height / 3));
+
+        parts.emplace_back(std::make_pair(w, h)); 
+
+        tmp_surface_width -= w;
+        tmp_x += w;
+    }
+    // ADD ONE LAST SURFACE PART IF NEEDED
+    if ( tmp_surface_width > 0)
+    {
+        auto w = tmp_surface_width; 
+        auto h = (int) surface_height / 4 + (rand() % (int)(surface_height / 3));
+        parts.emplace_back(std::make_pair(w, h)); 
+    }
+
+    //CREATION OF FRACTAL NOISE
+    tmp_x = surface_x;
+    tmp_avg_part_width = surface_width / fq;
+    tmp_parts = fq;
+    tmp_surface_width = surface_width;
+    auto ypsilons = std::vector<float>();
+
+    auto nh = (float) rand() / RAND_MAX;
+    for (auto i = 0; i < fq; ++i)
+    {
+        tmp_parts = fq - i;
+        tmp_avg_part_width = tmp_surface_width / tmp_parts;
+
+        auto w = (int) tmp_avg_part_width / 2 + (rand() % (int)(tmp_avg_part_width / 2));
+        auto h = nh;
+        nh = (float) rand() / RAND_MAX;
+
+        for (auto x = 0; x < w; ++x) { ypsilons.emplace_back(cerp(h, nh, (float) x / w)); }
+
+        tmp_surface_width -= w;
+        tmp_x += w;
+    }
+    if ( tmp_surface_width > 0)
+    {
+        auto w = tmp_surface_width; 
+        auto h = nh;
+        nh = (float) rand() / RAND_MAX;
+        for (auto x = 0; x < w; ++x) { ypsilons.emplace_back(cerp(h, nh, (float) x / w)); }
+    }
+
+    // CREATE SURFACE PARTS WITH FRACTAL NOISE
+    MiniBiomes::SurfacePart* surface_part_before = nullptr;
+    tmp_x = surface_x;
+    for (auto i = 0; i < parts.size(); ++i)
+    {
+        auto part = parts.at(i);
+        auto w = std::get<0>(part);
+        auto h = std::get<1>(part);
+
+        float nsy = 0.0;
+        auto fq = 2;
+        auto lq = 0.5;
+        for (auto o = 0; o < octaves; ++o) { nsy += ypsilons[(tmp_x * fq) % ypsilons.size()] * lq;    fq = pow(fq, o); lq = pow(lq, o); }
+        float ney = 0.0;
+        fq = 2;
+        lq = 0.5;
+        for (auto o = 0; o < octaves; ++o) { ney += ypsilons[((tmp_x + w) * fq) % ypsilons.size()] * lq;    fq = pow(fq, o); lq = pow(lq, o); }
+        //                                           NOISE WIDTH   CENTER CORECTION 
+        //                                                     N   C
+        auto sy = surface_rect.y + surface_rect.h - h - (nsy * 8 - 4);
+        auto ey = surface_rect.y + surface_rect.h - h - (ney * 8 - 4);
+
+        auto& surface_part = map.SurfacePart(tmp_x, tmp_x + w, sy, ey, surface_rect.y + surface_rect.h - h); 
+        
+        // SET NEXT
+        if (surface_part_before != nullptr) { surface_part_before->SetNext(&surface_part); }
+        // SET BEFORE
+        surface_part.SetBefore(surface_part_before);
+
+        for (auto x = tmp_x; x < tmp_x + w; ++x)
+        {
+            float noise = 0.0;
+            auto fq = 2;
+            auto lq = 0.5;
+            for (auto o = 0; o < octaves; ++o) 
+            { 
+                noise += ypsilons[(x * fq) % ypsilons.size()] * lq;    
+                fq = pow(fq, o);
+                lq = pow(lq, o);
+            }
+
+            //                                                                                        NOISE WIDTH   CENTER CORECTION 
+            //                                                                                                  N   C
+            for (auto _y = surface_rect.y + surface_rect.h; _y > surface_rect.y + surface_rect.h - h - (noise * 8 - 4); --_y) { surface_part.add(x, _y); }
+            surface_part.AddY(surface_rect.y + surface_rect.h - h - (noise * 8 - 4));
+        }
+        tmp_x += w;
+        
+        surface_part_before = &surface_part;
     }
 };
 
