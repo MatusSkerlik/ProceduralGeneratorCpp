@@ -186,13 +186,11 @@ inline void CreateHill(const Rect& rect, PixelArray& arr, double sy, double ey)
 /**
  * Create hole inside rect and fill array with pixels
  */
-inline void CreateHole(const Rect& rect, PixelArray& arr)
+inline void CreateHole(const Rect& rect, PixelArray& arr, double sy, double ey)
 {
     double sx = rect.x;
     double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
     double ex = rect.x + rect.w;
-    double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3)) - 32;
-    double ey = sy + -8 + (rand() % 17);
     double cy = std::max(sy, ey) + (rand() % (int)(std::max(sy, ey) - rect.y - rect.h));
 
     std::vector<double> X = {sx, cx, ex};
@@ -434,7 +432,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         {
             auto x = result[var];
             printf("Creating hole at x: %d\n", x);
-            auto& hole = map.MiniBiome(MiniBiomes::HOLE);
+            auto& hole = map.Structure(Structures::HOLE);
             printf("After creating hole\n");
             Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hole);
@@ -444,7 +442,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         {
             printf("Creating hill\n");
             auto x = result[var];
-            auto& hill = map.MiniBiome(MiniBiomes::HILL);
+            auto& hill = map.Structure(Structures::HILL);
             Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hill);
         }
@@ -453,7 +451,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         {
             printf("Creating island\n");
             auto x = result[var];
-            auto& island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
+            auto& island = map.Structure(Structures::FLOATING_ISLAND);
             Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, island);
         }
@@ -530,7 +528,7 @@ EXPORT inline void DefineCabins(Map& map)
             auto x = (int) tundra_rect.x + (v % tundra_rect.w); 
             auto y = (int) tundra_rect.y + (v / tundra_rect.w);
 
-            auto& cabin = map.MiniBiome(MiniBiomes::CABIN); 
+            auto& cabin = map.Structure(Structures::CABIN); 
             PixelsOfRect(x, y, cabin_width, cabin_height, cabin);
         }
     }
@@ -608,25 +606,25 @@ EXPORT inline void DefineCastles(Map& map)
         auto forest_v = result["forest_castle"];
         auto f_x = forest_rect.x + (forest_v % forest_rect.w);
         auto f_y = forest_rect.y + (forest_v / forest_rect.w);
-        auto& forest_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        auto& forest_castle = map.Structure(Structures::CASTLE);
         PixelsOfRect(f_x, f_y, castle_width, castle_height, forest_castle);
 
         auto tundra_v = result["tundra_castle"];
         auto t_x = tundra_rect.x + (tundra_v % tundra_rect.w);
         auto t_y = tundra_rect.y + (tundra_v / tundra_rect.w);
-        auto& tundra_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        auto& tundra_castle = map.Structure(Structures::CASTLE);
         PixelsOfRect(t_x, t_y, castle_width, castle_height, tundra_castle);
 
         auto jungle_v = result["jungle_castle"];
         auto j_x = jungle_rect.x + (jungle_v % jungle_rect.w);
         auto j_y = jungle_rect.y + (jungle_v / jungle_rect.w);
-        auto& jungle_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        auto& jungle_castle = map.Structure(Structures::CASTLE);
         PixelsOfRect(j_x, j_y, castle_width, castle_height, jungle_castle);
 
         auto hell_v = result["hell_castle"];
         auto h_x = hell_rect.x + (hell_v % hell_rect.w);
         auto h_y = hell_rect.y + (hell_v / hell_rect.w);
-        auto& hell_castle = map.MiniBiome(MiniBiomes::CASTLE);
+        auto& hell_castle = map.Structure(Structures::CASTLE);
         PixelsOfRect(h_x, h_y, castle_width, castle_height, hell_castle);
     }
 };
@@ -710,7 +708,7 @@ EXPORT inline void DefineSurface(Map& map)
     }
 
     // CREATE SURFACE PARTS WITH FRACTAL NOISE
-    MiniBiomes::SurfacePart* surface_part_before = nullptr;
+    Structures::SurfacePart* surface_part_before = nullptr;
     tmp_x = surface_x;
     for (auto i = 0; i < parts.size(); ++i)
     {
@@ -766,7 +764,7 @@ EXPORT inline void GenerateHills(Map& map)
 {
     printf("GenerateHills\n");
 
-    auto hills = map.GetMiniBiomes(MiniBiomes::HILL);
+    auto hills = map.GetStructures(Structures::HILL);
     auto* surface_part = map.GetSurfacePart();
     while (surface_part->Before() != nullptr) { surface_part = surface_part->Before(); }
 
@@ -779,14 +777,12 @@ EXPORT inline void GenerateHills(Map& map)
         
         auto sx = hill_rect.x;
         auto ex = hill_rect.x + hill_rect.w;
-        //printf("sx=%d, ex=%d\n", sx, ex);
 
-        MiniBiomes::SurfacePart* s_part = surface_part;
+        Structures::SurfacePart* s_part = surface_part;
         while (!(s_part->StartX() <= sx) || !(s_part->EndX() > sx)) { s_part = s_part->Next(); }
-        MiniBiomes::SurfacePart* e_part = surface_part;
+        Structures::SurfacePart* e_part = surface_part;
         while (!(e_part->StartX() <= ex) || !(e_part->EndX() > ex)) { e_part = e_part->Next(); }
-        //printf("s_part StartX=%d EndX=%d\n", s_part->StartX(), s_part->EndX());
-        //printf("e_part StartX=%d EndX=%d\n", e_part->StartX(), e_part->EndX()); 
+
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
 
@@ -798,6 +794,33 @@ EXPORT inline void GenerateHills(Map& map)
 
 EXPORT inline void GenerateLakes(Map& map)
 {
+    printf("GenerateLakes\n");
+
+    auto holes = map.GetStructures(Structures::HOLE);
+    auto* surface_part = map.GetSurfacePart();
+    while (surface_part->Before() != nullptr) { surface_part = surface_part->Before(); }
+
+    for (auto& ref: holes)
+    {
+        printf("Generation of Hole\n");
+
+        auto& hole = ref.get(); 
+        auto hole_rect = hole.bbox(); 
+        
+        auto sx = hole_rect.x;
+        auto ex = hole_rect.x + hole_rect.w;
+
+        Structures::SurfacePart* s_part = surface_part;
+        while (!(s_part->StartX() <= sx) || !(s_part->EndX() > sx)) { s_part = s_part->Next(); }
+        Structures::SurfacePart* e_part = surface_part;
+        while (!(e_part->StartX() <= ex) || !(e_part->EndX() > ex)) { e_part = e_part->Next(); }
+
+        auto sy = s_part->GetY(sx);
+        auto ey = e_part->GetY(ex);
+
+        hole.clear();
+        CreateHole(hole_rect, hole, sy, ey);
+    }
 
 };
 

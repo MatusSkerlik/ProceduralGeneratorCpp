@@ -105,27 +105,27 @@ void DrawBiomes(Map& map)
     }
 };
 
-void DrawMiniBiomes(Map& map)
+void DrawStructures(Map& map)
 {
-    for (auto& biome: map.MiniBiomes())
+    for (auto& biome: map.Structures())
     {
         for (auto& p: *biome)
         {
             switch (biome->GetType())
             {
-                case MiniBiomes::HILL:
+                case Structures::HILL:
                     DrawPixel(p.x, p.y, C_UNDERGROUND);
                     break;
-                case MiniBiomes::HOLE:
+                case Structures::HOLE:
                     DrawPixel(p.x, p.y, C_UNDERGROUND);
                     break;
-                case MiniBiomes::FLOATING_ISLAND:
+                case Structures::FLOATING_ISLAND:
                     DrawPixel(p.x, p.y, YELLOW);
                     break;
-                case MiniBiomes::CABIN:
+                case Structures::CABIN:
                     DrawPixel(p.x, p.y, ORANGE);
                     break;
-                case MiniBiomes::CASTLE:
+                case Structures::CASTLE:
                     DrawPixel(p.x, p.y, RED);
                     break;
                 default:
@@ -135,15 +135,15 @@ void DrawMiniBiomes(Map& map)
     }
 };
 
-void DrawSurfaceMiniBiomes(Map& map)
+void DrawSurfaceStructures(Map& map)
 {
-    for (auto& biome: map.SurfaceMiniBiomes())
+    for (auto& biome: map.SurfaceStructures())
     {
         for (auto& p: *biome)
         {
             switch (biome->GetType())
             {
-                case MiniBiomes::SURFACE_PART:
+                case Structures::SURFACE_PART:
                     DrawPixel(p.x, p.y, C_UNDERGROUND);
                     break;
                 default:
@@ -268,19 +268,19 @@ void _PCGGen(Map& map)
             map.Error("DEFINITION OF BIOMES INFEASIBLE");
         }
     }
-    DrawStage1 = true;
+    //DrawStage1 = true;
 
     // STAGE 2
     if (!map.ShouldForceStop() && GenerateStage2)
     {
         map.ClearStage2();
 
-        auto define_minibiomes_future = std::async(std::launch::async, PCGFunction, DefineHillsHolesIslands, std::ref(map));
+        auto define_structures_future = std::async(std::launch::async, PCGFunction, DefineHillsHolesIslands, std::ref(map));
         auto define_cabins_future = std::async(std::launch::async, PCGFunction, DefineCabins, std::ref(map));
         auto define_castles_future = std::async(std::launch::async, PCGFunction, DefineCastles, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
-        if (define_minibiomes_future.wait_for(5s) == std::future_status::timeout)
+        if (define_structures_future.wait_for(5s) == std::future_status::timeout)
         {
             map.SetForceStop(true);
             map.Error("DEFINITION OF HILLS, HOLES, ISLANDS INFEASIBLE");
@@ -393,7 +393,7 @@ void PCGRegenerateSurface(Map& map)
     PCGRegenerateHills(map);
 };
 
-void PCGRegenerateMinibiomes(Map& map)
+void PCGRegeneratestructures(Map& map)
 {
     GenerateStage2 = true;
     PCGRegenerateSurface(map);
@@ -402,7 +402,7 @@ void PCGRegenerateMinibiomes(Map& map)
 void PCGRegenerateBiomes(Map& map)
 {
     GenerateStage1 = true;
-    PCGRegenerateMinibiomes(map);
+    PCGRegeneratestructures(map);
 };
 
 void PCGRegenerateHorizontalAreas(Map& map)
@@ -495,7 +495,7 @@ int main(void)
         if (DrawStage2)
         {
             BeginTextureMode(canvas);
-                DrawMiniBiomes(map);
+                DrawStructures(map);
             EndTextureMode();
 
             DrawStage2 = false;
@@ -504,7 +504,7 @@ int main(void)
         if (DrawStage3)
         {
             BeginTextureMode(canvas);
-                DrawSurfaceMiniBiomes(map);
+                DrawSurfaceStructures(map);
             EndTextureMode();
 
             DrawStage3 = false;
@@ -513,7 +513,7 @@ int main(void)
         if (DrawStage4)
         {
             BeginTextureMode(canvas);
-                DrawMiniBiomes(map);
+                DrawStructures(map);
             EndTextureMode();
 
             DrawStage4 = false;
@@ -583,13 +583,13 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
 
                     if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateMinibiomes(map);
+                        PCGRegeneratestructures(map);
                     if (map.HolesFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.HolesFrequency(), 0.0, 1.0)))
-                        PCGRegenerateMinibiomes(map);
+                        PCGRegeneratestructures(map);
                     if (map.CabinsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.CabinsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateMinibiomes(map);
+                        PCGRegeneratestructures(map);
                     if (map.IslandsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.IslandsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateMinibiomes(map);
+                        PCGRegeneratestructures(map);
 
                 }
                 else
