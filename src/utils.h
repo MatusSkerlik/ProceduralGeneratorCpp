@@ -627,6 +627,16 @@ class Map {
             return *_mini_biomes[_mini_biomes.size() - 1];
         }
 
+        auto GetMiniBiomes(MiniBiomes::Type type)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            std::vector<std::reference_wrapper<MiniBiomes::Biome>> minibiomes;
+            for (auto& biome: _mini_biomes)
+                if (biome->GetType() == type)
+                    minibiomes.push_back(std::ref(*biome));
+            return minibiomes;
+        }
+
         auto& SurfaceMiniBiomes()
         {
             const std::lock_guard<std::mutex> lock(mutex);
@@ -640,12 +650,26 @@ class Map {
             return *_surface_mini_biomes[_surface_mini_biomes.size() - 1];
         }
         
-        MiniBiomes::SurfacePart& SurfacePart(int sx, int ex, int sy, int ey, int by)
+        auto& SurfacePart(int sx, int ex, int sy, int ey, int by)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _surface_mini_biomes.emplace_back(new MiniBiomes::SurfacePart(sx, ex, sy, ey, by, nullptr, nullptr));
             return static_cast<MiniBiomes::SurfacePart&>(*_surface_mini_biomes[_surface_mini_biomes.size() - 1]);
         };
+
+        MiniBiomes::SurfacePart* GetSurfacePart()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            for (auto& biome: _surface_mini_biomes)
+            {
+                if (biome->GetType() == MiniBiomes::SURFACE_PART)
+                {
+                    return static_cast<MiniBiomes::SurfacePart*>(biome.get());
+                }
+            }
+            return nullptr;
+        };
+
 
         void ClearStage0()
         {

@@ -17,12 +17,15 @@
 
 #if (PCG_AS_DLL)
 HMODULE module;
-PCG_FUNC define_horizontal;
-PCG_FUNC define_biomes;
-PCG_FUNC define_hills_holes_islands;
-PCG_FUNC define_cabins;
-PCG_FUNC define_castles;
-PCG_FUNC define_surface;
+PCG_FUNC DefineHorizontal;
+PCG_FUNC DefineBiomes;
+PCG_FUNC DefineHillsHolesIslands;
+PCG_FUNC DefineCabins;
+PCG_FUNC DefineCastles;
+PCG_FUNC DefineSurface;
+PCG_FUNC GenerateHills;
+PCG_FUNC GenerateLakes;
+PCG_FUNC GenerateIslands;
 #include "utils.h"
 
 #else
@@ -162,10 +165,12 @@ std::atomic_bool GenerateStage0 { false };
 std::atomic_bool GenerateStage1 { false };
 std::atomic_bool GenerateStage2 { false };
 std::atomic_bool GenerateStage3 { false };
+std::atomic_bool GenerateStage4 { false };
 std::atomic_bool DrawStage0 { false };
 std::atomic_bool DrawStage1 { false };
 std::atomic_bool DrawStage2 { false };
 std::atomic_bool DrawStage3 { false };
+std::atomic_bool DrawStage4 { false };
 
 std::atomic_bool GenerationScheduled { false };
 std::atomic_bool ScheduleThreadRunning { false };
@@ -183,12 +188,15 @@ bool LoadPCG()
     module = LoadLibrary("pcg.dll");
     if (module)
     {
-        define_horizontal = (PCG_FUNC) GetProcAddress(module, "define_horizontal");
-        define_biomes = (PCG_FUNC) GetProcAddress(module, "define_biomes");
-        define_hills_holes_islands = (PCG_FUNC) GetProcAddress(module, "define_hills_holes_islands");
-        define_cabins = (PCG_FUNC) GetProcAddress(module, "define_cabins");
-        define_castles = (PCG_FUNC) GetProcAddress(module, "define_castles");
-        define_surface = (PCG_FUNC) GetProcAddress(module, "define_surface");
+        DefineHorizontal = (PCG_FUNC) GetProcAddress(module, "DefineHorizontal");
+        DefineBiomes = (PCG_FUNC) GetProcAddress(module, "DefineBiomes");
+        DefineHillsHolesIslands = (PCG_FUNC) GetProcAddress(module, "DefineHillsHolesIslands");
+        DefineCabins = (PCG_FUNC) GetProcAddress(module, "DefineCabins");
+        DefineCastles = (PCG_FUNC) GetProcAddress(module, "DefineCastles");
+        DefineSurface = (PCG_FUNC) GetProcAddress(module, "DefineSurface");
+        GenerateHills = (PCG_FUNC) GetProcAddress(module, "GenerateHills");
+        GenerateLakes = (PCG_FUNC) GetProcAddress(module, "GenerateLakes");
+        GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
         return true;
     }
     return false;
@@ -235,7 +243,7 @@ void _PCGGen(Map& map)
     {
         map.ClearStage0();
      
-        auto define_horizontal_future = std::async(std::launch::async, PCGFunction, define_horizontal, std::ref(map));
+        auto define_horizontal_future = std::async(std::launch::async, PCGFunction, DefineHorizontal, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
         if (define_horizontal_future.wait_for(50s) == std::future_status::timeout)
@@ -251,7 +259,7 @@ void _PCGGen(Map& map)
     {
         map.ClearStage1();
 
-        auto define_biomes_future = std::async(std::launch::async, PCGFunction, define_biomes, std::ref(map));
+        auto define_biomes_future = std::async(std::launch::async, PCGFunction, DefineBiomes, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF BIOMES...");
         if (define_biomes_future.wait_for(50s) == std::future_status::timeout)
@@ -267,9 +275,9 @@ void _PCGGen(Map& map)
     {
         map.ClearStage2();
 
-        auto define_minibiomes_future = std::async(std::launch::async, PCGFunction, define_hills_holes_islands, std::ref(map));
-        auto define_cabins_future = std::async(std::launch::async, PCGFunction, define_cabins, std::ref(map));
-        auto define_castles_future = std::async(std::launch::async, PCGFunction, define_castles, std::ref(map));
+        auto define_minibiomes_future = std::async(std::launch::async, PCGFunction, DefineHillsHolesIslands, std::ref(map));
+        auto define_cabins_future = std::async(std::launch::async, PCGFunction, DefineCabins, std::ref(map));
+        auto define_castles_future = std::async(std::launch::async, PCGFunction, DefineCastles, std::ref(map));
 
         map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
         if (define_minibiomes_future.wait_for(5s) == std::future_status::timeout)
@@ -286,19 +294,19 @@ void _PCGGen(Map& map)
         }
 
         map.SetGenerationMessage("DEFINITION OF UNDERGROUND CASTLES...");
-        if (define_castles_future.wait_for(5s) == std::future_status::timeout)
+        if (define_cabins_future.wait_for(5s) == std::future_status::timeout)
         {
             map.SetForceStop(true);
             map.Error("DEFINITION OF UNDERGROUND CASTLES INFEASIBLE");
         }
     }
-    DrawStage2 = true;
+    //DrawStage2 = true;
 
     if (!map.ShouldForceStop() && GenerateStage2)
     {
         map.ClearStage3();
 
-        auto define_surface_future = std::async(std::launch::async, PCGFunction, define_surface, std::ref(map));
+        auto define_surface_future= std::async(std::launch::async, PCGFunction, DefineSurface, std::ref(map));
         
         map.SetGenerationMessage("DEFINITION OF SURFACE");
         if (define_surface_future.wait_for(5s) == std::future_status::timeout)
@@ -309,6 +317,18 @@ void _PCGGen(Map& map)
     }
     DrawStage3 = true;
 
+    if (!map.ShouldForceStop() && GenerateStage4)
+    {
+        auto generate_hills_future = std::async(std::launch::async, PCGFunction, GenerateHills, std::ref(map));
+        
+        map.SetGenerationMessage("GENERATION OF HILLS");
+        if (generate_hills_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("GENERATION OF HILLS INFEASIBLE");
+        }
+    }
+    DrawStage4 = true;
 
     if (!map.ShouldForceStop())
     {
@@ -316,6 +336,7 @@ void _PCGGen(Map& map)
         GenerateStage1 = false;
         GenerateStage2 = false;
         GenerateStage3 = false;
+        GenerateStage4 = false;
     }
 
     // FINALIZE
@@ -359,27 +380,36 @@ void ScheduleGeneration(Map& map)
     }
 };
 
-void PCGRegenerateHorizontalAreas(Map& map)
+
+void PCGRegenerateHills(Map& map)
 {
-    GenerateStage0 = true;
-    GenerateStage1 = true;
-    GenerateStage2 = true;
+    GenerateStage4 = true;
     ScheduleGeneration(map);
 };
 
-void PCGRegenerateBiomes(Map& map)
+void PCGRegenerateSurface(Map& map)
 {
-    GenerateStage1 = true;
-    GenerateStage2 = true;
-    ScheduleGeneration(map);
+    GenerateStage3 = true;
+    PCGRegenerateHills(map);
 };
 
 void PCGRegenerateMinibiomes(Map& map)
 {
     GenerateStage2 = true;
-    ScheduleGeneration(map);
+    PCGRegenerateSurface(map);
 };
 
+void PCGRegenerateBiomes(Map& map)
+{
+    GenerateStage1 = true;
+    PCGRegenerateMinibiomes(map);
+};
+
+void PCGRegenerateHorizontalAreas(Map& map)
+{
+    GenerateStage0 = true;
+    PCGRegenerateBiomes(map);
+};
 
 /**************************************************
 *
@@ -439,6 +469,7 @@ int main(void)
     GenerateStage1 = true;
     GenerateStage2 = true;
     GenerateStage3 = true;
+    GenerateStage4 = true;
     ScheduleGeneration(map);
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
@@ -479,6 +510,14 @@ int main(void)
             DrawStage3 = false;
         }
 
+        if (DrawStage4)
+        {
+            BeginTextureMode(canvas);
+                DrawMiniBiomes(map);
+            EndTextureMode();
+
+            DrawStage4 = false;
+        }
 
         // RELOAD DLL
         if (IsKeyDown(KEY_R) && !map.IsGenerating())

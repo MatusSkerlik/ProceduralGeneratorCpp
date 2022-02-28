@@ -157,31 +157,30 @@ class InsidePixelArrayConstraint2D: public Constraint<V, D>
 /**
  * Create hill inside rect and fill array with pixels
  */
-inline void CreateHill(const Rect& rect, PixelArray& arr)
+inline void CreateHill(const Rect& rect, PixelArray& arr, double sy, double ey)
 {
-   double sx = rect.x;
-   double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
-   double ex = rect.x + rect.w;
-   double sy = rect.y + rect.h - (rand() % (int)(rect.h / 3));
-   double ey = sy + (-8 + rand() % 17);
-   double cy = std::min(sy, ey) - (20 + rand() % 40);
+    printf("CreateHill\n");
+    double sx = rect.x;
+    double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
+    double ex = rect.x + rect.w;
+    double cy = std::min(sy, ey) - (20 + rand() % 40);
 
-   std::vector<double> X = {sx, cx, ex};
-   std::vector<double> Y = {sy, cy, ey};
+    std::vector<double> X = {sx, cx, ex};
+    std::vector<double> Y = {sy, cy, ey};
 
-   tk::spline s;
-   s.set_boundary(tk::spline::first_deriv, -1, tk::spline::first_deriv, 1);
-   s.set_boundary(tk::spline::second_deriv, 0, tk::spline::second_deriv, 0);
-   s.set_points(X, Y, tk::spline::cspline);
+    tk::spline s;
+    s.set_boundary(tk::spline::first_deriv, -1, tk::spline::first_deriv, 1);
+    s.set_boundary(tk::spline::second_deriv, 0, tk::spline::second_deriv, 0);
+    s.set_points(X, Y, tk::spline::cspline);
 
-   for (int x = rect.x; x < rect.x + rect.w; ++x)
-   {
+    for (int x = rect.x; x < rect.x + rect.w; ++x)
+    {
        int _y = (int) s(x);
        for (int y = _y; y < rect.y + rect.h; ++y)
        {
             arr.add(x, y);
        }
-   }
+    }
 };
 
 /**
@@ -233,9 +232,9 @@ extern "C"
 /**
  * Define horizonal areas
  */
-EXPORT inline void define_horizontal(Map& map)
+EXPORT inline void DefineHorizontal(Map& map)
 {
-    printf("define horizontal\n");
+    printf("DefineHorizontal\n");
 
     int width = map.Width();
     int height = map.Height();
@@ -256,9 +255,9 @@ EXPORT inline void define_horizontal(Map& map)
 /**
  * Define biome positions and shapes
  */
-EXPORT inline void define_biomes(Map& map)
+EXPORT inline void DefineBiomes(Map& map)
 {
-    printf("define biomes\n");
+    printf("DefineBiomes\n");
 
     int width = map.Width();
     int ocean_width = 250;
@@ -348,9 +347,9 @@ EXPORT inline void define_biomes(Map& map)
 /*
  * Define minibiomes hill, hole, island
  */ 
-EXPORT inline void define_hills_holes_islands(Map& map)
+EXPORT inline void DefineHillsHolesIslands(Map& map)
 {
-    printf("define hills, holes, islands\n");
+    printf("DefineHillsHolesIslands\n");
 
     int width = map.Width();
     
@@ -438,7 +437,7 @@ EXPORT inline void define_hills_holes_islands(Map& map)
             auto& hole = map.MiniBiome(MiniBiomes::HOLE);
             printf("After creating hole\n");
             Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
-            CreateHole(rect, hole);
+            PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hole);
         }
         
         for (auto& var: hills)
@@ -447,7 +446,7 @@ EXPORT inline void define_hills_holes_islands(Map& map)
             auto x = result[var];
             auto& hill = map.MiniBiome(MiniBiomes::HILL);
             Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
-            CreateHill(rect, hill);
+            PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hill);
         }
 
         for (auto& var: islands)
@@ -456,7 +455,7 @@ EXPORT inline void define_hills_holes_islands(Map& map)
             auto x = result[var];
             auto& island = map.MiniBiome(MiniBiomes::FLOATING_ISLAND);
             Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
-            PixelsAroundRect(rect.x, rect.y, rect.w, rect.h, island);
+            PixelsOfRect(rect.x, rect.y, rect.w, rect.h, island);
         }
     }
 };
@@ -464,9 +463,9 @@ EXPORT inline void define_hills_holes_islands(Map& map)
 /*
  * Define underground cabin minibiomes
  */ 
-EXPORT inline void define_cabins(Map& map)
+EXPORT inline void DefineCabins(Map& map)
 {
-    printf("define cabins\n");
+    printf("DefineCabins\n");
 
     int cabin_count = map.CabinsFrequency() * 60;
     int cabin_width = 80;
@@ -528,11 +527,11 @@ EXPORT inline void define_cabins(Map& map)
         {
             printf("Creating cabin\n");
             auto v = result[var];
-            auto x = (int) tundra_rect.x + + cabin_width / 2 + (v % tundra_rect.w); 
-            auto y = (int) tundra_rect.y + cabin_height / 2 + (v / tundra_rect.w);
+            auto x = (int) tundra_rect.x + (v % tundra_rect.w); 
+            auto y = (int) tundra_rect.y + (v / tundra_rect.w);
 
             auto& cabin = map.MiniBiome(MiniBiomes::CABIN); 
-            PixelsAroundRect(x, y, cabin_width, cabin_height, cabin);
+            PixelsOfRect(x, y, cabin_width, cabin_height, cabin);
         }
     }
 };
@@ -540,9 +539,9 @@ EXPORT inline void define_cabins(Map& map)
 /**
  * Definition of castles for each biome
  */
-EXPORT inline void define_castles(Map& map)
+EXPORT inline void DefineCastles(Map& map)
 {
-    printf("define castles\n");
+    printf("DefineCastles\n");
 
     auto castle_width = 250;
     auto castle_height = 150;
@@ -607,39 +606,40 @@ EXPORT inline void define_castles(Map& map)
     {
         // RESULT HANDLING
         auto forest_v = result["forest_castle"];
-        auto f_x = forest_rect.x + castle_width / 2 + (forest_v % forest_rect.w);
-        auto f_y = forest_rect.y + castle_height / 2 + (forest_v / forest_rect.w);
+        auto f_x = forest_rect.x + (forest_v % forest_rect.w);
+        auto f_y = forest_rect.y + (forest_v / forest_rect.w);
         auto& forest_castle = map.MiniBiome(MiniBiomes::CASTLE);
-        PixelsAroundRect(f_x, f_y, castle_width, castle_height, forest_castle);
+        PixelsOfRect(f_x, f_y, castle_width, castle_height, forest_castle);
 
         auto tundra_v = result["tundra_castle"];
-        auto t_x = tundra_rect.x + castle_width / 2 + (tundra_v % tundra_rect.w);
-        auto t_y = tundra_rect.y + castle_height / 2 + (tundra_v / tundra_rect.w);
+        auto t_x = tundra_rect.x + (tundra_v % tundra_rect.w);
+        auto t_y = tundra_rect.y + (tundra_v / tundra_rect.w);
         auto& tundra_castle = map.MiniBiome(MiniBiomes::CASTLE);
-        PixelsAroundRect(t_x, t_y, castle_width, castle_height, tundra_castle);
+        PixelsOfRect(t_x, t_y, castle_width, castle_height, tundra_castle);
 
         auto jungle_v = result["jungle_castle"];
-        auto j_x = jungle_rect.x + castle_width / 2 + (jungle_v % jungle_rect.w);
-        auto j_y = jungle_rect.y + castle_height / 2 + (jungle_v / jungle_rect.w);
+        auto j_x = jungle_rect.x + (jungle_v % jungle_rect.w);
+        auto j_y = jungle_rect.y + (jungle_v / jungle_rect.w);
         auto& jungle_castle = map.MiniBiome(MiniBiomes::CASTLE);
-        PixelsAroundRect(j_x, j_y, castle_width, castle_height, jungle_castle);
+        PixelsOfRect(j_x, j_y, castle_width, castle_height, jungle_castle);
 
         auto hell_v = result["hell_castle"];
-        auto h_x = hell_rect.x + castle_width / 2 + (hell_v % hell_rect.w);
-        auto h_y = hell_rect.y + castle_height / 2 + (hell_v / hell_rect.w);
+        auto h_x = hell_rect.x + (hell_v % hell_rect.w);
+        auto h_y = hell_rect.y + (hell_v / hell_rect.w);
         auto& hell_castle = map.MiniBiome(MiniBiomes::CASTLE);
-        PixelsAroundRect(h_x, h_y, castle_width, castle_height, hell_castle);
+        PixelsOfRect(h_x, h_y, castle_width, castle_height, hell_castle);
     }
 };
 
-EXPORT inline void define_surface(Map& map)
+EXPORT inline void DefineSurface(Map& map)
 {
-    printf("define surface\n");
+    printf("DefineSurface\n");
 
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
     auto width = map.Width();
 
+    // TODO GUI CONTROLS
     auto left_ocean_width = 250;
     auto right_ocean_widht = 250;
     auto surface_parts = 10;
@@ -733,10 +733,11 @@ EXPORT inline void define_surface(Map& map)
 
         auto& surface_part = map.SurfacePart(tmp_x, tmp_x + w, sy, ey, surface_rect.y + surface_rect.h - h); 
         
-        // SET NEXT
-        if (surface_part_before != nullptr) { surface_part_before->SetNext(&surface_part); }
-        // SET BEFORE
-        surface_part.SetBefore(surface_part_before);
+        if (surface_part_before != nullptr) 
+        { 
+            surface_part_before->SetNext(&surface_part); 
+            surface_part.SetBefore(surface_part_before);
+        }
 
         for (auto x = tmp_x; x < tmp_x + w; ++x)
         {
@@ -760,5 +761,50 @@ EXPORT inline void define_surface(Map& map)
         surface_part_before = &surface_part;
     }
 };
+
+EXPORT inline void GenerateHills(Map& map)
+{
+    printf("GenerateHills\n");
+
+    auto hills = map.GetMiniBiomes(MiniBiomes::HILL);
+    auto* surface_part = map.GetSurfacePart();
+    while (surface_part->Before() != nullptr) { surface_part = surface_part->Before(); }
+
+    for (auto& ref: hills)
+    {
+        printf("Generation of Hill\n");
+
+        auto& hill = ref.get(); 
+        auto hill_rect = hill.bbox(); 
+        
+        auto sx = hill_rect.x;
+        auto ex = hill_rect.x + hill_rect.w;
+        //printf("sx=%d, ex=%d\n", sx, ex);
+
+        MiniBiomes::SurfacePart* s_part = surface_part;
+        while (!(s_part->StartX() <= sx) || !(s_part->EndX() > sx)) { s_part = s_part->Next(); }
+        MiniBiomes::SurfacePart* e_part = surface_part;
+        while (!(e_part->StartX() <= ex) || !(e_part->EndX() > ex)) { e_part = e_part->Next(); }
+        //printf("s_part StartX=%d EndX=%d\n", s_part->StartX(), s_part->EndX());
+        //printf("e_part StartX=%d EndX=%d\n", e_part->StartX(), e_part->EndX()); 
+        auto sy = s_part->GetY(sx);
+        auto ey = e_part->GetY(ex);
+
+        hill.clear();
+        CreateHill(hill_rect, hill, sy, ey);
+    }
+};
+
+
+EXPORT inline void GenerateLakes(Map& map)
+{
+
+};
+
+EXPORT inline void GenerateIslands(Map& map)
+{
+
+};
+
 
 };
