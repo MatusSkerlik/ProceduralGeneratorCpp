@@ -3,13 +3,20 @@
 #include <mutex>
 #include <memory>
 #include <cmath>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include <tuple>
 #include <limits>
 #include <atomic>
 
-typedef struct Rect {
+class Map;
+namespace Structures { enum Type: unsigned short; class Structure; };
+namespace Biomes { class Biome; };
+
+typedef struct Rect 
+{
     Rect() = default;
     Rect(const Rect& r): x{r.x}, y{r.y}, w{r.w}, h{r.h} {};
     Rect(int _x, int _y, int _w, int _h): x{_x}, y{_y}, w{_w}, h{_h} {};
@@ -39,7 +46,8 @@ inline auto RectUnion(const Rect& r0, const Rect& r1)
     return (Rect){x0, y0, x1 - x0, y1 - y0};
 };
 
-typedef struct Pixel {
+typedef struct Pixel 
+{
     int x;
     int y;
     Pixel(int _x, int _y): x{_x}, y{_y} {};
@@ -48,8 +56,35 @@ typedef struct Pixel {
 
 struct PixelHash
 {
-    size_t operator()(const Pixel& pixel) const { return pixel.x * 4200 + pixel.y; };    
+    inline size_t operator()(const Pixel& p) const 
+    { 
+        uint64_t hash = 0;
+        auto add = [&](uint64_t elm)
+        {
+            const uint64_t m = UINT64_C(0xc6a4a7935bd1e995);
+            elm *= m;
+            elm ^= elm >> 47;
+            elm *= m;
+            hash ^= elm;
+            hash *= m; 
+        };
+        add(p.x);
+        add(p.y);
+        return (size_t) hash;
+    };    
 };
+
+struct PixelEqual 
+{
+    inline bool operator()( const Pixel& left, const Pixel& right) const { return left.x == right.x && left.y == right.y; };    
+};
+
+typedef struct PixelMetadata
+{
+    Biomes::Biome* biome { nullptr };
+    Structures::Structure* owner { nullptr };
+} PixelMetadata;
+
 
 class Vector2D
 {
@@ -80,40 +115,35 @@ class Vector2D
 class PixelArray
 {
     protected:
-        std::unordered_set<Pixel, PixelHash> _set_pixels;
+        std::unordered_set<Pixel, PixelHash, PixelEqual> _set_pixels;
         Rect _bounding_box {0, 0, 0, 0};
 
     public:
-        PixelArray()
-        {
-            printf("PixelArray();\n");
-        };
+        PixelArray(){};
         
         PixelArray(const PixelArray& arr)
         {
-            printf("PixelArray&();\n");
             _set_pixels = arr._set_pixels;
             _bounding_box = arr._bounding_box;
         }
 
         PixelArray(PixelArray&& arr)
         {
-            printf("PixelArray&&();\n");
             _set_pixels = std::move(arr._set_pixels);
             _bounding_box = std::move(arr._bounding_box);
         }
 
-        ~PixelArray(){ printf("~PixelArray();\n"); };
+        ~PixelArray(){};
 
         auto begin() const { return this->_set_pixels.begin(); };
         auto end() const { return this->_set_pixels.end(); };
         auto size() const { return this->_set_pixels.size(); };
-        auto contains(Pixel pixel) const { return this->_set_pixels.find(pixel) != this->_set_pixels.end(); };
-        void add(Pixel pixel) { _set_pixels.insert(pixel); };
-        void add(int x, int y) { add((Pixel){x, y}); };
-        void remove(Pixel pixel) { _set_pixels.erase(pixel); };
-        void remove(int x, int y) { remove((Pixel){x, y}); };
-        void clear() { _set_pixels.clear(); };
+        auto contains(Pixel pixel) const { return (bool)_set_pixels.count(pixel); };
+        virtual void add(Pixel pixel) { _set_pixels.insert(pixel); };
+        virtual void add(int x, int y) { add((Pixel){x, y}); };
+        virtual void remove(Pixel pixel) { _set_pixels.erase(pixel); };
+        virtual void remove(int x, int y) { remove((Pixel){x, y}); };
+        virtual void clear() { _set_pixels.clear(); };
         void bbox(Rect rect) { _bounding_box = rect; };
 
         Rect bbox()
@@ -169,30 +199,40 @@ namespace Biomes {
     class Biome: public PixelArray 
     {
         protected:
+            Map& map;
             Type type;
+
         public:
-            Biome(): PixelArray() {};
-            Biome(Type _t): PixelArray(), type{_t} {};
+            Biome(Map& _map): PixelArray(), map{_map} {};
+            Biome(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            ~Biome() { clear(); };
 
             auto GetType(){ return type; }
+            void add(Pixel pixel) override;
+            void remove(Pixel pixel) override;
+            void clear() override;
    };
-
-
 };
 
 namespace Structures {
     
-    enum Type: unsigned short { SURFACE_PART, HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
+    enum Type: unsigned short { NONE, SURFACE_PART, HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
     
     class Structure: public PixelArray 
     {
         protected:
+            Map& map;
             Type type;
-        public:
-            Structure(): PixelArray() {};
-            Structure(Type _t): PixelArray(), type{_t} {};
 
+        public:
+            Structure(Map& _map): PixelArray(), map{_map} {};
+            Structure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            ~Structure(){ clear(); };
+            
             auto GetType(){ return type; }
+            void add(Pixel pixel) override;
+            void remove(Pixel pixel) override;
+            void clear() override;
    };
  
     class SurfacePart: public Structure 
@@ -209,7 +249,7 @@ namespace Structures {
             std::vector<int> ypsilons;
 
         public:
-            SurfacePart(int _sx, int _ex, int _sy, int _ey, int _by, SurfacePart* _before, SurfacePart* _next): Structure(SURFACE_PART),
+            SurfacePart(Map& _map, int _sx, int _ex, int _sy, int _ey, int _by, SurfacePart* _before, SurfacePart* _next): Structure(_map, SURFACE_PART),
             sx{_sx}, ex{_ex}, sy{_sy}, ey{_ey}, by{_by}, 
             before{_before}, next{_next} 
             {};
@@ -229,13 +269,26 @@ namespace Structures {
             auto GetY(int x) { return ypsilons.at(x - sx); };
             auto GetYpsilons() { return ypsilons; };
    };
+};
 
+namespace Special
+{
+    class Eraser: public PixelArray
+    {
+        private:
+            Map& map;
+
+        public:
+            Eraser(Map& _map): PixelArray(), map{_map} {};
+
+            void add(Pixel pixel) override;
+    };
 };
 
 class Map {
     private:
-        int _WIDTH;
-        int _HEIGHT;
+        int _WIDTH {4200};
+        int _HEIGHT {1200};
 
         float _COPPER_FREQUENCY = 0.5;
         float _COPPER_SIZE = 0.5;
@@ -267,42 +320,35 @@ class Map {
         std::vector<std::unique_ptr<Structures::Structure>> _structures;
         std::vector<std::unique_ptr<Structures::Structure>> _surface_structures;
         std::vector<std::string> _errors;
+        std::unordered_map<Pixel, PixelMetadata, PixelHash> _pixel_map;
 
     public:
-        Map(){ printf("Map();\n"); };
+        Map(){};
 
-        auto Width()
+        void _InitializePixelMap()
+        {
+            for (auto x = 0; x < this->Width(); ++x)
+                for (auto y = 0; y < this->Height(); ++y) 
+                    _pixel_map.emplace(std::make_pair((Pixel){x, y}, PixelMetadata()));
+        };
+
+        void Init(int w = 4200, int h = 1200)
+        {
+            _WIDTH = w;
+            _HEIGHT = h;
+            _InitializePixelMap();
+        }
+
+        int Width()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _WIDTH;
         };
         
-        auto Height()
+        int Height()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _HEIGHT;
-        };
-
-        auto Width(int w)
-        {
-            const std::lock_guard<std::mutex> lock(mutex);
-            if (_WIDTH != w)
-            {
-                _WIDTH = w;
-                return true;
-            }
-            return false;
-        };
-
-        auto Height(int h)
-        {
-            const std::lock_guard<std::mutex> lock(mutex);
-            if (_HEIGHT != h)
-            {
-                _HEIGHT = h;
-                return true;
-            }
-            return false;
         };
 
         auto CopperFrequency()
@@ -595,7 +641,7 @@ class Map {
         Biomes::Biome& Biome(Biomes::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _biomes.emplace_back(new Biomes::Biome(type));
+            _biomes.emplace_back(new Biomes::Biome(*this, type));
             return *_biomes[_biomes.size() - 1];
         }
 
@@ -623,18 +669,18 @@ class Map {
         Structures::Structure& Structure(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _structures.emplace_back(new Structures::Structure(type));
+            _structures.emplace_back(new Structures::Structure(*this, type));
             return *_structures[_structures.size() - 1];
         }
 
         auto GetStructures(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            std::vector<std::reference_wrapper<Structures::Structure>> minibiomes;
+            std::vector<std::reference_wrapper<Structures::Structure>> structures;
             for (auto& biome: _structures)
                 if (biome->GetType() == type)
-                    minibiomes.push_back(std::ref(*biome));
-            return minibiomes;
+                    structures.push_back(std::ref(*biome));
+            return structures;
         }
 
         auto& SurfaceStructures()
@@ -646,14 +692,14 @@ class Map {
         Structures::Structure& SurfaceStructure(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _surface_structures.emplace_back(new Structures::Structure(type));
+            _surface_structures.emplace_back(new Structures::Structure(*this, type));
             return *_surface_structures[_surface_structures.size() - 1];
         }
         
         auto& SurfacePart(int sx, int ex, int sy, int ey, int by)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _surface_structures.emplace_back(new Structures::SurfacePart(sx, ex, sy, ey, by, nullptr, nullptr));
+            _surface_structures.emplace_back(new Structures::SurfacePart(*this, sx, ex, sy, ey, by, nullptr, nullptr));
             return static_cast<Structures::SurfacePart&>(*_surface_structures[_surface_structures.size() - 1]);
         };
 
@@ -670,6 +716,10 @@ class Map {
             return nullptr;
         };
 
+        std::unique_ptr<Special::Eraser> Eraser()
+        {
+            return std::unique_ptr<Special::Eraser>(new Special::Eraser(*this));
+        };
 
         void ClearStage0()
         {
@@ -731,7 +781,72 @@ class Map {
             _errors.pop_back();
             return msg;
         };
+
+        auto& GetMetadata(Pixel pixel)
+        {
+            return _pixel_map.at(pixel);
+        };
 };
+
+void Biomes::Biome::add(Pixel pixel)
+{
+    auto& meta = map.GetMetadata(pixel);
+    meta.biome = this;
+    PixelArray::add(pixel);
+};
+
+void Structures::Structure::add(Pixel pixel)
+{
+    auto& meta = map.GetMetadata(pixel);
+    meta.owner = this;
+    PixelArray::add(pixel);
+};
+
+void Biomes::Biome::remove(Pixel pixel)
+{
+    auto& meta = map.GetMetadata(pixel);
+    meta.biome = nullptr;
+    PixelArray::remove(pixel);
+};
+
+void Structures::Structure::remove(Pixel pixel)
+{
+    auto& meta = map.GetMetadata(pixel);
+    meta.owner = nullptr;
+    PixelArray::remove(pixel);
+};
+
+void Biomes::Biome::clear()
+{
+    for (auto& p: _set_pixels)
+    {
+        auto& meta = map.GetMetadata(p);
+        meta.biome = nullptr;
+    };
+
+    PixelArray::clear();
+};
+
+void Structures::Structure::clear()
+{
+    for (auto& p: _set_pixels)
+    {
+        auto& meta = map.GetMetadata(p);
+        meta.owner = nullptr;
+    };
+
+    PixelArray::clear();
+};
+
+void Special::Eraser::add(Pixel pixel)
+{
+    auto& meta = map.GetMetadata(pixel);
+    if (meta.owner != nullptr)
+    {
+        meta.owner->remove(pixel);
+    };
+    PixelArray::add(pixel);
+}
 
 inline void FillWithRect(const Rect& rect, PixelArray& arr)
 {

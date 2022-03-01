@@ -163,7 +163,7 @@ inline void CreateHill(const Rect& rect, PixelArray& arr, double sy, double ey)
     double sx = rect.x;
     double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
     double ex = rect.x + rect.w;
-    double cy = std::min(sy, ey) - (20 + rand() % 40);
+    double cy = std::min(sy, ey) - 20 - (rand() % 40);
 
     std::vector<double> X = {sx, cx, ex};
     std::vector<double> Y = {sy, cy, ey};
@@ -173,10 +173,10 @@ inline void CreateHill(const Rect& rect, PixelArray& arr, double sy, double ey)
     s.set_boundary(tk::spline::second_deriv, 0, tk::spline::second_deriv, 0);
     s.set_points(X, Y, tk::spline::cspline);
 
-    for (int x = rect.x; x < rect.x + rect.w; ++x)
+    for (int x = rect.x; x <= rect.x + rect.w; ++x)
     {
        int _y = (int) s(x);
-       for (int y = _y; y < rect.y + rect.h; ++y)
+       for (int y = _y; y <= rect.y + rect.h; ++y)
        {
             arr.add(x, y);
        }
@@ -191,7 +191,7 @@ inline void CreateHole(const Rect& rect, PixelArray& arr, double sy, double ey)
     double sx = rect.x;
     double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
     double ex = rect.x + rect.w;
-    double cy = std::max(sy, ey) + (rand() % (int)(std::max(sy, ey) - rect.y - rect.h));
+    double cy = std::max(sy, ey) + 8 + (rand() % 30);
 
     std::vector<double> X = {sx, cx, ex};
     std::vector<double> Y = {sy, cy, ey};
@@ -201,10 +201,10 @@ inline void CreateHole(const Rect& rect, PixelArray& arr, double sy, double ey)
     s.set_boundary(tk::spline::second_deriv, 0.1, tk::spline::second_deriv, 0.1);
     s.set_points(X, Y, tk::spline::cspline);
 
-    for (int x = rect.x; x < rect.x + rect.w; ++x)
+    for (int x = rect.x; x <= rect.x + rect.w; ++x)
     {
        int _y = (int) s(x);
-       for (int y = _y; y < rect.y + rect.h; ++y)
+       for (int y = _y; y <= rect.y + rect.h; ++y)
        {
             arr.add(x, y);
        }
@@ -357,7 +357,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
 
     int ocean_width = 250;
     int hill_width = 80;
-    int hole_width = 60;
+    int hole_width = 80;
     int island_width = 120;
 
     Rect Surface = map.Surface().bbox(); 
@@ -431,16 +431,13 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         for (auto& var: holes)
         {
             auto x = result[var];
-            printf("Creating hole at x: %d\n", x);
             auto& hole = map.Structure(Structures::HOLE);
-            printf("After creating hole\n");
             Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hole);
         }
         
         for (auto& var: hills)
         {
-            printf("Creating hill\n");
             auto x = result[var];
             auto& hill = map.Structure(Structures::HILL);
             Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
@@ -449,7 +446,6 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
 
         for (auto& var: islands)
         {
-            printf("Creating island\n");
             auto x = result[var];
             auto& island = map.Structure(Structures::FLOATING_ISLAND);
             Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
@@ -523,7 +519,6 @@ EXPORT inline void DefineCabins(Map& map)
     {
         for (auto& var: variables) 
         {
-            printf("Creating cabin\n");
             auto v = result[var];
             auto x = (int) tundra_rect.x + (v % tundra_rect.w); 
             auto y = (int) tundra_rect.y + (v / tundra_rect.w);
@@ -751,7 +746,7 @@ EXPORT inline void DefineSurface(Map& map)
 
             //                                                                                        NOISE WIDTH   CENTER CORECTION 
             //                                                                                                  N   C
-            for (auto _y = surface_rect.y + surface_rect.h; _y > surface_rect.y + surface_rect.h - h - (noise * 8 - 4); --_y) { surface_part.add(x, _y); }
+            for (auto _y = surface_rect.y + surface_rect.h; _y > surface_rect.y + surface_rect.h - h - (noise * 8 - 4); --_y) { surface_part.add((Pixel){x, _y}); }
             surface_part.AddY(surface_rect.y + surface_rect.h - h - (noise * 8 - 4));
         }
         tmp_x += w;
@@ -770,8 +765,6 @@ EXPORT inline void GenerateHills(Map& map)
 
     for (auto& ref: hills)
     {
-        printf("Generation of Hill\n");
-
         auto& hill = ref.get(); 
         auto hill_rect = hill.bbox(); 
         
@@ -792,9 +785,9 @@ EXPORT inline void GenerateHills(Map& map)
 };
 
 
-EXPORT inline void GenerateLakes(Map& map)
+EXPORT inline void GenerateHoles(Map& map)
 {
-    printf("GenerateLakes\n");
+    printf("GenerateHoles\n");
 
     auto holes = map.GetStructures(Structures::HOLE);
     auto* surface_part = map.GetSurfacePart();
@@ -802,8 +795,6 @@ EXPORT inline void GenerateLakes(Map& map)
 
     for (auto& ref: holes)
     {
-        printf("Generation of Hole\n");
-
         auto& hole = ref.get(); 
         auto hole_rect = hole.bbox(); 
         
@@ -817,6 +808,10 @@ EXPORT inline void GenerateLakes(Map& map)
 
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
+
+        printf("%d, %d, %d, %d\n", sx, ex, sy, ey);
+        auto eraser = map.Eraser();
+        for (auto p: hole) { eraser->add(p); }
 
         hole.clear();
         CreateHole(hole_rect, hole, sy, ey);

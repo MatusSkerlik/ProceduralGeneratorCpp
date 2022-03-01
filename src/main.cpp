@@ -24,7 +24,7 @@ PCG_FUNC DefineCabins;
 PCG_FUNC DefineCastles;
 PCG_FUNC DefineSurface;
 PCG_FUNC GenerateHills;
-PCG_FUNC GenerateLakes;
+PCG_FUNC GenerateHoles;
 PCG_FUNC GenerateIslands;
 #include "utils.h"
 
@@ -104,6 +104,21 @@ void DrawBiomes(Map& map)
         }
     }
 };
+
+void DrawHills(Map& map)
+{
+    for (auto& biome: map.GetStructures(Structures::HILL))
+        for (auto& p: biome.get())
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
+
+void DrawHoles(Map& map)
+{
+    for (auto& biome: map.GetStructures(Structures::HOLE))
+        for (auto& p: biome.get())
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
+
 
 void DrawStructures(Map& map)
 {
@@ -195,7 +210,7 @@ bool LoadPCG()
         DefineCastles = (PCG_FUNC) GetProcAddress(module, "DefineCastles");
         DefineSurface = (PCG_FUNC) GetProcAddress(module, "DefineSurface");
         GenerateHills = (PCG_FUNC) GetProcAddress(module, "GenerateHills");
-        GenerateLakes = (PCG_FUNC) GetProcAddress(module, "GenerateLakes");
+        GenerateHoles = (PCG_FUNC) GetProcAddress(module, "GenerateHoles");
         GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
         return true;
     }
@@ -327,6 +342,16 @@ void _PCGGen(Map& map)
             map.SetForceStop(true);
             map.Error("GENERATION OF HILLS INFEASIBLE");
         }
+
+        auto generate_holes_future = std::async(std::launch::async, PCGFunction, GenerateHoles, std::ref(map));
+        
+        map.SetGenerationMessage("GENERATION OF HOLES");
+        if (generate_holes_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("GENERATION OF HOLES INFEASIBLE");
+        }
+
     }
     DrawStage4 = true;
 
@@ -462,8 +487,7 @@ int main(void)
 
     // CORE LOGIC INIT
     Map map;
-    map.Width(map_width);
-    map.Height(map_height);
+    map.Init(map_width, map_height);
 
     GenerateStage0 = true;
     GenerateStage1 = true;
@@ -513,7 +537,11 @@ int main(void)
         if (DrawStage4)
         {
             BeginTextureMode(canvas);
-                DrawStructures(map);
+                DrawHorizontal(map);
+                DrawSurfaceStructures(map);
+                DrawBiomes(map);
+                DrawHills(map);
+                DrawHoles(map);
             EndTextureMode();
 
             DrawStage4 = false;
