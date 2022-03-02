@@ -268,6 +268,33 @@ inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
 
 };
 
+inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
+{
+    std::vector<double> X; 
+    std::vector<double> Y;
+
+    auto half_x = rect.x + rect.w / 2;
+    //auto half_y = rect.y + rect.h / 2;
+    auto quater_y = rect.y + rect.h / 4;
+    auto full_y = rect.y + rect.h;
+
+    X = {(double)half_x, (double)rect.x + rect.w, (double)half_x, (double)rect.x, (double)half_x};
+    Y = {(double)full_y, (double)quater_y, (double) quater_y, (double)quater_y, (double)full_y};
+
+    std::vector<double> T { 0.0 };
+    for(auto i=1; i < (int)X.size(); i++)
+        T.push_back(T[i-1] + sqrt( (X[i]-X[i-1])*(X[i]-X[i-1]) + (Y[i]-Y[i-1])*(Y[i]-Y[i-1]) ));
+    tk::spline sx(T,X), sy(T,Y);
+
+    auto size = (int)T.back();
+    Point polygon[size]; 
+    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
+
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+            if (CNPnPoly({x, y}, polygon, size)) arr.add(x, y);
+};
+
 inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
 {
     std::unordered_set<int> domain;
@@ -869,7 +896,15 @@ EXPORT inline void GenerateHoles(Map& map)
 
 EXPORT inline void GenerateIslands(Map& map)
 {
+    printf("GenerateIslands\n");
 
+    auto islands = map.GetStructures(Structures::FLOATING_ISLAND);
+    for (auto* island: islands)
+    {
+        auto island_rect = island->bbox();
+        island->clear();
+        CreateIsland(island_rect, *island, rand() % 2);
+    }
 };
 
 EXPORT inline void GenerateCliffsTransitions(Map& map)

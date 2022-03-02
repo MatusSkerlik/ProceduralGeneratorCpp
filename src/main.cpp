@@ -62,7 +62,7 @@ void DrawHorizontal(Map& map)
         switch (area->GetType())
         {
             case HorizontalAreas::SPACE:
-                color = C_SPACE;
+                color = C_SURFACE;
                 break;
             case HorizontalAreas::SURFACE:
                 color = C_SURFACE;
@@ -185,6 +185,14 @@ void DrawTransitions(Map& map)
         for (auto& p: *biome)
             DrawPixel(p.x, p.y, C_UNDERGROUND);
 };
+
+void DrawIslands(Map& map)
+{
+    for (auto* biome: map.GetStructures(Structures::FLOATING_ISLAND))
+        for (auto& p: *biome)
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
+
 
 /**************************************************
 *
@@ -353,6 +361,9 @@ void _PCGGen(Map& map)
     if (!map.ShouldForceStop() && GenerateStage4)
     {
         auto generate_hills_future = std::async(std::launch::async, PCGFunction, GenerateHills, std::ref(map));
+        auto generate_holes_future = std::async(std::launch::async, PCGFunction, GenerateHoles, std::ref(map));
+        auto generate_cliffs_transitions_future = std::async(std::launch::async, PCGFunction, GenerateCliffsTransitions, std::ref(map));
+        auto generate_islands_future = std::async(std::launch::async, PCGFunction, GenerateIslands, std::ref(map)); 
         
         map.SetGenerationMessage("GENERATION OF HILLS");
         if (generate_hills_future.wait_for(5s) == std::future_status::timeout)
@@ -361,22 +372,25 @@ void _PCGGen(Map& map)
             map.Error("GENERATION OF HILLS INFEASIBLE");
         }
 
-        auto generate_holes_future = std::async(std::launch::async, PCGFunction, GenerateHoles, std::ref(map));
-        
         map.SetGenerationMessage("GENERATION OF HOLES");
         if (generate_holes_future.wait_for(5s) == std::future_status::timeout)
         {
             map.SetForceStop(true);
             map.Error("GENERATION OF HOLES INFEASIBLE");
         }
-
-        auto generate_cliffs_transitions_future = std::async(std::launch::async, PCGFunction, GenerateCliffsTransitions, std::ref(map));
         
         map.SetGenerationMessage("GENERATION OF CLIFFS AND TRANSITIONS");
         if (generate_cliffs_transitions_future.wait_for(5s) == std::future_status::timeout)
         {
             map.SetForceStop(true);
             map.Error("GENERATION OF CLIFFS AND TRANSITIONS INFEASIBLE");
+        }
+ 
+        map.SetGenerationMessage("GENERATION OF ISLANDS");
+        if (generate_islands_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("GENERATION OF ISLANDS INFEASIBLE");
         }
     }
     DrawStage4 = true;
@@ -571,6 +585,7 @@ int main(void)
                 DrawHoles(map);
                 DrawCliffs(map);
                 DrawTransitions(map);
+                DrawIslands(map);
             EndTextureMode();
 
             DrawStage4 = false;
