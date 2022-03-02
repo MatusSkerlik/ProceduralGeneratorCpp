@@ -174,7 +174,7 @@ inline void CreateHill(const Rect& rect, PixelArray& arr, double sy, double ey)
        int _y = (int) s(x);
        for (int y = _y; y <= rect.y + rect.h; ++y)
        {
-            arr.add(x, y);
+            arr.add({x, y});
        }
     }
 };
@@ -202,7 +202,7 @@ inline void CreateHole(const Rect& rect, PixelArray& arr, double sy, double ey)
        int _y = (int) s(x);
        for (int y = _y; y <= rect.y + rect.h; ++y)
        {
-            arr.add(x, y);
+            arr.add({x, y});
        }
     }
 };
@@ -239,9 +239,12 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
 
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
-            if (CNPnPoly({x, y}, polygon, size)) arr.add(x, y);
+            if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
 };
 
+/*
+ * Create surface transition from one surface part to another
+ */
 inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
 {
     std::vector<double> X {(double)rect.x, (double)rect.x + rect.w / 4 + rand() % (int)(rect.w / 2), (double)rect.x + rect.w};
@@ -262,12 +265,15 @@ inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
        int _y = (int) s(x);
        for (int y = _y; y <= rect.y + rect.h; ++y)
        {
-            arr.add(x, y);
+            arr.add({x, y});
        }
     }
 
 };
 
+/*
+ * Create island terrain
+ */
 inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
 {
     std::vector<double> X; 
@@ -287,12 +293,14 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
     tk::spline sx(T,X), sy(T,Y);
 
     auto size = (int)T.back();
-    Point polygon[size]; 
-    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
-
+    Point polygon[size + 2]; 
+    polygon[0] = {half_x, full_y};
+    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t - 1),(int)sy(t - 1)};
+    polygon[size + 1] = {half_x, full_y};
+    
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
-            if (CNPnPoly({x, y}, polygon, size)) arr.add(x, y);
+            if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
 };
 
 inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
@@ -532,7 +540,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         {
             auto x = result[var];
             auto& island = map.Structure(Structures::FLOATING_ISLAND);
-            Rect rect ((int) x - island_width / 2, Surface.y, island_width, 50);
+            Rect rect ((int) x - island_width / 2, Surface.y - rand() % 40, island_width, 50);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, island);
         }
     }
@@ -886,8 +894,8 @@ EXPORT inline void GenerateHoles(Map& map)
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
 
-        auto& eraser = map.Eraser();
-        for (auto p: hole) { eraser.Erase(p); }
+        //auto& eraser = map.Eraser();
+        //for (auto p: hole) { eraser.Erase(p); }
 
         hole.clear();
         CreateHole(hole_rect, hole, sy, ey);
@@ -918,9 +926,10 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
     do {
         Pixel p0 = {s_one->EndX(), s_one->EndY()};
         Pixel p1 = {s_two->StartX(), s_two->StartY()};
-        auto& meta0 = map.GetMetadata(p0);
-        auto& meta1 = map.GetMetadata(p1);
-        printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
+        auto meta0 = map.GetMetadata(p0);
+        auto meta1 = map.GetMetadata(p1);
+        
+        //printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
 
         if (((meta0.owner == nullptr) && (meta1.owner == nullptr)) || 
             ((meta0.owner != nullptr) && (meta0.owner->GetType() == Structures::SURFACE_PART) && 

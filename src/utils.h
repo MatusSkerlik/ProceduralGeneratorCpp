@@ -804,37 +804,46 @@ class Map {
             return msg;
         };
 
-        auto& GetMetadata(Pixel pixel)
+        auto GetMetadata(Pixel pixel)
         {
             return _pixel_map.at(pixel);
+        };
+
+        void SetMetadata(Pixel p, PixelMetadata meta)
+        {
+            _pixel_map[p] = meta;
         };
 };
 
 inline void Biomes::Biome::add(Pixel pixel)
 {
-    auto& meta = map.GetMetadata(pixel);
+    auto meta = map.GetMetadata(pixel);
     meta.biome = this;
+    map.SetMetadata(pixel, meta);
     PixelArray::add(pixel);
 };
 
 inline void Structures::Structure::add(Pixel pixel)
 {
-    auto& meta = map.GetMetadata(pixel);
+    auto meta = map.GetMetadata(pixel);
     meta.owner = this;
+    map.SetMetadata(pixel, meta);
     PixelArray::add(pixel);
 };
 
 inline void Biomes::Biome::remove(Pixel pixel)
 {
-    auto& meta = map.GetMetadata(pixel);
+    auto meta = map.GetMetadata(pixel);
     meta.biome = nullptr;
+    map.SetMetadata(pixel, meta);
     PixelArray::remove(pixel);
 };
 
 inline void Structures::Structure::remove(Pixel pixel)
 {
-    auto& meta = map.GetMetadata(pixel);
+    auto meta = map.GetMetadata(pixel);
     meta.owner = nullptr;
+    map.SetMetadata(pixel, meta);
     PixelArray::remove(pixel);
 };
 
@@ -842,8 +851,9 @@ inline void Biomes::Biome::clear()
 {
     for (auto& p: _set_pixels)
     {
-        auto& meta = map.GetMetadata(p);
+        auto meta = map.GetMetadata(p);
         meta.biome = nullptr;
+        map.SetMetadata(p, meta);
     };
 
     PixelArray::clear();
@@ -853,8 +863,9 @@ inline void Structures::Structure::clear()
 {
     for (auto& p: _set_pixels)
     {
-        auto& meta = map.GetMetadata(p);
+        auto meta = map.GetMetadata(p);
         meta.owner = nullptr;
+        map.SetMetadata(p, meta);
     };
 
     PixelArray::clear();
@@ -862,7 +873,7 @@ inline void Structures::Structure::clear()
 
 inline void Special::Eraser::Erase(Pixel pixel)
 {
-    auto& meta = map.GetMetadata(pixel);
+    auto meta = map.GetMetadata(pixel);
     if (meta.owner != nullptr)
     {
         meta.owner->remove(pixel);
