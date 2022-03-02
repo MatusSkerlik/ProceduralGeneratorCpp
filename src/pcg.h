@@ -232,10 +232,17 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
 
     auto size = (int)T.back();
     Point polygon[size + 2]; 
-    polygon[0] = {s.x, s.y};
-    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
-    polygon[size + 1] = {e.x, e.y};
-    //for (auto& p: polygon) { printf("x=%d, y=%d\n", p.x, p.y); }
+    if (s.y < e.y)
+        polygon[0] = {e.x, e.y};
+    else
+        polygon[0] = {s.x, s.y};
+
+    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t - 1),(int)sy(t - 1)};
+
+    if (s.y < e.y)
+        polygon[size + 1] = {s.x, s.y};
+    else
+        polygon[size + 1] = {e.x, e.y};
 
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
@@ -937,9 +944,8 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
         {
             auto sign = 1 ? p0.y < p1.y : -1;
 
-
             auto y_diff = abs(p0.y - p1.y);
-            if (y_diff >= 20 && y_diff <= 35) // CLIFF
+            if (y_diff >= 20 && y_diff <= 40) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
