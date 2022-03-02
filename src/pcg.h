@@ -9,9 +9,11 @@
 #include <cstdlib>
 #include <string>
 #include <algorithm>
+#include <vector>
 #include "utils.h"
 #include "csp.h"
 #include "spline.h"
+#include "polygon.h"
 
 #define EXPORT __declspec(dllexport)
 
@@ -20,11 +22,6 @@ inline float cerp(float v0, float v1, float t)
     auto mu2 = (1 - cos(t * 3.14159)) / 2;
     return v0 * (1 - mu2) + v1 * mu2;
 };
-
-inline bool StrContains(std::string str, std::string pattern)
-{
-    return str.find(pattern) != std::string::npos;
-}
 
 template <typename V, typename D>
 class DistanceConstraint: public Constraint<V, D>
@@ -159,11 +156,10 @@ class InsidePixelArrayConstraint2D: public Constraint<V, D>
  */
 inline void CreateHill(const Rect& rect, PixelArray& arr, double sy, double ey)
 {
-    printf("CreateHill\n");
     double sx = rect.x;
     double cx = rect.x + (int)(rect.w / 4) + (rand() % (int)(rect.w / 4));
     double ex = rect.x + rect.w;
-    double cy = std::min(sy, ey) - 20 - (rand() % 40);
+    double cy = std::min(sy, ey) - 20 - (rand() % 30);
 
     std::vector<double> X = {sx, cx, ex};
     std::vector<double> Y = {sy, cy, ey};
@@ -211,7 +207,39 @@ inline void CreateHole(const Rect& rect, PixelArray& arr, double sy, double ey)
     }
 };
 
-inline std::unordered_set<int> DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
+inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
+{
+    std::vector<double> X;
+    std::vector<double> Y;
+    if (s.y < e.y) // RIGHT
+    {
+        X = {(double)s.x, (double)rect.x + rect.w * 0.75, (double)rect.x + rect.w, (double)s.x};
+        Y = {(double)s.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.5), (double)e.y};
+    }
+    else // LEFT
+    {
+        X = {(double)e.x, (double)rect.x + rect.w * 0.25, (double)rect.x, (double)e.x};
+        Y = {(double)e.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.5), (double)s.y};
+    }
+
+    std::vector<double> T { 0.0 };
+    for(auto i=1; i < (int)X.size(); i++)
+        T.push_back(T[i-1] + sqrt( (X[i]-X[i-1])*(X[i]-X[i-1]) + (Y[i]-Y[i-1])*(Y[i]-Y[i-1]) ));
+    tk::spline sx(T,X), sy(T,Y);
+
+    auto size = (int)T.back();
+    Point polygon[size + 2]; 
+    polygon[0] = {s.x, s.y};
+    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
+    polygon[size + 1] = {e.x, e.y};
+    //for (auto& p: polygon) { printf("x=%d, y=%d\n", p.x, p.y); }
+
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+            if (cn_PnPoly({x, y}, polygon, size)) arr.add(x, y);
+};
+
+inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
 {
     std::unordered_set<int> domain;
     for (auto v = 0; v < rect.w * rect.h; v += step)
@@ -640,7 +668,7 @@ EXPORT inline void DefineSurface(Map& map)
     auto fq = 50;
 
     auto surface_x = left_ocean_width;
-    auto surface_y = surface_rect.y + surface_rect.h;
+    //auto surface_y = surface_rect.y + surface_rect.h;
     auto surface_width = width - left_ocean_width - right_ocean_widht;
     auto surface_height = surface_rect.h;
 
@@ -705,7 +733,7 @@ EXPORT inline void DefineSurface(Map& map)
     // CREATE SURFACE PARTS WITH FRACTAL NOISE
     Structures::SurfacePart* surface_part_before = nullptr;
     tmp_x = surface_x;
-    for (auto i = 0; i < parts.size(); ++i)
+    for (auto i = 0; i < (int)parts.size(); ++i)
     {
         auto part = parts.at(i);
         auto w = std::get<0>(part);
@@ -724,7 +752,7 @@ EXPORT inline void DefineSurface(Map& map)
         auto sy = surface_rect.y + surface_rect.h - h - (nsy * 8 - 4);
         auto ey = surface_rect.y + surface_rect.h - h - (ney * 8 - 4);
 
-        auto& surface_part = map.SurfacePart(tmp_x, tmp_x + w, sy, ey, surface_rect.y + surface_rect.h - h); 
+        auto& surface_part = map.SurfacePart(tmp_x, tmp_x + w - 1, sy, ey, surface_rect.y + surface_rect.h - h); 
         
         if (surface_part_before != nullptr) 
         { 
@@ -760,21 +788,17 @@ EXPORT inline void GenerateHills(Map& map)
     printf("GenerateHills\n");
 
     auto hills = map.GetStructures(Structures::HILL);
-    auto* surface_part = map.GetSurfacePart();
-    while (surface_part->Before() != nullptr) { surface_part = surface_part->Before(); }
 
-    for (auto& ref: hills)
+    for (auto* ref: hills)
     {
-        auto& hill = ref.get(); 
+        auto& hill = *ref; 
         auto hill_rect = hill.bbox(); 
         
         auto sx = hill_rect.x;
         auto ex = hill_rect.x + hill_rect.w;
 
-        Structures::SurfacePart* s_part = surface_part;
-        while (!(s_part->StartX() <= sx) || !(s_part->EndX() > sx)) { s_part = s_part->Next(); }
-        Structures::SurfacePart* e_part = surface_part;
-        while (!(e_part->StartX() <= ex) || !(e_part->EndX() > ex)) { e_part = e_part->Next(); }
+        Structures::SurfacePart* s_part = map.GetSurfacePart(sx);
+        Structures::SurfacePart* e_part = map.GetSurfacePart(ex);
 
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
@@ -790,28 +814,23 @@ EXPORT inline void GenerateHoles(Map& map)
     printf("GenerateHoles\n");
 
     auto holes = map.GetStructures(Structures::HOLE);
-    auto* surface_part = map.GetSurfacePart();
-    while (surface_part->Before() != nullptr) { surface_part = surface_part->Before(); }
 
-    for (auto& ref: holes)
+    for (auto* ref: holes)
     {
-        auto& hole = ref.get(); 
+        auto& hole = *ref; 
         auto hole_rect = hole.bbox(); 
         
         auto sx = hole_rect.x;
         auto ex = hole_rect.x + hole_rect.w;
 
-        Structures::SurfacePart* s_part = surface_part;
-        while (!(s_part->StartX() <= sx) || !(s_part->EndX() > sx)) { s_part = s_part->Next(); }
-        Structures::SurfacePart* e_part = surface_part;
-        while (!(e_part->StartX() <= ex) || !(e_part->EndX() > ex)) { e_part = e_part->Next(); }
+        Structures::SurfacePart* s_part = map.GetSurfacePart(sx);
+        Structures::SurfacePart* e_part = map.GetSurfacePart(ex); 
 
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
 
-        printf("%d, %d, %d, %d\n", sx, ex, sy, ey);
-        auto eraser = map.Eraser();
-        for (auto p: hole) { eraser->add(p); }
+        auto& eraser = map.Eraser();
+        for (auto p: hole) { eraser.Erase(p); }
 
         hole.clear();
         CreateHole(hole_rect, hole, sy, ey);
@@ -822,6 +841,60 @@ EXPORT inline void GenerateHoles(Map& map)
 EXPORT inline void GenerateIslands(Map& map)
 {
 
+};
+
+EXPORT inline void GenerateCliffsTransitions(Map& map)
+{
+    printf("GenerateCliffs\n");
+
+    auto* s_one = map.GetSurfaceBegin();
+    auto* s_two = s_one->Next(); 
+
+    do {
+        Pixel p0 = {s_one->EndX(), s_one->EndY()};
+        Pixel p1 = {s_two->StartX(), s_two->StartY()};
+        auto& meta0 = map.GetMetadata(p0);
+        auto& meta1 = map.GetMetadata(p1);
+        printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
+
+        if (((meta0.owner == nullptr) && (meta1.owner == nullptr)) || 
+            ((meta0.owner != nullptr) && (meta0.owner->GetType() == Structures::SURFACE_PART) && 
+             (meta1.owner != nullptr) && (meta1.owner->GetType() == Structures::SURFACE_PART)))
+        {
+            auto sign = 1 ? p0.y < p1.y : -1;
+
+
+            if (abs(p1.y - p0.y) >= 10) // CLIFF
+            {
+                Rect rect;
+                rect.h = abs(p0.y - p1.y);
+                rect.w = rect.h + rand() % 20;
+                if (sign > 0) // RIGHT
+                {
+                    rect.x = p0.x;
+                    rect.y = p0.y - rand() % 5; // POINTING UPWARDS
+                    printf("Right Cliff\n");
+                }
+                else // LEFT
+                {
+                    rect.x = p1.x - rect.w;
+                    rect.y = p1.y - rand() % 5; // POINTING UPWARDS 
+                    printf("Left Cliff\n");
+                }
+
+                auto& cliff = map.Structure(Structures::CLIFF);
+                CreateCliff(rect, cliff, p0, p1);
+                //FillWithRect(rect, cliff);
+            }
+            else // TRANSITION
+            {
+                printf("Transition\n");
+            }
+        }
+
+        s_one = s_one->Next();
+        s_two = s_two->Next();
+    } while(s_two != nullptr && s_one->Next() != nullptr);
 };
 
 

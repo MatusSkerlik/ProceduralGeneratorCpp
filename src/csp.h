@@ -77,21 +77,21 @@ class CSPSolver {
         };
 };
 
-inline std::unordered_set<std::string> CreateVariables(std::string name, int from, int to)
+inline auto CreateVariables(std::string name, int from, int to)
 {
     std::unordered_set<std::string> variables;
     for (int i = from; i < to; ++i) { variables.insert(name + std::to_string(i)); }
     return variables;
 };
 
-inline std::unordered_set<std::string> CreateVariables(std::initializer_list<std::string> names)
+inline auto CreateVariables(std::initializer_list<std::string> names)
 {
     std::unordered_set<std::string> variables;
     for (auto name: names) { variables.insert(name); };
     return variables;
 }
 
-inline std::unordered_set<std::string> JoinVariables(std::unordered_set<std::string> vars0, std::unordered_set<std::string> vars1)
+inline auto JoinVariables(std::unordered_set<std::string> vars0, std::unordered_set<std::string> vars1)
 {
     std::unordered_set<std::string> variables;
     for (auto var: vars0) { variables.insert(var); }
@@ -99,7 +99,7 @@ inline std::unordered_set<std::string> JoinVariables(std::unordered_set<std::str
     return variables;
 }
 
-inline std::unordered_set<int> Domain(int from, int to, int step)
+inline auto Domain(int from, int to, int step)
 {
     std::unordered_set<int> domain;
     for (int i = from; i < to; i += step){ domain.insert(i); }

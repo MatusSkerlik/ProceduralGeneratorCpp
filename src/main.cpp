@@ -1,5 +1,6 @@
 #include <atomic>
 #include <mutex>
+#include <stdexcept>
 #include <stdio.h>
 #include <string>
 #include <thread>
@@ -11,7 +12,11 @@
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
+#pragma GCC diagnostic push 
+#pragma GCC diagnostic ignored "-Wenum-compare"
 #include "raygui.h"
+#pragma GCC diagnostic pop
+
 
 #define PCG_AS_DLL false 
 
@@ -26,6 +31,7 @@ PCG_FUNC DefineSurface;
 PCG_FUNC GenerateHills;
 PCG_FUNC GenerateHoles;
 PCG_FUNC GenerateIslands;
+PCG_FUNC GenerateCliffsTransitions;
 #include "utils.h"
 
 #else
@@ -49,12 +55,11 @@ using namespace std::chrono_literals;
 
 void DrawHorizontal(Map& map)
 {
-    for (auto& ref: map.HorizontalAreas())
+    for (auto* area: map.HorizontalAreas())
     {
-        auto& area = ref.get();
-        Rect rect = area.bbox();
+        Rect rect = area->bbox();
         Color color;
-        switch (area.GetType())
+        switch (area->GetType())
         {
             case HorizontalAreas::SPACE:
                 color = C_SPACE;
@@ -105,21 +110,6 @@ void DrawBiomes(Map& map)
     }
 };
 
-void DrawHills(Map& map)
-{
-    for (auto& biome: map.GetStructures(Structures::HILL))
-        for (auto& p: biome.get())
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-void DrawHoles(Map& map)
-{
-    for (auto& biome: map.GetStructures(Structures::HOLE))
-        for (auto& p: biome.get())
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-
 void DrawStructures(Map& map)
 {
     for (auto& biome: map.Structures())
@@ -168,6 +158,26 @@ void DrawSurfaceStructures(Map& map)
     }
 };
 
+void DrawHills(Map& map)
+{
+    for (auto& biome: map.GetStructures(Structures::HILL))
+        for (auto& p: *biome)
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
+
+void DrawHoles(Map& map)
+{
+    for (auto* biome: map.GetStructures(Structures::HOLE))
+        for (auto& p: *biome)
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
+
+void DrawCliffs(Map& map)
+{
+    for (auto* biome: map.GetStructures(Structures::CLIFF))
+        for (auto& p: *biome)
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
 
 /**************************************************
 *
@@ -212,6 +222,7 @@ bool LoadPCG()
         GenerateHills = (PCG_FUNC) GetProcAddress(module, "GenerateHills");
         GenerateHoles = (PCG_FUNC) GetProcAddress(module, "GenerateHoles");
         GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
+        GenerateCliffsTransitions = (PCG_FUNC) GetProcAddress(module, "GenerateCliffsTransitions");
         return true;
     }
     return false;
@@ -321,7 +332,7 @@ void _PCGGen(Map& map)
     {
         map.ClearStage3();
 
-        auto define_surface_future= std::async(std::launch::async, PCGFunction, DefineSurface, std::ref(map));
+        auto define_surface_future = std::async(std::launch::async, PCGFunction, DefineSurface, std::ref(map));
         
         map.SetGenerationMessage("DEFINITION OF SURFACE");
         if (define_surface_future.wait_for(5s) == std::future_status::timeout)
@@ -330,7 +341,7 @@ void _PCGGen(Map& map)
             map.Error("DEFINITION OF SURFACE INFEASIBLE");
         }
     }
-    DrawStage3 = true;
+    //DrawStage3 = true;
 
     if (!map.ShouldForceStop() && GenerateStage4)
     {
@@ -352,6 +363,14 @@ void _PCGGen(Map& map)
             map.Error("GENERATION OF HOLES INFEASIBLE");
         }
 
+        auto generate_cliffs_transitions_future = std::async(std::launch::async, PCGFunction, GenerateCliffsTransitions, std::ref(map));
+        
+        map.SetGenerationMessage("GENERATION OF CLIFFS AND TRANSITIONS");
+        if (generate_cliffs_transitions_future.wait_for(5s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("GENERATION OF CLIFFS AND TRANSITIONS INFEASIBLE");
+        }
     }
     DrawStage4 = true;
 
@@ -390,8 +409,10 @@ void ScheduleGeneration(Map& map)
     {
         ScheduleThreadRunning = true;
         auto _ = std::thread([&](){
-            while (GenerationScheduled || map.IsGenerating())
+            while (GenerationScheduled || map.IsGenerating() || !map.IsInitialized())
             {
+                if (!map.IsInitialized())
+                    map.Init();
                 if (map.IsGenerating())
                     map.SetForceStop(true);
                 GenerationScheduled = false;
@@ -452,7 +473,7 @@ void Pass(){};
 int main(void)
 {
     // BASE CONSTANTS
-    const float width = 1640;
+    const float width = 1620;
     const float height = 600;
     const float map_width = 4200;
     const float map_height = 1200;
@@ -487,7 +508,6 @@ int main(void)
 
     // CORE LOGIC INIT
     Map map;
-    map.Init(map_width, map_height);
 
     GenerateStage0 = true;
     GenerateStage1 = true;
@@ -539,9 +559,10 @@ int main(void)
             BeginTextureMode(canvas);
                 DrawHorizontal(map);
                 DrawSurfaceStructures(map);
-                DrawBiomes(map);
+                //DrawBiomes(map);
                 DrawHills(map);
                 DrawHoles(map);
+                DrawCliffs(map);
             EndTextureMode();
 
             DrawStage4 = false;
@@ -639,14 +660,62 @@ int main(void)
 
                 if ((mx > map_view.x) && (mx < map_view.x + map_view.width) && (my > map_view.y) && (my < map_view.y + map_view.height))
                 {
-                    auto x = (mx - map_view.x) * 1 / camera.zoom;
-                    auto y = (my - map_view.y) * 1 / camera.zoom;
+                    int x = (mx - map_view.x) * 1 / camera.zoom;
+                    int y = (my - map_view.y) * 1 / camera.zoom;
                     std::string t = "[";
                     t += std::to_string((int)x);
                     t += ":";
                     t += std::to_string((int)y);
                     t += "]";
                     DrawText(t.c_str(), mx, my - 16, 16, WHITE);
+
+                    try {
+                        auto& info = map.GetMetadata({x, y});
+                        if (info.biome != nullptr)
+                        {
+                            switch (info.biome->GetType())
+                            {
+                                case Biomes::FOREST:
+                                    DrawText("FOREST", mx, my - 32, 16, RED);
+                                    break;
+                                case Biomes::JUNGLE:
+                                    DrawText("JUNGLE", mx, my - 32, 16, RED);
+                                    break;
+                                case Biomes::TUNDRA:
+                                    DrawText("TUNDRA", mx, my - 32, 16, RED);
+                                    break;
+                                case Biomes::OCEAN:
+                                    DrawText("OCEAN", mx, my - 32, 16, RED);
+                                    break;
+                            }
+                        }
+                        if (info.owner != nullptr)
+                        {
+                            switch (info.owner->GetType())
+                            {
+                                case Structures::HILL:
+                                    DrawText("HILL", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::HOLE:
+                                    DrawText("HOLE", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::CABIN:
+                                    DrawText("CABIN", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::CASTLE:
+                                    DrawText("CASTLE", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::SURFACE_PART:
+                                    DrawText("SUTFACE_PART", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::CLIFF:
+                                    DrawText("CLIFF", mx, my - 48, 16, BLUE);
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    } catch (std::out_of_range& e){};
                 }
 
                 if (map.IsGenerating())
