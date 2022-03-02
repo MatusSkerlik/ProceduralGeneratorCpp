@@ -20,7 +20,7 @@ struct PointEqual
 };
 
 
-inline bool cn_PnPoly( Point P, Point* V, int n )
+inline bool CNPnPoly( Point P, Point* V, int n )
 {
     int    cn = 0;    // the  crossing number counter
 

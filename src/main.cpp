@@ -179,6 +179,13 @@ void DrawCliffs(Map& map)
             DrawPixel(p.x, p.y, C_UNDERGROUND);
 };
 
+void DrawTransitions(Map& map)
+{
+    for (auto* biome: map.GetStructures(Structures::TRANSITION))
+        for (auto& p: *biome)
+            DrawPixel(p.x, p.y, C_UNDERGROUND);
+};
+
 /**************************************************
 *
 * PROCEDURAL GENERATION LOGIC 
@@ -563,6 +570,7 @@ int main(void)
                 DrawHills(map);
                 DrawHoles(map);
                 DrawCliffs(map);
+                DrawTransitions(map);
             EndTextureMode();
 
             DrawStage4 = false;
@@ -710,6 +718,9 @@ int main(void)
                                     break;
                                 case Structures::CLIFF:
                                     DrawText("CLIFF", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::TRANSITION:
+                                    DrawText("TRANSITION", mx, my - 48, 16, BLUE);
                                     break;
                                 default:
                                     break;

@@ -204,7 +204,7 @@ namespace Biomes {
 
 namespace Structures {
     
-    enum Type: unsigned short { CLIFF, SURFACE_PART, HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
+    enum Type: unsigned short { TRANSITION, CLIFF, SURFACE_PART, HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
     
     class Structure: public PixelArray 
     {

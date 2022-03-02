@@ -207,6 +207,9 @@ inline void CreateHole(const Rect& rect, PixelArray& arr, double sy, double ey)
     }
 };
 
+/**
+ * Create surface cliff on right or left side of surface part identified by pixels s and e
+ */
 inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
 {
     std::vector<double> X;
@@ -236,7 +239,33 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
 
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
-            if (cn_PnPoly({x, y}, polygon, size)) arr.add(x, y);
+            if (CNPnPoly({x, y}, polygon, size)) arr.add(x, y);
+};
+
+inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
+{
+    std::vector<double> X {(double)rect.x, (double)rect.x + rect.w / 4 + rand() % (int)(rect.w / 2), (double)rect.x + rect.w};
+    std::vector<double> Y;
+    auto h = abs(rect.y - p.y);
+    if (rect.x == p.x) // LEFT
+    {
+        Y = {(double)p.y, (double)rect.y + h / 4 + rand() % (int)h / 2, (double)rect.y }; 
+    }
+    else
+    {
+        Y = {(double)rect.y, (double)rect.y + h / 4 + rand() % (int)h / 2, (double)p.y }; 
+    }
+    
+    tk::spline s(X, Y);
+    for (int x = rect.x; x <= rect.x + rect.w; ++x)
+    {
+       int _y = (int) s(x);
+       for (int y = _y; y <= rect.y + rect.h; ++y)
+       {
+            arr.add(x, y);
+       }
+    }
+
 };
 
 inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
@@ -747,6 +776,7 @@ EXPORT inline void DefineSurface(Map& map)
         fq = 2;
         lq = 0.5;
         for (auto o = 0; o < octaves; ++o) { ney += ypsilons[((tmp_x + w) * fq) % ypsilons.size()] * lq;    fq = pow(fq, o); lq = pow(lq, o); }
+        // CALLCULATE START AND END Y
         //                                           NOISE WIDTH   CENTER CORECTION 
         //                                                     N   C
         auto sy = surface_rect.y + surface_rect.h - h - (nsy * 8 - 4);
@@ -760,6 +790,7 @@ EXPORT inline void DefineSurface(Map& map)
             surface_part.SetBefore(surface_part_before);
         }
 
+        // CALCULATE Y FOR SURFACE PART
         for (auto x = tmp_x; x < tmp_x + w; ++x)
         {
             float noise = 0.0;
@@ -779,6 +810,7 @@ EXPORT inline void DefineSurface(Map& map)
         }
         tmp_x += w;
         
+        // SET BEFORE SURFACE PART POINTER
         surface_part_before = &surface_part;
     }
 };
@@ -788,7 +820,6 @@ EXPORT inline void GenerateHills(Map& map)
     printf("GenerateHills\n");
 
     auto hills = map.GetStructures(Structures::HILL);
-
     for (auto* ref: hills)
     {
         auto& hill = *ref; 
@@ -814,7 +845,6 @@ EXPORT inline void GenerateHoles(Map& map)
     printf("GenerateHoles\n");
 
     auto holes = map.GetStructures(Structures::HOLE);
-
     for (auto* ref: holes)
     {
         auto& hole = *ref; 
@@ -835,7 +865,6 @@ EXPORT inline void GenerateHoles(Map& map)
         hole.clear();
         CreateHole(hole_rect, hole, sy, ey);
     }
-
 };
 
 EXPORT inline void GenerateIslands(Map& map)
@@ -847,6 +876,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
 {
     printf("GenerateCliffs\n");
 
+    auto surface_rect = map.Surface().bbox();
     auto* s_one = map.GetSurfaceBegin();
     auto* s_two = s_one->Next(); 
 
@@ -864,7 +894,8 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
             auto sign = 1 ? p0.y < p1.y : -1;
 
 
-            if (abs(p1.y - p0.y) >= 10) // CLIFF
+            auto y_diff = abs(p0.y - p1.y);
+            if (y_diff >= 20 && y_diff <= 35) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
@@ -873,13 +904,11 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 {
                     rect.x = p0.x;
                     rect.y = p0.y - rand() % 5; // POINTING UPWARDS
-                    printf("Right Cliff\n");
                 }
                 else // LEFT
                 {
                     rect.x = p1.x - rect.w;
                     rect.y = p1.y - rand() % 5; // POINTING UPWARDS 
-                    printf("Left Cliff\n");
                 }
 
                 auto& cliff = map.Structure(Structures::CLIFF);
@@ -887,8 +916,31 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 //FillWithRect(rect, cliff);
             }
             else // TRANSITION
-            {
-                printf("Transition\n");
+            { 
+                Rect rect;
+                rect.w = 40 + rand() % 30;
+                rect.h = surface_rect.y + surface_rect.h - std::min(p0.y, p1.y); 
+
+                Pixel p {0, 0};
+                if (sign > 0) // RIGHT
+                {
+                    rect.x = p0.x;
+                    rect.y = p0.y;
+                    auto* part = map.GetSurfacePart(rect.x + rect.w);
+                    p = {rect.x + rect.w, part->GetY(rect.x + rect.w)};
+                }
+                else // LEFT
+                {
+                    rect.x = p1.x - rect.w;
+                    rect.y = p1.y; 
+                    auto* part = map.GetSurfacePart(rect.x);
+                    p = {rect.x, part->GetY(rect.x)};
+                }
+
+                
+                auto& transition = map.Structure(Structures::TRANSITION);
+                CreateTransition(rect, transition, p); 
+                //FillWithRect(rect, transition);
             }
         }
 
