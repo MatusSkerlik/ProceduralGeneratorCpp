@@ -33,6 +33,7 @@ PCG_FUNC GenerateHoles;
 PCG_FUNC GenerateIslands;
 PCG_FUNC GenerateCliffsTransitions;
 PCG_FUNC GenerateGrass;
+PCG_FUNC GenerateTrees;
 #include "utils.h"
 
 #else
@@ -227,11 +228,15 @@ void DrawSurface(Map& map)
                             DrawPixel(x, y, C_GRASS);
                         else
                             DrawPixel(x, y, DIRT);
-
                 }
                 else 
                 {
                     DrawPixel(x, y, DIRT);
+                }
+
+                if (meta.owner->GetType() == Structures::TREE)
+                {
+                    DrawPixel(x, y, (Color){191, 143, 111, 255});
                 }
             }
         }
@@ -282,6 +287,7 @@ bool LoadPCG()
         GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
         GenerateCliffsTransitions = (PCG_FUNC) GetProcAddress(module, "GenerateCliffsTransitions");
         GenerateGrass = (PCG_FUNC) GetProcAddress(module, "GenerateGrass");
+        GenerateTrees = (PCG_FUNC) GetProcAddress(module, "GenerateTrees");
         return true;
     }
     return false;
@@ -393,6 +399,14 @@ void _PCGGen(Map& map)
         GenerateIslands(map);
         map.SetGenerationMessage("GENERATION OF GRASS...");
         GenerateGrass(map);
+
+        auto generate_trees_future = std::async(std::launch::async, PCGFunction, GenerateTrees, std::ref(map));
+        map.SetGenerationMessage("GENERATION OF TREES...");
+        if (generate_trees_future.wait_for(2s) == std::future_status::timeout)
+        {
+            map.SetForceStop(true);
+            map.Error("DEFINITION OF TREES INFEASIBLE"); 
+        }
     }
     DrawStage4 = true;
 

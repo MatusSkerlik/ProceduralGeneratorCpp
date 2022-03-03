@@ -735,8 +735,8 @@ EXPORT inline void DefineSurface(Map& map)
     auto left_ocean_width = 250;
     auto right_ocean_widht = 250;
     auto surface_parts = 10;
-    auto octaves = 3;
-    auto fq = 50;
+    auto octaves = 2;
+    auto fq = 120;
 
     auto surface_x = left_ocean_width;
     //auto surface_y = surface_rect.y + surface_rect.h;
@@ -1057,6 +1057,61 @@ EXPORT void GenerateGrass(Map& map)
         surface_part = surface_part->Next();
     } 
     while (surface_part != nullptr);
+};
+
+EXPORT void GenerateTrees(Map& map)
+{
+    printf("Generate Trees\n");
+    auto count = 150;
+
+    auto* grass = map.GetStructures(Structures::GRASS)[0];
+    auto size = grass->size(); 
+
+    auto check_placement = [&](Pixel start, int height) -> bool
+    {
+        int h = 1; 
+        while (h < height + 1)
+        {
+            Pixel p = {start.x, start.y - h};
+            auto info_this = map.GetMetadata(p); 
+            auto info_left = map.GetMetadata({p.x - 1, p.y});
+            auto info_right = map.GetMetadata({p.x + 1, p.y});
+            
+            if (info_this.owner != nullptr || info_left.owner != nullptr || info_right.owner != nullptr)
+                return false;
+            ++h;
+        };
+
+        return true;
+    };
+
+    while (!map.ShouldForceStop() && count > 0)
+    {
+        auto h = 10 + rand() % 10;
+        auto p = *std::next(grass->begin(), rand() % size);
+
+        if (check_placement(p, h))
+        {
+            auto& tree = map.Structure(Structures::TREE);
+            auto _h = 0;
+            while (_h < h + 1)
+            {
+                tree.add({p.x, p.y - _h});
+                if ( _h > 5)
+                {
+                    if ((rand() % 6) == 5)
+                    {
+                        if ((rand() % 2) == 1)
+                            tree.add({p.x - 1, p.y - _h});
+                        else
+                            tree.add({p.x + 1, p.y - _h});
+                    }
+                }
+                ++_h;
+            }
+            --count;
+        }
+    };
 };
 
 

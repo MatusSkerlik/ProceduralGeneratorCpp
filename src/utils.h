@@ -205,7 +205,8 @@ namespace Structures {
         FLOATING_ISLAND = 128, 
         UNDERGROUND_TUNNEL = 256, 
         GRASS = 512, 
-        CASTLE = 1024 
+        CASTLE = 1024,
+        TREE = 2048
     }; 
     
     class Structure: public PixelArray 
