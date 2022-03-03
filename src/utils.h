@@ -104,21 +104,17 @@ class PixelArray
 {
     protected:
         std::unordered_set<Pixel, PixelHash, PixelEqual> _set_pixels;
-        Rect _bounding_box {0, 0, 0, 0};
-
     public:
         PixelArray(){};
         
         PixelArray(const PixelArray& arr)
         {
             _set_pixels = arr._set_pixels;
-            _bounding_box = arr._bounding_box;
         }
 
         PixelArray(PixelArray&& arr)
         {
             _set_pixels = std::move(arr._set_pixels);
-            _bounding_box = std::move(arr._bounding_box);
         }
 
         ~PixelArray(){};
@@ -132,19 +128,9 @@ class PixelArray
         virtual void remove(Pixel pixel) { _set_pixels.erase(pixel); };
         virtual void remove(int x, int y) { remove((Pixel){x, y}); };
         virtual void clear() { _set_pixels.clear(); };
-        void bbox(Rect rect) { _bounding_box = rect; };
 
         Rect bbox()
         {
-        /*    if (_set_pixels.size() == 0)
-            {
-                _bounding_box = {0, 0, 0, 0};
-                return _bounding_box;
-            }
-
-            if ((_bounding_box.x >= 0) && (_bounding_box.y >= 0) && (_bounding_box.w > 0) && (_bounding_box.h > 0))
-                return _bounding_box;
-        */
             int minx = std::numeric_limits<int>::max();
             int miny = std::numeric_limits<int>::max();
             int maxx = std::numeric_limits<int>::min();
@@ -158,8 +144,7 @@ class PixelArray
                 if (pixel.y > maxy) maxy = pixel.y;
             }
 
-            _bounding_box = {minx, miny, maxx - minx, maxy - miny};
-            return _bounding_box;
+            return {minx, miny, maxx - minx, maxy - miny};
         };
 };
 
@@ -182,7 +167,12 @@ namespace HorizontalAreas
 
 namespace Biomes {
 
-    enum Type: unsigned short { JUNGLE, TUNDRA, FOREST, OCEAN };
+    enum Type: unsigned short { 
+        FOREST = 1, 
+        JUNGLE = 2, 
+        TUNDRA = 4, 
+        OCEAN = 8 
+    };
 
     class Biome: public PixelArray 
     {
@@ -204,7 +194,19 @@ namespace Biomes {
 
 namespace Structures {
     
-    enum Type: unsigned short { TRANSITION, CLIFF, SURFACE_PART, HILL, HOLE, CABIN, FLOATING_ISLAND, SURFACE_TUNNEL, UNDERGROUND_TUNNEL, CASTLE }; 
+    enum Type: unsigned short { 
+        SURFACE_PART = 1, 
+        HILL = 2, 
+        HOLE = 4, 
+        CABIN = 8, 
+        CLIFF = 16, 
+        TRANSITION = 32, 
+        SURFACE_TUNNEL = 64, 
+        FLOATING_ISLAND = 128, 
+        UNDERGROUND_TUNNEL = 256, 
+        GRASS = 512, 
+        CASTLE = 1024 
+    }; 
     
     class Structure: public PixelArray 
     {
@@ -886,7 +888,6 @@ inline void FillWithRect(const Rect& rect, PixelArray& arr)
     for (int x = rect.x; x < rect.x + rect.w; ++x)
         for (int y = rect.y; y < rect.y + rect.h; ++y)
             arr.add(x, y);
-    arr.bbox(rect);
 }
 
 inline void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)

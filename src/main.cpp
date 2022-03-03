@@ -32,6 +32,7 @@ PCG_FUNC GenerateHills;
 PCG_FUNC GenerateHoles;
 PCG_FUNC GenerateIslands;
 PCG_FUNC GenerateCliffsTransitions;
+PCG_FUNC GenerateGrass;
 #include "utils.h"
 
 #else
@@ -46,7 +47,13 @@ using namespace std::chrono_literals;
 *
 *************************************************/
 
-#define DIRT            (Color){151, 107, 75, 255}
+#define DIRT              (Color){151, 107, 75, 255}
+#define MUD               (Color){92, 68, 73, 255}
+#define SAND              (Color){255, 218, 56, 255}
+#define ICE               (Color){255, 255, 255, 255}
+#define C_GRASS           (Color){28, 216, 94, 255}
+#define C_JGRASS          (Color){143, 215, 29, 255}
+
 #define C_SPACE           (Color){51, 102, 153, 255}
 #define C_SURFACE         (Color){155, 209, 255, 255}
 #define C_UNDERGROUND     (Color){151, 107, 75, 255}
@@ -204,7 +211,28 @@ void DrawSurface(Map& map)
             auto meta = map.GetMetadata({x, y});
             if (meta.owner != nullptr)
             {
-                DrawPixel(x, y, C_UNDERGROUND);
+                if (meta.biome != nullptr)
+                {
+                    if (meta.biome->GetType() == Biomes::JUNGLE)
+                        if (meta.owner->GetType() == Structures::GRASS)
+                            DrawPixel(x, y, C_JGRASS);
+                        else
+                            DrawPixel(x, y, MUD);
+                    else if (meta.biome->GetType() == Biomes::TUNDRA)
+                        DrawPixel(x, y, ICE);
+                    else if (meta.biome->GetType() == Biomes::OCEAN)
+                        DrawPixel(x, y, SAND);
+                    else
+                        if (meta.owner->GetType() == Structures::GRASS)
+                            DrawPixel(x, y, C_GRASS);
+                        else
+                            DrawPixel(x, y, DIRT);
+
+                }
+                else 
+                {
+                    DrawPixel(x, y, DIRT);
+                }
             }
         }
     }
@@ -253,6 +281,7 @@ bool LoadPCG()
         GenerateHoles = (PCG_FUNC) GetProcAddress(module, "GenerateHoles");
         GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
         GenerateCliffsTransitions = (PCG_FUNC) GetProcAddress(module, "GenerateCliffsTransitions");
+        GenerateGrass = (PCG_FUNC) GetProcAddress(module, "GenerateGrass");
         return true;
     }
     return false;
@@ -362,6 +391,8 @@ void _PCGGen(Map& map)
         GenerateCliffsTransitions(map);
         map.SetGenerationMessage("GENERATION OF ISLANDS...");
         GenerateIslands(map);
+        map.SetGenerationMessage("GENERATION OF GRASS...");
+        GenerateGrass(map);
     }
     DrawStage4 = true;
 
@@ -464,7 +495,7 @@ void Pass(){};
 int main(void)
 {
     // BASE CONSTANTS
-    const float width = 1620;
+    const float width = 1640;
     const float height = 600;
     const float map_width = 4200;
     const float map_height = 1200;
@@ -499,7 +530,6 @@ int main(void)
 
     // CORE LOGIC INIT
     Map map;
-
     GenerateStage0 = true;
     GenerateStage1 = true;
     GenerateStage2 = true;
@@ -568,6 +598,19 @@ int main(void)
             map.ClearAll();
             ScheduleGeneration(map);
         }
+
+        if (IsKeyDown(KEY_Q))
+            camera.zoom *= 0.95;
+        if (IsKeyDown(KEY_E))
+            camera.zoom *= 1.05;
+        if (IsKeyDown(KEY_A))
+            ScrollOffset.x += 20;
+        if (IsKeyDown(KEY_D))
+            ScrollOffset.x -= 20;
+        if (IsKeyDown(KEY_W))
+            ScrollOffset.y += 20;
+        if (IsKeyDown(KEY_S))
+            ScrollOffset.y -= 20;
 
         // DRAW LOGIC
         BeginDrawing();
@@ -645,7 +688,7 @@ int main(void)
 
                 BeginScissorMode(map_view.x, map_view.y, map_view.width, map_view.height);
                     BeginMode2D(camera);
-                        DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {map_view_anchor.x * 1 / camera.zoom, map_view_anchor.y * 1 / camera.zoom}, WHITE);        
+                        DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {ScrollOffset.x + map_view_anchor.x * 1 / camera.zoom, ScrollOffset.y + map_view_anchor.y * 1 / camera.zoom}, WHITE);        
                     EndMode2D();
                 EndScissorMode();
 
@@ -654,8 +697,8 @@ int main(void)
 
                 if ((mx > map_view.x) && (mx < map_view.x + map_view.width) && (my > map_view.y) && (my < map_view.y + map_view.height))
                 {
-                    int x = (mx - map_view.x) * 1 / camera.zoom;
-                    int y = (my - map_view.y) * 1 / camera.zoom;
+                    int x = -ScrollOffset.x + (mx - map_view.x) * 1 / camera.zoom;
+                    int y = -ScrollOffset.y + (my - map_view.y) * 1 / camera.zoom;
                     std::string t = "[";
                     t += std::to_string((int)x);
                     t += ":";

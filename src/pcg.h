@@ -999,5 +999,65 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
     } while(s_two != nullptr && s_one->Next() != nullptr);
 };
 
+EXPORT void GenerateGrass(Map& map)
+{
+    printf("GenerateGrass\n");
+
+    auto& grass = map.Structure(Structures::GRASS);
+    auto* surface_part = map.GetSurfaceBegin();
+
+    auto A_STRUCT = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
+                Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL;
+    auto A_BIOMES = Biomes::FOREST | Biomes::JUNGLE;
+    std::unordered_set<Pixel, PixelHash, PixelEqual> visited;
+    std::vector<Pixel> queue;
+    auto traverse = [&](Pixel start)
+    {
+       queue.push_back(start); 
+
+       while (queue.size() > 0)
+       {
+            auto p = queue.back();
+            queue.pop_back();
+            if (visited.count(p) == 1)
+                continue;
+
+            visited.insert(p);
+
+            auto info_this = map.GetMetadata(p);
+            auto info_up = map.GetMetadata({p.x, p.y - 1}); 
+            //auto info_down = map.GetMetadata({p.x, p.y + 1});
+            auto info_left = map.GetMetadata({p.x - 1, p.y});
+            auto info_right = map.GetMetadata({p.x + 1, p.y});
+
+            if ((info_this.biome != nullptr) && (info_this.biome->GetType() & A_BIOMES) &&
+                (info_this.owner != nullptr) && (info_this.owner->GetType() & A_STRUCT) &&
+                ((info_up.owner == nullptr) || (info_left.owner == nullptr) || (info_right.owner == nullptr)))
+            {
+                grass.add(p);
+
+                queue.push_back({p.x - 1, p.y});
+                queue.push_back({p.x + 1, p.y});
+                queue.push_back({p.x, p.y + 1});
+                queue.push_back({p.x, p.y - 1});
+                queue.push_back({p.x - 1, p.y + 1});
+                queue.push_back({p.x - 1, p.y - 1});
+                queue.push_back({p.x + 1, p.y + 1});
+                queue.push_back({p.x + 1, p.y - 1});
+            }
+       }
+    };
+
+    do 
+    {
+        auto sp = (Pixel){surface_part->StartX(), surface_part->StartY()};
+        auto ep = (Pixel){surface_part->EndX(), surface_part->EndY()};
+        traverse(sp);
+        traverse(ep);
+        surface_part = surface_part->Next();
+    } 
+    while (surface_part != nullptr);
+};
+
 
 };
