@@ -288,11 +288,11 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
 
     auto half_x = rect.x + rect.w / 2;
     //auto half_y = rect.y + rect.h / 2;
-    auto quater_y = rect.y + rect.h / 4;
-    auto full_y = rect.y + rect.h;
+    auto quater_y = rect.y + rect.h / 3;
+    auto full_y = rect.y + rect.h + 5;
 
-    X = {(double)half_x, (double)rect.x + rect.w, (double)half_x, (double)rect.x, (double)half_x};
-    Y = {(double)full_y, (double)quater_y, (double) quater_y, (double)quater_y, (double)full_y};
+    X = {(double)half_x, (double)rect.x + rect.w, (double)half_x + ((rand() % 11) - 5), (double)rect.x, (double)half_x};
+    Y = {(double)full_y, (double)quater_y + ((rand() % 5) - 3), (double) quater_y + ((rand() % 5) - 3), (double)quater_y + ((rand() % 5) - 3), (double)full_y};
 
     std::vector<double> T { 0.0 };
     for(auto i=1; i < (int)X.size(); i++)
@@ -300,10 +300,8 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
     tk::spline sx(T,X), sy(T,Y);
 
     auto size = (int)T.back();
-    Point polygon[size + 2]; 
-    polygon[0] = {half_x, full_y};
-    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t - 1),(int)sy(t - 1)};
-    polygon[size + 1] = {half_x, full_y};
+    Point polygon[size]; 
+    for (auto t = 0; t < size; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
     
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
