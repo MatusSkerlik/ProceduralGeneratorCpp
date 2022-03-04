@@ -12,7 +12,11 @@
 #include <atomic>
 
 class Map;
-namespace Structures { enum Type: unsigned short; class Structure; };
+namespace Structures { 
+    enum Type: unsigned short; 
+    class Structure; 
+    class SurfaceStructure;
+};
 namespace Biomes { class Biome; };
 
 typedef struct Rect 
@@ -70,7 +74,8 @@ struct PixelEqual
 typedef struct PixelMetadata
 {
     Biomes::Biome* biome { nullptr };
-    Structures::Structure* owner { nullptr };
+    Structures::Structure* structure { nullptr };
+    Structures::SurfaceStructure* surface_structure { nullptr };
 } PixelMetadata;
 
 
@@ -224,9 +229,27 @@ namespace Structures {
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
-   };
+    };
+
+    class SurfaceStructure: public PixelArray 
+    {
+        protected:
+            Map& map;
+            Type type;
+
+        public:
+            SurfaceStructure(Map& _map): PixelArray(), map{_map} {};
+            SurfaceStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            ~SurfaceStructure(){ clear(); };
+            
+            auto GetType(){ return type; }
+            void add(Pixel pixel) override;
+            void remove(Pixel pixel) override;
+            void clear() override;
+    };
+
  
-    class SurfacePart: public Structure 
+    class SurfacePart: public SurfaceStructure 
     {
         protected:
             int sx {0}; // START X
@@ -240,7 +263,7 @@ namespace Structures {
             std::vector<int> ypsilons;
 
         public:
-            SurfacePart(Map& _map, int _sx, int _ex, int _sy, int _ey, int _by, SurfacePart* _before, SurfacePart* _next): Structure(_map, SURFACE_PART),
+            SurfacePart(Map& _map, int _sx, int _ex, int _sy, int _ey, int _by, SurfacePart* _before, SurfacePart* _next): SurfaceStructure(_map, SURFACE_PART),
             sx{_sx}, ex{_ex}, sy{_sy}, ey{_ey}, by{_by}, 
             before{_before}, next{_next} 
             {};
@@ -262,19 +285,6 @@ namespace Structures {
    };
 };
 
-namespace Special
-{
-    class Eraser: public PixelArray
-    {
-        private:
-            Map& map;
-
-        public:
-            Eraser(Map& _map): PixelArray(), map{_map} {};
-            void Erase(Pixel pixel);
-    };
-};
-
 class Map {
     private:
         int _WIDTH {4200};
@@ -294,6 +304,10 @@ class Map {
         float _CABINS_FREQUENCY = 0.5;
         float _ISLANDS_FREQUENCY = 0.5;
 
+        float _SURFACE_PARTS_COUNT = 0;
+        float _SURFACE_PARTS_FREQUENCY = 0.5;
+        float _SURFACE_PARTS_OCTAVES = 0;
+
         std::atomic_bool _initialized { false };
         std::atomic_bool _force_stop {false };
         std::atomic_bool _generating { false };
@@ -308,8 +322,7 @@ class Map {
 
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
         std::vector<std::unique_ptr<Structures::Structure>> _structures;
-        std::vector<std::unique_ptr<Structures::Structure>> _surface_structures;
-        std::vector<std::unique_ptr<Special::Eraser>> _erasers;
+        std::vector<std::unique_ptr<Structures::SurfaceStructure>> _surface_structures;
         std::vector<std::string> _errors;
 
         std::unordered_map<Pixel, PixelMetadata, PixelHash, PixelEqual> _pixel_map;
@@ -549,6 +562,57 @@ class Map {
             return false;
         };
 
+        auto SurfacePartsCount()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _SURFACE_PARTS_COUNT;
+        };
+
+        auto SurfacePartsCount(float c)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_SURFACE_PARTS_COUNT != c)
+            {
+                _SURFACE_PARTS_COUNT = c;
+                return true;
+            }
+            return false;
+        };
+
+        auto SurfacePartsFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _SURFACE_PARTS_FREQUENCY;
+        };
+
+        auto SurfacePartsFrequency(float fq)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_SURFACE_PARTS_FREQUENCY != fq)
+            {
+                _SURFACE_PARTS_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        auto SurfacePartsOctaves()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _SURFACE_PARTS_OCTAVES;
+        };
+
+        auto SurfacePartsOctaves(float o)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_SURFACE_PARTS_OCTAVES != o)
+            {
+                _SURFACE_PARTS_OCTAVES = o;
+                return true;
+            }
+            return false;
+        };
+
         auto IsGenerating()
         {
             return _generating.load();
@@ -686,10 +750,20 @@ class Map {
         auto& SurfaceStructure(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _surface_structures.emplace_back(new Structures::Structure(*this, type));
+            _surface_structures.emplace_back(new Structures::SurfaceStructure(*this, type));
             return *_surface_structures.back();
         }
-        
+
+        auto GetSurfaceStructures(Structures::Type type)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            std::vector<Structures::SurfaceStructure*> structures;
+            for (auto& biome: _surface_structures)
+                if (biome->GetType() == type)
+                    structures.push_back(biome.get());
+            return structures;
+        }
+
         auto& SurfacePart(int sx, int ex, int sy, int ey, int by)
         {
             const std::lock_guard<std::mutex> lock(mutex);
@@ -710,9 +784,7 @@ class Map {
         {
             Structures::SurfacePart* surface_part = GetRandomSurface();
             if (surface_part == nullptr) return nullptr;
-
-            while(surface_part->Before() != nullptr)
-                surface_part = surface_part->Before();
+            while(surface_part->Before() != nullptr) surface_part = surface_part->Before();
             return surface_part;
         };
 
@@ -720,9 +792,7 @@ class Map {
         {
             Structures::SurfacePart* surface_part = GetRandomSurface();
             if (surface_part == nullptr) return nullptr;
-
-            while (surface_part->Next() != nullptr)
-                surface_part = surface_part->Next();
+            while (surface_part->Next() != nullptr) surface_part = surface_part->Next();
             return surface_part;
         };
 
@@ -730,15 +800,8 @@ class Map {
         {
             Structures::SurfacePart* s_part = GetSurfaceBegin();
             if (s_part == nullptr) return nullptr;
-
-            while (!(s_part->StartX() <= sx) || !(s_part->EndX() > sx)) { s_part = s_part->Next(); }
+            while (!((s_part->StartX() <= sx) && (s_part->EndX() >= sx))) { s_part = s_part->Next(); }
             return s_part;
-        };
-
-        auto& Eraser()
-        {
-            _erasers.emplace_back(new Special::Eraser(*this));
-            return *_erasers.back();
         };
 
         void ClearStage0()
@@ -777,7 +840,6 @@ class Map {
             ClearStage3();
 
             _errors.clear();
-            _erasers.clear();
             _pixel_map.clear();
         };
 
@@ -826,26 +888,10 @@ inline void Biomes::Biome::add(Pixel pixel)
     PixelArray::add(pixel);
 };
 
-inline void Structures::Structure::add(Pixel pixel)
-{
-    auto meta = map.GetMetadata(pixel);
-    meta.owner = this;
-    map.SetMetadata(pixel, meta);
-    PixelArray::add(pixel);
-};
-
 inline void Biomes::Biome::remove(Pixel pixel)
 {
     auto meta = map.GetMetadata(pixel);
     meta.biome = nullptr;
-    map.SetMetadata(pixel, meta);
-    PixelArray::remove(pixel);
-};
-
-inline void Structures::Structure::remove(Pixel pixel)
-{
-    auto meta = map.GetMetadata(pixel);
-    meta.owner = nullptr;
     map.SetMetadata(pixel, meta);
     PixelArray::remove(pixel);
 };
@@ -862,27 +908,64 @@ inline void Biomes::Biome::clear()
     PixelArray::clear();
 };
 
+inline void Structures::Structure::add(Pixel pixel)
+{
+    auto meta = map.GetMetadata(pixel);
+    meta.structure = this;
+    map.SetMetadata(pixel, meta);
+    PixelArray::add(pixel);
+};
+
+inline void Structures::Structure::remove(Pixel pixel)
+{
+    auto meta = map.GetMetadata(pixel);
+    meta.structure = nullptr;
+    map.SetMetadata(pixel, meta);
+    PixelArray::remove(pixel);
+};
+
+
 inline void Structures::Structure::clear()
 {
     for (auto& p: _set_pixels)
     {
         auto meta = map.GetMetadata(p);
-        meta.owner = nullptr;
+        meta.structure = nullptr;
         map.SetMetadata(p, meta);
     };
 
     PixelArray::clear();
 };
 
-inline void Special::Eraser::Erase(Pixel pixel)
+inline void Structures::SurfaceStructure::add(Pixel pixel)
 {
     auto meta = map.GetMetadata(pixel);
-    if (meta.owner != nullptr)
-    {
-        meta.owner->remove(pixel);
-    };
+    meta.surface_structure = this;
+    map.SetMetadata(pixel, meta);
     PixelArray::add(pixel);
-}
+};
+
+inline void Structures::SurfaceStructure::remove(Pixel pixel)
+{
+    auto meta = map.GetMetadata(pixel);
+    meta.surface_structure = nullptr;
+    map.SetMetadata(pixel, meta);
+    PixelArray::remove(pixel);
+};
+
+
+inline void Structures::SurfaceStructure::clear()
+{
+    for (auto& p: _set_pixels)
+    {
+        auto meta = map.GetMetadata(p);
+        meta.surface_structure = nullptr;
+        map.SetMetadata(p, meta);
+    };
+
+    PixelArray::clear();
+};
+
 
 inline void FillWithRect(const Rect& rect, PixelArray& arr)
 {

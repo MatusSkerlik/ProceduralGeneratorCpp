@@ -217,12 +217,12 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
     if (s.y < e.y) // RIGHT
     {
         X = {(double)s.x, (double)rect.x + rect.w * 0.75, (double)rect.x + rect.w, (double)s.x};
-        Y = {(double)s.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.5), (double)e.y};
+        Y = {(double)s.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.3), (double)e.y};
     }
     else // LEFT
     {
         X = {(double)e.x, (double)rect.x + rect.w * 0.25, (double)rect.x, (double)e.x};
-        Y = {(double)e.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.5), (double)s.y};
+        Y = {(double)e.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.3), (double)s.y};
     }
 
     std::vector<double> T { 0.0 };
@@ -254,17 +254,14 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
  */
 inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
 {
-    std::vector<double> X {(double)rect.x, (double)rect.x + rect.w / 4 + rand() % (int)(rect.w / 2), (double)rect.x + rect.w};
+    std::vector<double> X {(double)rect.x, (double)rect.x + (double)rect.w / 4 + (rand() % (int)(rect.w / 2)), (double)rect.x + rect.w};
     std::vector<double> Y;
-    auto h = abs(rect.y - p.y);
+
+    double h = abs(rect.y - p.y);
     if (rect.x == p.x) // LEFT
-    {
-        Y = {(double)p.y, (double)rect.y + h / 4 + rand() % (int)h / 2, (double)rect.y }; 
-    }
+        Y = {(double)p.y, (double)rect.y + (h / 4) + (rand() % (int)(h / 2)), (double)rect.y}; 
     else
-    {
-        Y = {(double)rect.y, (double)rect.y + h / 4 + rand() % (int)h / 2, (double)p.y }; 
-    }
+        Y = {(double)rect.y, (double)rect.y + (h / 4) + (rand() % (int)(h / 2)), (double)p.y}; 
     
     tk::spline s(X, Y);
     for (int x = rect.x; x <= rect.x + rect.w; ++x)
@@ -732,9 +729,9 @@ EXPORT inline void DefineSurface(Map& map)
     // TODO GUI CONTROLS
     auto left_ocean_width = 250;
     auto right_ocean_widht = 250;
-    auto surface_parts = 10;
-    auto octaves = 2;
-    auto fq = 120;
+    int surface_parts = 4 + (int)(30 * map.SurfacePartsCount());
+    int octaves = 1 + (int)(5 * map.SurfacePartsOctaves());
+    int fq = 60 + (int)(200 * map.SurfacePartsFrequency());
 
     auto surface_x = left_ocean_width;
     //auto surface_y = surface_rect.y + surface_rect.h;
@@ -754,7 +751,7 @@ EXPORT inline void DefineSurface(Map& map)
         tmp_avg_part_width = tmp_surface_width / tmp_parts;
 
         auto w = (int) tmp_avg_part_width / 2 + (rand() % (int)(tmp_avg_part_width / 2));
-        auto h = (int) surface_height / 4 + (rand() % (int)(surface_height / 3));
+        auto h = (int) surface_height / 4 + (rand() % (int)(surface_height / 4));
 
         parts.emplace_back(std::make_pair(w, h)); 
 
@@ -874,8 +871,8 @@ EXPORT inline void GenerateHills(Map& map)
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
 
-        hill.clear();
-        CreateHill(hill_rect, hill, sy, ey);
+        auto& s_hill = map.SurfaceStructure(Structures::HILL);
+        CreateHill(hill_rect, s_hill, sy, ey);
     }
 };
 
@@ -899,11 +896,15 @@ EXPORT inline void GenerateHoles(Map& map)
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
 
-        //auto& eraser = map.Eraser();
-        //for (auto p: hole) { eraser.Erase(p); }
+        for (auto p: hole)
+        {
+            auto meta = map.GetMetadata(p);
+            meta.surface_structure = nullptr;
+            map.SetMetadata(p, meta);
+        }
 
-        hole.clear();
-        CreateHole(hole_rect, hole, sy, ey);
+        auto& s_hole = map.SurfaceStructure(Structures::HOLE);
+        CreateHole(hole_rect, s_hole, sy, ey);
     }
 };
 
@@ -915,14 +916,14 @@ EXPORT inline void GenerateIslands(Map& map)
     for (auto* island: islands)
     {
         auto island_rect = island->bbox();
-        island->clear();
-        CreateIsland(island_rect, *island, rand() % 2);
+        auto& s_island = map.SurfaceStructure(Structures::FLOATING_ISLAND);
+        CreateIsland(island_rect, s_island, rand() % 2);
     }
 };
 
 EXPORT inline void GenerateCliffsTransitions(Map& map)
 {
-    printf("GenerateCliffs\n");
+    printf("GenerateCliffsTransitions\n");
 
     auto surface_rect = map.Surface().bbox();
     auto* s_one = map.GetSurfaceBegin();
@@ -934,16 +935,16 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
         auto meta0 = map.GetMetadata(p0);
         auto meta1 = map.GetMetadata(p1);
         
-        //printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
+        printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
 
-        if (((meta0.owner == nullptr) && (meta1.owner == nullptr)) || 
-            ((meta0.owner != nullptr) && (meta0.owner->GetType() == Structures::SURFACE_PART) && 
-             (meta1.owner != nullptr) && (meta1.owner->GetType() == Structures::SURFACE_PART)))
+        if (((meta0.structure == nullptr) && (meta1.structure == nullptr)) || 
+            ((meta0.structure != nullptr) && (meta0.structure->GetType() == Structures::SURFACE_PART) && 
+             (meta1.structure != nullptr) && (meta1.structure->GetType() == Structures::SURFACE_PART)))
         {
             auto sign = 1 ? p0.y < p1.y : -1;
 
             auto y_diff = abs(p0.y - p1.y);
-            if (y_diff >= 20 && y_diff <= 40) // CLIFF
+            if (y_diff >= 15 && y_diff <= 25) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
@@ -959,7 +960,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                     rect.y = p1.y - rand() % 5; // POINTING UPWARDS 
                 }
 
-                auto& cliff = map.Structure(Structures::CLIFF);
+                auto& cliff = map.SurfaceStructure(Structures::CLIFF);
                 CreateCliff(rect, cliff, p0, p1);
                 //FillWithRect(rect, cliff);
             }
@@ -975,6 +976,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                     rect.x = p0.x;
                     rect.y = p0.y;
                     auto* part = map.GetSurfacePart(rect.x + rect.w);
+                    while (part == nullptr) { rect.w -= 1; part = map.GetSurfacePart(rect.x + rect.w); }
                     p = {rect.x + rect.w, part->GetY(rect.x + rect.w)};
                 }
                 else // LEFT
@@ -985,23 +987,25 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                     p = {rect.x, part->GetY(rect.x)};
                 }
 
-                
-                auto& transition = map.Structure(Structures::TRANSITION);
-                CreateTransition(rect, transition, p); 
-                //FillWithRect(rect, transition);
+                if (abs(rect.y - p.y) > 2)
+                {
+                    auto& transition = map.SurfaceStructure(Structures::TRANSITION);
+                    CreateTransition(rect, transition, p); 
+                    //FillWithRect(rect, transition);
+                }
             }
         }
 
         s_one = s_one->Next();
         s_two = s_two->Next();
-    } while(s_two != nullptr && s_one->Next() != nullptr);
+    } while(s_one != nullptr && s_two != nullptr);
 };
 
-EXPORT void GenerateGrass(Map& map)
+EXPORT inline void GenerateGrass(Map& map)
 {
     printf("GenerateGrass\n");
 
-    auto& grass = map.Structure(Structures::GRASS);
+    auto& grass = map.SurfaceStructure(Structures::GRASS);
     auto* surface_part = map.GetSurfaceBegin();
 
     auto A_STRUCT = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
@@ -1029,8 +1033,8 @@ EXPORT void GenerateGrass(Map& map)
             auto info_right = map.GetMetadata({p.x + 1, p.y});
 
             if ((info_this.biome != nullptr) && (info_this.biome->GetType() & A_BIOMES) &&
-                (info_this.owner != nullptr) && (info_this.owner->GetType() & A_STRUCT) &&
-                ((info_up.owner == nullptr) || (info_left.owner == nullptr) || (info_right.owner == nullptr)))
+                (info_this.surface_structure != nullptr) && (info_this.surface_structure->GetType() & A_STRUCT) &&
+                ((info_up.surface_structure == nullptr) || (info_left.surface_structure == nullptr) || (info_right.surface_structure == nullptr)))
             {
                 grass.add(p);
 
@@ -1057,12 +1061,12 @@ EXPORT void GenerateGrass(Map& map)
     while (surface_part != nullptr);
 };
 
-EXPORT void GenerateTrees(Map& map)
+EXPORT inline void GenerateTrees(Map& map)
 {
     printf("Generate Trees\n");
     auto count = 150;
 
-    auto* grass = map.GetStructures(Structures::GRASS)[0];
+    auto* grass = map.GetSurfaceStructures(Structures::GRASS)[0];
     auto size = grass->size(); 
 
     auto check_placement = [&](Pixel start, int height) -> bool
@@ -1075,7 +1079,7 @@ EXPORT void GenerateTrees(Map& map)
             auto info_left = map.GetMetadata({p.x - 1, p.y});
             auto info_right = map.GetMetadata({p.x + 1, p.y});
             
-            if (info_this.owner != nullptr || info_left.owner != nullptr || info_right.owner != nullptr)
+            if (info_this.surface_structure != nullptr || info_left.surface_structure != nullptr || info_right.surface_structure != nullptr)
                 return false;
             ++h;
         };
@@ -1090,7 +1094,7 @@ EXPORT void GenerateTrees(Map& map)
 
         if (check_placement(p, h))
         {
-            auto& tree = map.Structure(Structures::TREE);
+            auto& tree = map.SurfaceStructure(Structures::TREE);
             auto _h = 0;
             while (_h < h + 1)
             {

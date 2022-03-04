@@ -8,7 +8,6 @@
 #include <functional>
 #include <chrono>
 #include <assert.h>
-#include "libloaderapi.h"
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
@@ -21,7 +20,11 @@
 #define PCG_AS_DLL false 
 
 #if (PCG_AS_DLL)
+#include "libloaderapi.h"
 HMODULE module;
+
+#include "utils.h"
+typedef void (*PCG_FUNC)(Map&);
 PCG_FUNC DefineHorizontal;
 PCG_FUNC DefineBiomes;
 PCG_FUNC DefineHillsHolesIslands;
@@ -34,10 +37,10 @@ PCG_FUNC GenerateIslands;
 PCG_FUNC GenerateCliffsTransitions;
 PCG_FUNC GenerateGrass;
 PCG_FUNC GenerateTrees;
-#include "utils.h"
 
 #else
 #include "pcg.h"
+typedef void (*PCG_FUNC)(Map&);
 #endif
 
 
@@ -47,7 +50,6 @@ using namespace std::chrono_literals;
 * DRAW LOGIC
 *
 *************************************************/
-
 #define DIRT              (Color){151, 107, 75, 255}
 #define MUD               (Color){92, 68, 73, 255}
 #define SAND              (Color){255, 218, 56, 255}
@@ -166,42 +168,6 @@ void DrawSurfaceStructures(Map& map)
     }
 };
 
-void DrawHills(Map& map)
-{
-    for (auto& biome: map.GetStructures(Structures::HILL))
-        for (auto& p: *biome)
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-void DrawHoles(Map& map)
-{
-    for (auto* biome: map.GetStructures(Structures::HOLE))
-        for (auto& p: *biome)
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-void DrawCliffs(Map& map)
-{
-    for (auto* biome: map.GetStructures(Structures::CLIFF))
-        for (auto& p: *biome)
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-void DrawTransitions(Map& map)
-{
-    for (auto* biome: map.GetStructures(Structures::TRANSITION))
-        for (auto& p: *biome)
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-void DrawIslands(Map& map)
-{
-    for (auto* biome: map.GetStructures(Structures::FLOATING_ISLAND))
-        for (auto& p: *biome)
-            DrawPixel(p.x, p.y, C_UNDERGROUND);
-};
-
-
 void DrawSurface(Map& map)
 {
     auto surface_rect = map.Surface().bbox();
@@ -210,12 +176,12 @@ void DrawSurface(Map& map)
         for (auto y = 0; y < surface_rect.y + surface_rect.h; ++y)
         {
             auto meta = map.GetMetadata({x, y});
-            if (meta.owner != nullptr)
+            if (meta.surface_structure != nullptr)
             {
                 if (meta.biome != nullptr)
                 {
                     if (meta.biome->GetType() == Biomes::JUNGLE)
-                        if (meta.owner->GetType() == Structures::GRASS)
+                        if (meta.surface_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_JGRASS);
                         else
                             DrawPixel(x, y, MUD);
@@ -224,7 +190,7 @@ void DrawSurface(Map& map)
                     else if (meta.biome->GetType() == Biomes::OCEAN)
                         DrawPixel(x, y, SAND);
                     else
-                        if (meta.owner->GetType() == Structures::GRASS)
+                        if (meta.surface_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_GRASS);
                         else
                             DrawPixel(x, y, DIRT);
@@ -234,7 +200,7 @@ void DrawSurface(Map& map)
                     DrawPixel(x, y, DIRT);
                 }
 
-                if (meta.owner->GetType() == Structures::TREE)
+                if (meta.surface_structure->GetType() == Structures::TREE)
                 {
                     DrawPixel(x, y, (Color){191, 143, 111, 255});
                 }
@@ -247,8 +213,6 @@ void DrawSurface(Map& map)
 * PROCEDURAL GENERATION LOGIC 
 *
 **************************************************/
-typedef void (*PCG_FUNC)(Map&);
-
 std::atomic_bool GenerateStage0 { false };
 std::atomic_bool GenerateStage1 { false };
 std::atomic_bool GenerateStage2 { false };
@@ -274,23 +238,19 @@ void PCGFunction(PCG_FUNC func, Map& map)
 bool LoadPCG()
 {
     module = LoadLibrary("pcg.dll");
-    if (module)
-    {
-        DefineHorizontal = (PCG_FUNC) GetProcAddress(module, "DefineHorizontal");
-        DefineBiomes = (PCG_FUNC) GetProcAddress(module, "DefineBiomes");
-        DefineHillsHolesIslands = (PCG_FUNC) GetProcAddress(module, "DefineHillsHolesIslands");
-        DefineCabins = (PCG_FUNC) GetProcAddress(module, "DefineCabins");
-        DefineCastles = (PCG_FUNC) GetProcAddress(module, "DefineCastles");
-        DefineSurface = (PCG_FUNC) GetProcAddress(module, "DefineSurface");
-        GenerateHills = (PCG_FUNC) GetProcAddress(module, "GenerateHills");
-        GenerateHoles = (PCG_FUNC) GetProcAddress(module, "GenerateHoles");
-        GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
-        GenerateCliffsTransitions = (PCG_FUNC) GetProcAddress(module, "GenerateCliffsTransitions");
-        GenerateGrass = (PCG_FUNC) GetProcAddress(module, "GenerateGrass");
-        GenerateTrees = (PCG_FUNC) GetProcAddress(module, "GenerateTrees");
-        return true;
-    }
-    return false;
+    DefineHorizontal = (PCG_FUNC) GetProcAddress(module, "DefineHorizontal");
+    DefineBiomes = (PCG_FUNC) GetProcAddress(module, "DefineBiomes");
+    DefineHillsHolesIslands = (PCG_FUNC) GetProcAddress(module, "DefineHillsHolesIslands");
+    DefineCabins = (PCG_FUNC) GetProcAddress(module, "DefineCabins");
+    DefineCastles = (PCG_FUNC) GetProcAddress(module, "DefineCastles");
+    DefineSurface = (PCG_FUNC) GetProcAddress(module, "DefineSurface");
+    GenerateHills = (PCG_FUNC) GetProcAddress(module, "GenerateHills");
+    GenerateHoles = (PCG_FUNC) GetProcAddress(module, "GenerateHoles");
+    GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
+    GenerateCliffsTransitions = (PCG_FUNC) GetProcAddress(module, "GenerateCliffsTransitions");
+    GenerateGrass = (PCG_FUNC) GetProcAddress(module, "GenerateGrass");
+    GenerateTrees = (PCG_FUNC) GetProcAddress(module, "GenerateTrees");
+    return true;
 };
 
 void FreePCG()
@@ -334,6 +294,7 @@ void _PCGGen(Map& map)
     {
         map.ClearStage0();
         map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
+        printf("DefineHorizontal\n");
         DefineHorizontal(map);
     }
     DrawStage0 = true;
@@ -379,7 +340,7 @@ void _PCGGen(Map& map)
     }
     //DrawStage2 = true;
 
-    if (!map.ShouldForceStop() && GenerateStage2)
+    if (!map.ShouldForceStop() && GenerateStage3)
     {
         map.ClearStage3();
         map.SetGenerationMessage("DEFINITION OF SURFACE...");
@@ -463,7 +424,7 @@ void ScheduleGeneration(Map& map)
 };
 
 
-void PCGRegenerateHills(Map& map)
+void PCGRegenerateStructures(Map& map)
 {
     GenerateStage4 = true;
     ScheduleGeneration(map);
@@ -472,10 +433,10 @@ void PCGRegenerateHills(Map& map)
 void PCGRegenerateSurface(Map& map)
 {
     GenerateStage3 = true;
-    PCGRegenerateHills(map);
+    PCGRegenerateStructures(map);
 };
 
-void PCGRegeneratestructures(Map& map)
+void PCGRegenerateStructureDefinition(Map& map)
 {
     GenerateStage2 = true;
     PCGRegenerateSurface(map);
@@ -484,7 +445,7 @@ void PCGRegeneratestructures(Map& map)
 void PCGRegenerateBiomes(Map& map)
 {
     GenerateStage1 = true;
-    PCGRegeneratestructures(map);
+    PCGRegenerateStructureDefinition(map);
 };
 
 void PCGRegenerateHorizontalAreas(Map& map)
@@ -593,13 +554,8 @@ int main(void)
         {
             BeginTextureMode(canvas);
                 DrawHorizontal(map);
+                //DrawStructures(map);
                 //DrawSurfaceStructures(map);
-                //DrawBiomes(map);
-                //DrawHills(map);
-                //DrawHoles(map);
-                //DrawCliffs(map);
-                //DrawTransitions(map);
-                //DrawIslands(map);
                 DrawSurface(map);
             EndTextureMode();
 
@@ -643,7 +599,7 @@ int main(void)
                 TabActive = GuiToggleGroup((Rectangle){2 * em, 2 * em + 2 * 24, 92, 24}, "MATERIALS;ENTITIES;WORLD", TabActive);
                 if (TabActive == 0)
                 {
-                    GuiLabel((Rectangle){2 * em, 2 * em + 24, width - 4 * 8, 24}, "Settings about materials");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 24, width - 4 * 8, 24}, "");
                     
                     GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
                     GuiLabel((Rectangle){2 * em + 2 * 92 + im, 5 * em + 2 * 24, 92, 24}, "SIZE");
@@ -661,7 +617,6 @@ int main(void)
                         Pass();
                     if (map.GoldFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldFrequency(), 0.0, 1.0)))
                         Pass();
-
                     if (map.CopperSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperSize(), 0.0, 1.0)))
                         Pass();
                     if (map.IronSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronSize(), 0.0, 1.0)))
@@ -673,7 +628,7 @@ int main(void)
                 }
                 else if (TabActive == 1)
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "Settings about entities in map");
+                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "");
 
                     GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
 
@@ -683,19 +638,32 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
 
                     if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
-                        PCGRegeneratestructures(map);
+                        PCGRegenerateStructureDefinition(map);
                     if (map.HolesFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.HolesFrequency(), 0.0, 1.0)))
-                        PCGRegeneratestructures(map);
+                        PCGRegenerateStructureDefinition(map);
                     if (map.CabinsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.CabinsFrequency(), 0.0, 1.0)))
-                        PCGRegeneratestructures(map);
+                        PCGRegenerateStructureDefinition(map);
                     if (map.IslandsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.IslandsFrequency(), 0.0, 1.0)))
-                        PCGRegeneratestructures(map);
+                        PCGRegenerateStructureDefinition(map);
 
                 }
                 else
                 {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "Lorem ipsum");
-                }
+                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "");
+
+                    GuiLabel((Rectangle){2 * em, 5 * em + 2 * 24, 92, 24}, "SURFACE");
+
+                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "PARTS");
+                    GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "FREQUENCY");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "OCTAVES");
+
+                    if (map.SurfacePartsCount(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.SurfacePartsCount(), 0.0, 1.0)))
+                        PCGRegenerateSurface(map);
+                    if (map.SurfacePartsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.SurfacePartsFrequency(), 0.0, 1.0)))
+                        PCGRegenerateSurface(map);
+                    if (map.SurfacePartsOctaves(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SurfacePartsOctaves(), 0.0, 1.0)))
+                        PCGRegenerateSurface(map);
+               }
 
                 ScrollView = GuiScrollPanel(map_view, (Rectangle){0, 0, map_width * camera.zoom, map_height * camera.zoom}, &ScrollOffset);
                 DrawRectangleRec(map_view, {40, 40, 40, 255});
@@ -740,9 +708,9 @@ int main(void)
                                     break;
                             }
                         }
-                        if (info.owner != nullptr)
+                        if (info.surface_structure != nullptr)
                         {
-                            switch (info.owner->GetType())
+                            switch (info.surface_structure->GetType())
                             {
                                 case Structures::HILL:
                                     DrawText("HILL", mx, my - 48, 16, BLUE);
