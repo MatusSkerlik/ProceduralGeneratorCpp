@@ -937,14 +937,12 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
         
         printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
 
-        if (((meta0.structure == nullptr) && (meta1.structure == nullptr)) || 
-            ((meta0.structure != nullptr) && (meta0.structure->GetType() == Structures::SURFACE_PART) && 
-             (meta1.structure != nullptr) && (meta1.structure->GetType() == Structures::SURFACE_PART)))
+        if ((meta0.structure == nullptr) && (meta1.structure == nullptr))
         {
             auto sign = 1 ? p0.y < p1.y : -1;
 
             auto y_diff = abs(p0.y - p1.y);
-            if (y_diff >= 15 && y_diff <= 25) // CLIFF
+            if (y_diff >= 25 && y_diff <= 35) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
@@ -975,6 +973,13 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 {
                     rect.x = p0.x;
                     rect.y = p0.y;
+                    while (rect.w > 0) {
+                        auto m = map.GetMetadata({rect.x + rect.w, rect.y});
+                        if (m.structure != nullptr)
+                            rect.w -= 1;
+                        else
+                            break;
+                    }
                     auto* part = map.GetSurfacePart(rect.x + rect.w);
                     while (part == nullptr) { rect.w -= 1; part = map.GetSurfacePart(rect.x + rect.w); }
                     p = {rect.x + rect.w, part->GetY(rect.x + rect.w)};
@@ -983,6 +988,16 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 {
                     rect.x = p1.x - rect.w;
                     rect.y = p1.y; 
+                    while (rect.w > 0) {
+                        auto m = map.GetMetadata({rect.x, rect.y});
+                        if (m.structure != nullptr)
+                        {
+                            rect.w -= 1;
+                            rect.x += 1;
+                        }
+                        else
+                            break;
+                    }
                     auto* part = map.GetSurfacePart(rect.x);
                     p = {rect.x, part->GetY(rect.x)};
                 }

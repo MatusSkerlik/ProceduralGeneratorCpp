@@ -168,6 +168,22 @@ void DrawSurfaceStructures(Map& map)
     }
 };
 
+void DrawSurfaceDebug(Map& map)
+{
+    auto surface_rect = map.Surface().bbox();
+    for (auto x = surface_rect.x; x < surface_rect.x + surface_rect.w; ++x)
+    {
+        for (auto y = 0; y < surface_rect.y + surface_rect.h; ++y)
+        {
+            auto meta = map.GetMetadata({x, y});
+            if (meta.structure != nullptr)
+            {
+                DrawPixel(x, y, (Color){255, 0, 0, 16});
+            }
+        }
+    }
+};
+
 void DrawSurface(Map& map)
 {
     auto surface_rect = map.Surface().bbox();
@@ -557,6 +573,7 @@ int main(void)
                 //DrawStructures(map);
                 //DrawSurfaceStructures(map);
                 DrawSurface(map);
+                DrawSurfaceDebug(map);
             EndTextureMode();
 
             DrawStage4 = false;
