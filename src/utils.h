@@ -176,7 +176,8 @@ namespace Biomes {
         FOREST = 1, 
         JUNGLE = 2, 
         TUNDRA = 4, 
-        OCEAN = 8 
+        OCEAN_LEFT = 8, 
+        OCEAN_RIGHT = 16 
     };
 
     class Biome: public PixelArray 
@@ -211,7 +212,8 @@ namespace Structures {
         UNDERGROUND_TUNNEL = 256, 
         GRASS = 512, 
         CASTLE = 1024,
-        TREE = 2048
+        TREE = 2048,
+        CHASM = 4096
     }; 
     
     class Structure: public PixelArray 
@@ -301,8 +303,9 @@ class Map {
 
         float _HILLS_FREQUENCY = 0.5;
         float _HOLES_FREQUENCY = 0.5;
-        float _CABINS_FREQUENCY = 0.5;
+        float _CABINS_FREQUENCY = 0;
         float _ISLANDS_FREQUENCY = 0.5;
+        float _CHASM_FREQUENCY = 0.0;
 
         float _SURFACE_PARTS_COUNT = 0;
         float _SURFACE_PARTS_FREQUENCY = 0.5;
@@ -557,6 +560,23 @@ class Map {
             if (_ISLANDS_FREQUENCY != fq)
             {
                 _ISLANDS_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+        auto ChasmFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _CHASM_FREQUENCY;
+        };
+
+        auto ChasmFrequency(float fq)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_CHASM_FREQUENCY!= fq)
+            {
+                _CHASM_FREQUENCY = fq;
                 return true;
             }
             return false;

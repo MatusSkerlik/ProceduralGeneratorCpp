@@ -305,6 +305,350 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
             if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
 };
 
+/*
+ * Namespace for Chasm algorithm related stuff
+ */
+namespace Chasm
+{
+    enum Direction {
+        TOP, 
+        LEFT, 
+        BOTTOM, 
+        RIGHT
+    };
+
+    typedef struct Point {
+
+        enum Type {
+            VOID, 
+            WALL, 
+            ACID, 
+            NONE
+        };
+
+        Type type;
+        int d; // durability
+        std::unordered_set<Pixel, PixelHash, PixelEqual> visited_points;
+    } Point;
+
+
+    /**
+     * Create pixel point mappint, where surface_structure is defined, there is wall, else void 
+     */
+    inline auto MappingFromRect(const Rect& rect, Map& map, int wall_durability)
+    {
+        std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual> mapping;
+        for (auto x = rect.x; x < rect.x + rect.w; ++x)
+        {
+            for (auto y = rect.y; y < rect.y + rect.h; ++y)
+            {
+                auto p = (Pixel){x, y};
+                auto meta = map.GetMetadata({x, y});
+                if (meta.surface_structure != nullptr)
+                    mapping[p] = {Chasm::Point::WALL, wall_durability};
+                else
+                    mapping[p] = {Chasm::Point::VOID, 0};
+            }
+        }
+        return mapping;
+    };
+
+    inline auto Top(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x, y - 1};
+        if (y > rect.y)
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto Left(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x - 1, y};
+        if (x > rect.x)
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto Bottom(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x, y + 1};
+        if (y < rect.y + rect.h - 1)
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto Right(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x + 1, y};
+        if (x < rect.x + rect.w - 1)
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto TopLeft(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x - 1, y - 1};
+        if (x > rect.x && y > rect.y)
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto TopRight(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x + 1, y - 1};
+        if (x < (rect.x + rect.w - 1) && y > rect.y)
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto BottomLeft(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x - 1, y + 1};
+        if (x > rect.x && y < (rect.y + rect.h - 1))
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto BottomRight(const Rect& rect, 
+            int x, int y, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
+    ){
+        Pixel k {x + 1, y + 1};
+        if (x < (rect.x + rect.w - 1) && y < (rect.y + rect.h - 1))
+            return mapping[k];
+        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
+    };
+
+    inline auto Step(
+            const Rect& rect, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual> mapping, 
+            std::unordered_set<Pixel, PixelHash, PixelEqual> points
+    ){
+        for (auto x = rect.x; x < rect.x + rect.w; ++x)
+        {
+            for (auto y = rect.y; y < rect.y + rect.h; ++y)
+            {
+                auto p = (Pixel){x, y};
+                auto cell = mapping[p];
+
+                if (cell.type == Chasm::Point::ACID)
+                {
+                    auto p_v = (Pixel){0, 0};
+                    auto min_d = rect.w * rect.h;
+                    for (auto p: points)
+                    {
+                        if (cell.visited_points.count(p) == 0)
+                        {
+                            if ((p.x == x) && (p.y == y))
+                            {
+                                cell.visited_points.insert(p);
+                            }
+                            else
+                            {
+                                auto tmp_v = Pixel(x - p.x, y - p.y);
+                                auto d = sqrt((tmp_v.x * tmp_v.x) + (tmp_v.y * tmp_v.y));
+                                if (d < 3)
+                                {
+                                    cell.visited_points.insert(p);
+                                }
+                                else if (d < min_d)
+                                {
+                                    min_d = d;
+                                    p_v = tmp_v;
+                                }
+                            }
+                        }
+                    }
+
+                    if ((cell.visited_points.size() == points.size()) || cell.d <= 0)
+                    {
+                        cell.type = Chasm::Point::VOID;
+                        cell.d = 0;
+                        cell.visited_points = {};
+                        mapping[p] = cell;
+                    }
+                    else
+                    {
+                        std::vector<Chasm::Direction> dirs;
+                        if (p_v.x > 0) for (auto i = 0; i < p_v.x; ++i) dirs.push_back(Chasm::Direction::LEFT);
+                        if (p_v.x < 0) for (auto i = 0; i < -p_v.x; ++i) dirs.push_back(Chasm::Direction::RIGHT);
+                        if (p_v.y > 0) for (auto i = 0; i < p_v.y; ++i) dirs.push_back(Chasm::Direction::TOP);
+                        if (p_v.y < 0) for (auto i = 0; i < -p_v.y; ++i) dirs.push_back(Chasm::Direction::BOTTOM);
+                        auto direction = dirs[rand() % (dirs.size() - 1)];
+
+                        Chasm::Point nb;
+                        switch (direction)
+                        {
+                            case Chasm::Direction::TOP:
+                                nb = Chasm::Top(rect, x, y, mapping);
+                                break;
+                            case Chasm::Direction::LEFT:
+                                nb = Chasm::Left(rect, x, y, mapping);
+                                break;
+                            case Chasm::Direction::BOTTOM:
+                                nb = Chasm::Bottom(rect, x, y, mapping);
+                                break;
+                            case Chasm::Direction::RIGHT:
+                                nb = Chasm::Right(rect, x, y, mapping);
+                                break;
+                        }
+
+                        if (nb.type != Chasm::Point::NONE && nb.type != Chasm::Point::ACID)
+                        {
+                            if (nb.type == Chasm::Point::WALL)
+                            {
+                                if (nb.d > 1)
+                                {
+                                    nb.d -= 1;
+                                }
+                                else
+                                {
+                                    if (cell.d > 1)
+                                    {
+                                        nb.type = Chasm::Point::ACID;
+                                        nb.d = cell.d - 1;
+                                        nb.visited_points = cell.visited_points;
+                                    }
+                                    else
+                                    {
+                                        nb.type = Chasm::Point::VOID;
+                                        nb.d = 0;
+                                        nb.visited_points = {};
+                                    }
+                                    cell.type = Chasm::Point::VOID;
+                                    cell.d = 0;
+                                    cell.visited_points = {};
+                                }
+                            }
+                            else
+                            {
+                                nb.type = Chasm::Point::ACID; 
+                                nb.d = cell.d;
+                                nb.visited_points = cell.visited_points;
+                                cell.type = Chasm::Point::VOID;
+                                cell.d = 0;
+                                cell.visited_points = {};
+                            }
+
+                            auto p0 = (Pixel){x, y - 1};
+                            auto p1 = (Pixel){x - 1, y};
+                            auto p2 = (Pixel){x, y + 1};
+                            auto p3 = (Pixel){x + 1, y};
+                            switch (direction)
+                            {
+                                case Chasm::Direction::TOP:
+                                    mapping[p0] = nb;
+                                    break;
+                                case Chasm::Direction::LEFT:
+                                    mapping[p1] = nb;
+                                    break;
+                                case Chasm::Direction::BOTTOM:
+                                    mapping[p2] = nb;
+                                    break;
+                                case Chasm::Direction::RIGHT:
+                                    mapping[p3] = nb;
+                                    break;
+                            }
+                            mapping[p] = cell;
+                        }
+                    }
+                }
+            }
+        }
+        return mapping;
+    };
+
+    inline auto SmoothStep(
+            const Rect& rect, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual> mapping 
+    ){
+        for (auto x = rect.x + 1; x < rect.x + rect.w - 1; ++x)
+        {
+            for (auto y = rect.y + 1; y < rect.y + rect.h - 1; ++y)
+            {
+                Pixel p {x, y};
+                auto alive = 0;
+                if (Chasm::Top(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::TopLeft(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::TopRight(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::Left(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::Right(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::Bottom(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::BottomLeft(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                if (Chasm::BottomRight(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
+                
+                if (alive < 4) mapping[p] = {Chasm::Point::VOID, 0, {}}; 
+            }
+        }
+
+        return mapping;
+    };
+};
+
+inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
+{
+    auto steps = 80;
+    auto smooth_steps = 5;
+    auto spawn_every_x_steps = 8;
+    auto rect_mapping = Chasm::MappingFromRect(rect, map, 2);
+
+    auto points_count = 5 + rand() % 4;
+    std::unordered_set<Pixel, PixelHash, PixelEqual> points;
+
+    for (auto _ = 0; _ < points_count; ++_)
+        points.insert({
+            rect.x + (rand() % (rect.w - 1)), 
+            rect.y + rect.h / 2 + (rand() % (int)((rect.h / 2) - 1))
+        });
+
+    // SPAWN ACID FROM TOP
+    auto spawn_acid = [&](){
+        for (auto x = rect.x; x < rect.x + rect.w; ++x)
+        {
+            auto p = (Pixel){x, rect.y};
+            rect_mapping[p] = {Chasm::Point::ACID, 20, {}};
+        }
+    };
+
+    // SIMULATE
+    for (auto i = 0; i < steps; ++i)
+    {
+        if ((i % spawn_every_x_steps) == 0)
+            spawn_acid();
+
+        rect_mapping = Chasm::Step(rect, rect_mapping, points);
+    }
+
+    // SMOOTH
+    for (auto i = 0; i < smooth_steps; ++i)
+        rect_mapping = Chasm::SmoothStep(rect, rect_mapping);
+
+    // PUSH RESULTS
+    for (auto x = rect.x; x < rect.x + rect.w; ++x)
+    {
+        for (auto y = rect.y; y < rect.y + rect.h; ++y)
+        {
+            auto p = (Pixel){x, y};
+            auto point = rect_mapping[p];
+            if (point.type == Chasm::Point::WALL) arr.add(p);
+        }
+    }
+};
+
 inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
 {
     std::unordered_set<int> domain;
@@ -358,10 +702,10 @@ EXPORT inline void DefineBiomes(Map& map)
     Rect Surface = map.Surface().bbox();
     Rect Hell = map.Hell().bbox();
 
-    auto& ocean_left = map.Biome(Biomes::OCEAN);
+    auto& ocean_left = map.Biome(Biomes::OCEAN_LEFT);
     PixelsOfRect(0, Surface.y, ocean_width, Surface.h, ocean_left); 
 
-    auto& ocean_right = map.Biome(Biomes::OCEAN);
+    auto& ocean_right = map.Biome(Biomes::OCEAN_RIGHT);
     PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, ocean_right);
 
     // USE CSP TO FIND LOCATIONS FOR JUNGLE AND TUNDRA 
@@ -1016,15 +1360,58 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
     } while(s_one != nullptr && s_two != nullptr);
 };
 
+EXPORT inline void GenerateChasms(Map& map)
+{
+    printf("GenerateChasms");
+
+    auto Surface = map.Surface();
+    auto& ocean_left = map.Biome(Biomes::OCEAN_LEFT);
+    auto ocean_left_rect = ocean_left.bbox();
+    auto& ocean_right = map.Biome(Biomes::OCEAN_LEFT);
+    auto ocean_right_rect = ocean_right.bbox();
+    auto width = map.Width();
+    auto surface_rect = Surface.bbox();
+    auto chasms_count = 2 + (int)(map.ChasmFrequency() * 10);
+    auto chasm_width = 50;
+
+    for (auto c = 0; c < chasms_count + 1; ++c)
+    {
+        auto w = chasm_width + (rand() % 41) - 20;
+        auto a_w = width - ocean_left_rect.w - ocean_right_rect.w - w; 
+        auto x = ocean_left_rect.w + (rand() % a_w);
+
+        Rect chasm_rect = {x - w / 2, surface_rect.y + surface_rect.h / 3, w, surface_rect.h / 2}; 
+
+        auto& chasm = map.Structure(Structures::CHASM);
+        FillWithRect(chasm_rect, chasm);
+
+        auto& s_chasm = map.SurfaceStructure(Structures::CHASM);
+        CreateChasm(chasm_rect, s_chasm, map);
+
+        for (auto p: chasm)
+        {
+            if (!s_chasm.contains(p))
+            {
+                auto meta = map.GetMetadata(p);
+                meta.surface_structure = nullptr;
+                map.SetMetadata(p, meta);
+            }
+        }
+    }
+};
+
 EXPORT inline void GenerateGrass(Map& map)
 {
     printf("GenerateGrass\n");
 
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
     auto& grass = map.SurfaceStructure(Structures::GRASS);
     auto* surface_part = map.GetSurfaceBegin();
 
     auto A_STRUCT = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
-                Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL;
+                Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL |
+                Structures::CHASM;
     auto A_BIOMES = Biomes::FOREST | Biomes::JUNGLE;
     std::unordered_set<Pixel, PixelHash, PixelEqual> visited;
     std::vector<Pixel> queue;
@@ -1067,8 +1454,25 @@ EXPORT inline void GenerateGrass(Map& map)
 
     do 
     {
-        auto sp = (Pixel){surface_part->StartX(), surface_part->StartY()};
-        auto ep = (Pixel){surface_part->EndX(), surface_part->EndY()};
+        auto sp = (Pixel){surface_part->StartX(), surface_rect.y};
+        while (sp.y < (surface_rect.y + surface_rect.h - 1)) 
+        {
+            auto meta = map.GetMetadata(sp);
+            if (meta.surface_structure == nullptr)
+                sp.y += 1;
+            else
+                break;
+        }
+        auto ep = (Pixel){surface_part->EndX(), surface_rect.y};
+        while (ep.y < (surface_rect.y + surface_rect.h - 1)) 
+        {
+            auto meta = map.GetMetadata(ep);
+            if (meta.surface_structure == nullptr)
+                ep.y += 1;
+            else
+                break;
+        }
+ 
         traverse(sp);
         traverse(ep);
         surface_part = surface_part->Next();

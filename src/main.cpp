@@ -110,7 +110,10 @@ void DrawBiomes(Map& map)
                 case Biomes::FOREST:
                     DrawPixel(p.x, p.y, (Color){0, 255, 0, 32});
                     break;
-                case Biomes::OCEAN:
+                case Biomes::OCEAN_LEFT:
+                    DrawPixel(p.x, p.y, (Color){0, 0, 255, 32});
+                    break;
+                case Biomes::OCEAN_RIGHT:
                     DrawPixel(p.x, p.y, (Color){0, 0, 255, 32});
                     break;
                 default:
@@ -203,7 +206,9 @@ void DrawSurface(Map& map)
                             DrawPixel(x, y, MUD);
                     else if (meta.biome->GetType() == Biomes::TUNDRA)
                         DrawPixel(x, y, ICE);
-                    else if (meta.biome->GetType() == Biomes::OCEAN)
+                    else if (meta.biome->GetType() == Biomes::OCEAN_LEFT)
+                        DrawPixel(x, y, SAND);
+                    else if (meta.biome->GetType() == Biomes::OCEAN_RIGHT)
                         DrawPixel(x, y, SAND);
                     else
                         if (meta.surface_structure->GetType() == Structures::GRASS)
@@ -264,6 +269,7 @@ bool LoadPCG()
     GenerateHoles = (PCG_FUNC) GetProcAddress(module, "GenerateHoles");
     GenerateIslands = (PCG_FUNC) GetProcAddress(module, "GenerateIslands");
     GenerateCliffsTransitions = (PCG_FUNC) GetProcAddress(module, "GenerateCliffsTransitions");
+    GenerateChasms = (PCG_FUNC) GetProcAddress(module, "GenerateChasms");
     GenerateGrass = (PCG_FUNC) GetProcAddress(module, "GenerateGrass");
     GenerateTrees = (PCG_FUNC) GetProcAddress(module, "GenerateTrees");
     return true;
@@ -372,6 +378,8 @@ void _PCGGen(Map& map)
         GenerateHoles(map);
         map.SetGenerationMessage("GENERATION OF CLIFFS AND TRANSITIONS...");
         GenerateCliffsTransitions(map);
+        map.SetGenerationMessage("GENERATION OF CHASMS...");
+        GenerateChasms(map);
         map.SetGenerationMessage("GENERATION OF ISLANDS...");
         GenerateIslands(map);
         map.SetGenerationMessage("GENERATION OF GRASS...");
@@ -653,6 +661,7 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "HOLES");
                     GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "CABINS");
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * im + 8 * 24, 92, 24}, "CHASMS");
 
                     if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
                         PCGRegenerateStructureDefinition(map);
@@ -662,7 +671,8 @@ int main(void)
                         PCGRegenerateStructureDefinition(map);
                     if (map.IslandsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.IslandsFrequency(), 0.0, 1.0)))
                         PCGRegenerateStructureDefinition(map);
-
+                    if (map.ChasmFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * im + 8 * 24, 92, 24}, "", "", map.ChasmFrequency(), 0.0, 1.0)))
+                        PCGRegenerateStructureDefinition(map);
                 }
                 else
                 {
@@ -720,7 +730,10 @@ int main(void)
                                 case Biomes::TUNDRA:
                                     DrawText("TUNDRA", mx, my - 32, 16, RED);
                                     break;
-                                case Biomes::OCEAN:
+                                case Biomes::OCEAN_LEFT:
+                                    DrawText("OCEAN", mx, my - 32, 16, RED);
+                                    break;
+                                case Biomes::OCEAN_RIGHT:
                                     DrawText("OCEAN", mx, my - 32, 16, RED);
                                     break;
                             }
@@ -743,6 +756,9 @@ int main(void)
                                     break;
                                 case Structures::SURFACE_PART:
                                     DrawText("SUTFACE_PART", mx, my - 48, 16, BLUE);
+                                    break;
+                                case Structures::CHASM:
+                                    DrawText("CHASM", mx, my - 48, 16, BLUE);
                                     break;
                                 case Structures::CLIFF:
                                     DrawText("CLIFF", mx, my - 48, 16, BLUE);
