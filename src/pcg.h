@@ -435,7 +435,7 @@ namespace Chasm
 
     inline auto Step(
             const Rect& rect, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual> mapping, 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>&& mapping, 
             std::unordered_set<Pixel, PixelHash, PixelEqual> points
     ){
         for (auto x = rect.x; x < rect.x + rect.w; ++x)
@@ -574,7 +574,7 @@ namespace Chasm
 
     inline auto SmoothStep(
             const Rect& rect, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual> mapping 
+            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>&& mapping 
     ){
         for (auto x = rect.x + 1; x < rect.x + rect.w - 1; ++x)
         {
@@ -630,12 +630,12 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
         if ((i % spawn_every_x_steps) == 0)
             spawn_acid();
 
-        rect_mapping = Chasm::Step(rect, rect_mapping, points);
+        rect_mapping = Chasm::Step(rect, std::move(rect_mapping), points);
     }
 
     // SMOOTH
     for (auto i = 0; i < smooth_steps; ++i)
-        rect_mapping = Chasm::SmoothStep(rect, rect_mapping);
+        rect_mapping = Chasm::SmoothStep(rect, std::move(rect_mapping));
 
     // PUSH RESULTS
     for (auto x = rect.x; x < rect.x + rect.w; ++x)
