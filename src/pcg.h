@@ -230,23 +230,20 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
         T.push_back(T[i-1] + sqrt( (X[i]-X[i-1])*(X[i]-X[i-1]) + (Y[i]-Y[i-1])*(Y[i]-Y[i-1]) ));
     tk::spline sx(T,X), sy(T,Y);
 
-    auto size = (int)T.back();
-    Point polygon[size + 2]; 
-    if (s.y < e.y)
-        polygon[0] = {e.x, e.y};
-    else
-        polygon[0] = {s.x, s.y};
+    auto size = (int)ceil(T.back()) + 1;
+    Point polygon[size]; 
+    for (auto t = 0; t < size; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
 
-    for (auto t = 1; t < size + 1; ++t) polygon[t] = {(int)sx(t - 1),(int)sy(t - 1)};
-
-    if (s.y < e.y)
-        polygon[size + 1] = {s.x, s.y};
-    else
-        polygon[size + 1] = {e.x, e.y};
-
-    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
-        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
-            if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
+    for (auto x = rect.x; x < rect.x + rect.w; ++x)
+        for (auto y = rect.y; y < rect.y + rect.h; ++y)
+            if (s.y < e.y)
+            {
+                if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
+            }
+            else
+            {
+                if (!CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
+            }
 };
 
 /*
@@ -264,10 +261,10 @@ inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
         Y = {(double)rect.y, (double)rect.y + (h / 4) + (rand() % (int)(h / 2)), (double)p.y}; 
     
     tk::spline s(X, Y);
-    for (int x = rect.x; x <= rect.x + rect.w; ++x)
+    for (int x = rect.x; x < rect.x + rect.w; ++x)
     {
        int _y = (int) s(x);
-       for (int y = _y; y <= rect.y + rect.h; ++y)
+       for (int y = _y; y < rect.y + rect.h; ++y)
        {
             arr.add({x, y});
        }
@@ -317,297 +314,179 @@ namespace Chasm
         RIGHT
     };
 
-    typedef struct Point {
-
-        enum Type {
-            VOID, 
-            WALL, 
-            ACID, 
-            NONE
-        };
-
-        Type type;
-        int d; // durability
-        std::unordered_set<Pixel, PixelHash, PixelEqual> visited_points;
-    } Point;
-
-
-    /**
-     * Create pixel point mappint, where surface_structure is defined, there is wall, else void 
-     */
-    inline auto MappingFromRect(const Rect& rect, Map& map, int wall_durability)
-    {
-        std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual> mapping;
-        for (auto x = rect.x; x < rect.x + rect.w; ++x)
-        {
-            for (auto y = rect.y; y < rect.y + rect.h; ++y)
-            {
-                auto p = (Pixel){x, y};
-                auto meta = map.GetMetadata({x, y});
-                if (meta.surface_structure != nullptr)
-                    mapping[p] = {Chasm::Point::WALL, wall_durability};
-                else
-                    mapping[p] = {Chasm::Point::VOID, 0};
-            }
-        }
-        return mapping;
-    };
-
-    inline auto Top(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x, y - 1};
-        if (y > rect.y)
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto Left(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x - 1, y};
-        if (x > rect.x)
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto Bottom(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x, y + 1};
-        if (y < rect.y + rect.h - 1)
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto Right(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x + 1, y};
-        if (x < rect.x + rect.w - 1)
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto TopLeft(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x - 1, y - 1};
-        if (x > rect.x && y > rect.y)
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto TopRight(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x + 1, y - 1};
-        if (x < (rect.x + rect.w - 1) && y > rect.y)
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto BottomLeft(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x - 1, y + 1};
-        if (x > rect.x && y < (rect.y + rect.h - 1))
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto BottomRight(const Rect& rect, 
-            int x, int y, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>& mapping 
-    ){
-        Pixel k {x + 1, y + 1};
-        if (x < (rect.x + rect.w - 1) && y < (rect.y + rect.h - 1))
-            return mapping[k];
-        return (Chasm::Point){Chasm::Point::NONE, 0, {}};
-    };
-
-    inline auto Step(
+    inline void Step(
             const Rect& rect, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>&& mapping, 
-            std::unordered_set<Pixel, PixelHash, PixelEqual> points
+            std::unordered_set<Pixel, PixelHash, PixelEqual>& walls,
+            std::unordered_set<Pixel, PixelHash, PixelEqual>& acids,
+            std::unordered_set<Pixel, PixelHash, PixelEqual>& points,
+            std::unordered_map<Pixel, std::unordered_set<Pixel, PixelHash, PixelEqual>, PixelHash, PixelEqual>& visited_points
     ){
-        for (auto x = rect.x; x < rect.x + rect.w; ++x)
+        std::vector<Pixel> acid_insert;
+        std::vector<Pixel> acid_removal;
+
+        for (auto acid_p: acids)
         {
-            for (auto y = rect.y; y < rect.y + rect.h; ++y)
+            auto x = acid_p.x;
+            auto y = acid_p.y;
+
+            auto p_v = (Pixel){0, 0};
+            auto min_distance = rect.w * rect.h;
+
+            auto& acid_visited = visited_points[acid_p];
+            for (auto p: points)
             {
-                auto p = (Pixel){x, y};
-                auto cell = mapping[p];
-
-                if (cell.type == Chasm::Point::ACID)
+                if (acid_visited.count(p) == 0)
                 {
-                    auto p_v = (Pixel){0, 0};
-                    auto min_d = rect.w * rect.h;
-                    for (auto p: points)
+                    auto diff_v = Pixel(x - p.x, y - p.y);
+                    auto distance = sqrt((diff_v.x * diff_v.x) + (diff_v.y * diff_v.y));
+                    if (distance < 5)
                     {
-                        if (cell.visited_points.count(p) == 0)
-                        {
-                            if ((p.x == x) && (p.y == y))
-                            {
-                                cell.visited_points.insert(p);
-                            }
-                            else
-                            {
-                                auto tmp_v = Pixel(x - p.x, y - p.y);
-                                auto d = sqrt((tmp_v.x * tmp_v.x) + (tmp_v.y * tmp_v.y));
-                                if (d < 3)
-                                {
-                                    cell.visited_points.insert(p);
-                                }
-                                else if (d < min_d)
-                                {
-                                    min_d = d;
-                                    p_v = tmp_v;
-                                }
-                            }
-                        }
+                        acid_visited.insert(p);
                     }
-
-                    if ((cell.visited_points.size() == points.size()) || cell.d <= 0)
+                    else if (distance < min_distance)
                     {
-                        cell.type = Chasm::Point::VOID;
-                        cell.d = 0;
-                        cell.visited_points = {};
-                        mapping[p] = cell;
-                    }
-                    else
-                    {
-                        std::vector<Chasm::Direction> dirs;
-                        if (p_v.x > 0) for (auto i = 0; i < p_v.x; ++i) dirs.push_back(Chasm::Direction::LEFT);
-                        if (p_v.x < 0) for (auto i = 0; i < -p_v.x; ++i) dirs.push_back(Chasm::Direction::RIGHT);
-                        if (p_v.y > 0) for (auto i = 0; i < p_v.y; ++i) dirs.push_back(Chasm::Direction::TOP);
-                        if (p_v.y < 0) for (auto i = 0; i < -p_v.y; ++i) dirs.push_back(Chasm::Direction::BOTTOM);
-                        auto direction = dirs[rand() % (dirs.size() - 1)];
-
-                        Chasm::Point nb;
-                        switch (direction)
-                        {
-                            case Chasm::Direction::TOP:
-                                nb = Chasm::Top(rect, x, y, mapping);
-                                break;
-                            case Chasm::Direction::LEFT:
-                                nb = Chasm::Left(rect, x, y, mapping);
-                                break;
-                            case Chasm::Direction::BOTTOM:
-                                nb = Chasm::Bottom(rect, x, y, mapping);
-                                break;
-                            case Chasm::Direction::RIGHT:
-                                nb = Chasm::Right(rect, x, y, mapping);
-                                break;
-                        }
-
-                        if (nb.type != Chasm::Point::NONE && nb.type != Chasm::Point::ACID)
-                        {
-                            if (nb.type == Chasm::Point::WALL)
-                            {
-                                if (nb.d > 1)
-                                {
-                                    nb.d -= 1;
-                                }
-                                else
-                                {
-                                    if (cell.d > 1)
-                                    {
-                                        nb.type = Chasm::Point::ACID;
-                                        nb.d = cell.d - 1;
-                                        nb.visited_points = cell.visited_points;
-                                    }
-                                    else
-                                    {
-                                        nb.type = Chasm::Point::VOID;
-                                        nb.d = 0;
-                                        nb.visited_points = {};
-                                    }
-                                    cell.type = Chasm::Point::VOID;
-                                    cell.d = 0;
-                                    cell.visited_points = {};
-                                }
-                            }
-                            else
-                            {
-                                nb.type = Chasm::Point::ACID; 
-                                nb.d = cell.d;
-                                nb.visited_points = cell.visited_points;
-                                cell.type = Chasm::Point::VOID;
-                                cell.d = 0;
-                                cell.visited_points = {};
-                            }
-
-                            auto p0 = (Pixel){x, y - 1};
-                            auto p1 = (Pixel){x - 1, y};
-                            auto p2 = (Pixel){x, y + 1};
-                            auto p3 = (Pixel){x + 1, y};
-                            switch (direction)
-                            {
-                                case Chasm::Direction::TOP:
-                                    mapping[p0] = nb;
-                                    break;
-                                case Chasm::Direction::LEFT:
-                                    mapping[p1] = nb;
-                                    break;
-                                case Chasm::Direction::BOTTOM:
-                                    mapping[p2] = nb;
-                                    break;
-                                case Chasm::Direction::RIGHT:
-                                    mapping[p3] = nb;
-                                    break;
-                            }
-                            mapping[p] = cell;
-                        }
+                        min_distance = distance;
+                        p_v = diff_v;
                     }
                 }
             }
-        }
-        return mapping;
-    };
 
-    inline auto SmoothStep(
-            const Rect& rect, 
-            std::unordered_map<Pixel, Chasm::Point, PixelHash, PixelEqual>&& mapping 
-    ){
-        for (auto x = rect.x + 1; x < rect.x + rect.w - 1; ++x)
-        {
-            for (auto y = rect.y + 1; y < rect.y + rect.h - 1; ++y)
+            if ((acid_visited.size() == points.size()))
             {
-                Pixel p {x, y};
-                auto alive = 0;
-                if (Chasm::Top(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::TopLeft(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::TopRight(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::Left(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::Right(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::Bottom(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::BottomLeft(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                if (Chasm::BottomRight(rect, x, y, mapping).type == Chasm::Point::WALL) ++alive;
-                
-                if (alive < 4) mapping[p] = {Chasm::Point::VOID, 0, {}}; 
+                // EXIT
+                acid_removal.push_back(acid_p);
+                visited_points.erase(acid_p);
+            }
+            else
+            {
+                std::vector<Chasm::Direction> dirs;
+                if (p_v.x > 0) for (auto i = 0; i < p_v.x; ++i) dirs.push_back(Chasm::Direction::LEFT);
+                if (p_v.x < 0) for (auto i = 0; i < -p_v.x; ++i) dirs.push_back(Chasm::Direction::RIGHT);
+                if (p_v.y > 0) for (auto i = 0; i < p_v.y; ++i) dirs.push_back(Chasm::Direction::TOP);
+                if (p_v.y < 0) for (auto i = 0; i < -p_v.y; ++i) dirs.push_back(Chasm::Direction::BOTTOM);
+
+                auto direction = dirs[rand() % (dirs.size() - 1)];
+                Pixel nb_p {0, 0};
+
+                // CHOOSE VALID DIRECTION
+                switch (direction)
+                {
+                    case Chasm::Direction::TOP:
+                        nb_p = {x, y - 1};
+                        break;
+                    case Chasm::Direction::LEFT:
+                        nb_p = {x - 1, y};
+                        break;
+                    case Chasm::Direction::BOTTOM:
+                        nb_p = {x, y + 1};
+                        break;
+                    case Chasm::Direction::RIGHT:
+                        nb_p = {x + 1, y};
+                        break;
+                }
+
+                // REMOVE ACID IF DIRECTION IS OUTSIDE RECT
+                if (!((nb_p.x > rect.x) && (nb_p.x < rect.x + rect.w - 1) && (nb_p.y > rect.y) && (nb_p.y < rect.y + rect.h - 1)))
+                {
+                    acid_removal.push_back(acid_p);
+                    continue;
+                }
+
+                auto& nb_visited = visited_points[nb_p];
+                auto nb_is_wall = walls.count(nb_p) > 0;
+                auto nb_is_acid = acids.count(nb_p) > 0;
+                auto nb_is_void = !nb_is_acid && !nb_is_wall;
+
+                if (nb_is_wall)
+                {
+                    walls.erase(nb_p);
+                    nb_visited.swap(acid_visited);
+                    acid_visited.clear();
+                    acid_removal.push_back(acid_p);
+                    acid_insert.push_back(nb_p); 
+                }
+                else if (nb_is_void)
+                {
+                    nb_visited.swap(acid_visited);
+                    acid_visited.clear();
+                    acid_removal.push_back(acid_p);
+                    acid_insert.push_back(nb_p); 
+                }
             }
         }
 
-        return mapping;
+        // UPDATE ACIDS
+        for (auto p: acid_removal) acids.erase(p);
+        for (auto p: acid_insert) acids.insert(p);
     };
+
+    inline void SmoothStep(const Rect& rect, std::unordered_set<Pixel, PixelHash, PixelEqual>& walls)
+    {
+        std::vector<Pixel> wall_removal;
+
+        for (auto p: walls)
+        {
+            auto x = p.x;
+            auto y = p.y;
+
+            if (x == rect.x)
+                continue;
+            if (x == rect.x + rect.w - 1)
+                continue;
+            if (y == rect.y)
+                continue;
+            if (y == rect.y + rect.h - 1)
+                continue;
+
+            auto alive = 0;        
+
+            Pixel top{x, y - 1};
+            Pixel top_left{x - 1, y - 1};
+            Pixel top_right{x + 1, y - 1};
+            Pixel bottom {x, y + 1};
+            Pixel bottom_left{x - 1, y + 1};
+            Pixel bottom_right {x + 1, y + 1};
+            Pixel left {x - 1, y};
+            Pixel right {x + 1, y};
+
+            if (walls.count(top) > 0) ++alive;
+            if (walls.count(left) > 0) ++alive;
+            if (walls.count(bottom) > 0) ++alive;
+            if (walls.count(right) > 0) ++alive;
+            if (walls.count(top_left) > 0) ++alive;
+            if (walls.count(top_right) > 0) ++alive;
+            if (walls.count(bottom_left) > 0) ++alive;
+            if (walls.count(bottom_right) > 0) ++alive;
+
+            if (alive < 4)
+                wall_removal.push_back(p);
+
+        }
+
+        for (auto p: wall_removal) walls.erase(p);
+    }
 };
 
 inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
 {
-    auto steps = 80;
     auto smooth_steps = 5;
-    auto spawn_every_x_steps = 8;
-    auto rect_mapping = Chasm::MappingFromRect(rect, map, 2);
+    auto points_count = 4 + rand() % 4;
 
-    auto points_count = 5 + rand() % 4;
+    std::unordered_map<Pixel, std::unordered_set<Pixel, PixelHash, PixelEqual>, PixelHash, PixelEqual> visited_points;
+    std::unordered_set<Pixel, PixelHash, PixelEqual> walls;
     std::unordered_set<Pixel, PixelHash, PixelEqual> points;
+    std::unordered_set<Pixel, PixelHash, PixelEqual> acids;
+
+    for (auto x = rect.x; x < rect.x + rect.w; ++x)
+    {
+        for (auto y = rect.y; y < rect.y + rect.h; ++y)
+        {
+            Pixel p = {x, y};
+            auto meta = map.GetMetadata(p);
+            if (meta.surface_structure != nullptr)
+                walls.insert(p);
+        }
+    }
 
     for (auto _ = 0; _ < points_count; ++_)
         points.insert({
@@ -616,37 +495,28 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
         });
 
     // SPAWN ACID FROM TOP
+    // TODO different strategy
     auto spawn_acid = [&](){
         for (auto x = rect.x; x < rect.x + rect.w; ++x)
         {
             auto p = (Pixel){x, rect.y};
-            rect_mapping[p] = {Chasm::Point::ACID, 20, {}};
+            acids.insert(p);
         }
     };
 
     // SIMULATE
-    for (auto i = 0; i < steps; ++i)
+    // TODO can froze
+    spawn_acid();
+    while (acids.size() > 0)
     {
-        if ((i % spawn_every_x_steps) == 0)
-            spawn_acid();
-
-        rect_mapping = Chasm::Step(rect, std::move(rect_mapping), points);
+        Chasm::Step(rect, walls, acids, points, visited_points);
     }
 
-    // SMOOTH
-    for (auto i = 0; i < smooth_steps; ++i)
-        rect_mapping = Chasm::SmoothStep(rect, std::move(rect_mapping));
+    // APPLY SMOOTH STEP
+    for (auto _ = 0; _ < smooth_steps; ++_) Chasm::SmoothStep(rect, walls);
 
     // PUSH RESULTS
-    for (auto x = rect.x; x < rect.x + rect.w; ++x)
-    {
-        for (auto y = rect.y; y < rect.y + rect.h; ++y)
-        {
-            auto p = (Pixel){x, y};
-            auto point = rect_mapping[p];
-            if (point.type == Chasm::Point::WALL) arr.add(p);
-        }
-    }
+    for (auto& p: walls) arr.add(p);
 };
 
 inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
@@ -699,14 +569,16 @@ EXPORT inline void DefineBiomes(Map& map)
     int ocean_width = 250;
     int tundra_width = 500;
     int jungle_width = 500;
-    Rect Surface = map.Surface().bbox();
-    Rect Hell = map.Hell().bbox();
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+    auto& Hell = map.Hell();
+    auto hell_rect = Hell.bbox();
 
     auto& ocean_left = map.Biome(Biomes::OCEAN_LEFT);
-    PixelsOfRect(0, Surface.y, ocean_width, Surface.h, ocean_left); 
+    PixelsOfRect(0, surface_rect.y, ocean_width, surface_rect.h, ocean_left); 
 
     auto& ocean_right = map.Biome(Biomes::OCEAN_RIGHT);
-    PixelsOfRect(width - ocean_width, Surface.y, ocean_width, Surface.h, ocean_right);
+    PixelsOfRect(width - ocean_width, surface_rect.y, ocean_width, surface_rect.h, ocean_right);
 
     // USE CSP TO FIND LOCATIONS FOR JUNGLE AND TUNDRA 
     // DEFINITION OF VARIABLES
@@ -747,7 +619,7 @@ EXPORT inline void DefineBiomes(Map& map)
         // DEFINITION OF JUNGLE
         auto jungle_x = result["jungle"];  
         auto& jungle = map.Biome(Biomes::JUNGLE);
-        for (int i = Surface.y; i < Hell.y; i++)
+        for (int i = surface_rect.y; i < hell_rect.y; i++)
         {
             PixelsAroundRect(jungle_x - i, i, jungle_width, 2, jungle);
         }
@@ -755,14 +627,14 @@ EXPORT inline void DefineBiomes(Map& map)
         // DEFINITION OF TUNDRA
         auto tundra_x = result["tundra"];
         auto& tundra = map.Biome(Biomes::TUNDRA);
-        for (int i = Surface.y; i < Hell.y; i++)
+        for (int i = surface_rect.y; i < hell_rect.y; i++)
         {
             PixelsAroundRect(tundra_x - i, i, tundra_width, 2, tundra);
         }
 
         // DEFINITION OF FORESTS
         PixelArray forests;
-        FillWithRect(Rect(0, Surface.y, width, Hell.y - Surface.y), forests);
+        FillWithRect(Rect(0, surface_rect.y, width, hell_rect.y - surface_rect.y), forests);
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
         for (auto pixel: ocean_left) { forests.remove(pixel); }
@@ -1269,6 +1141,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
 {
     printf("GenerateCliffsTransitions\n");
 
+    auto D_STRUCTURES = Structures::HOLE;
     auto surface_rect = map.Surface().bbox();
     auto* s_one = map.GetSurfaceBegin();
     auto* s_two = s_one->Next(); 
@@ -1276,17 +1149,17 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
     do {
         Pixel p0 = {s_one->EndX(), s_one->EndY()};
         Pixel p1 = {s_two->StartX(), s_two->StartY()};
+        
         auto meta0 = map.GetMetadata(p0);
         auto meta1 = map.GetMetadata(p1);
-        
-        printf("p0 = [%d,%d], p1 = [%d,%d]\n", p0.x, p0.y, p1.x, p1.y);
 
-        if ((meta0.structure == nullptr) && (meta1.structure == nullptr))
-        {
+        if (((meta0.structure == nullptr) || (meta0.structure != nullptr && meta0.structure->GetType() != D_STRUCTURES)) &&
+            ((meta1.structure == nullptr) || (meta1.structure != nullptr && meta1.structure->GetType() != D_STRUCTURES)))
+        { 
             auto sign = 1 ? p0.y < p1.y : -1;
-
             auto y_diff = abs(p0.y - p1.y);
-            if (y_diff >= 25 && y_diff <= 35) // CLIFF
+
+            if (y_diff >= 20 && y_diff <= 35) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
@@ -1294,19 +1167,18 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 if (sign > 0) // RIGHT
                 {
                     rect.x = p0.x;
-                    rect.y = p0.y - rand() % 5; // POINTING UPWARDS
+                    rect.y = p0.y;
                 }
                 else // LEFT
                 {
                     rect.x = p1.x - rect.w;
-                    rect.y = p1.y - rand() % 5; // POINTING UPWARDS 
+                    rect.y = p1.y;
                 }
 
                 auto& cliff = map.SurfaceStructure(Structures::CLIFF);
                 CreateCliff(rect, cliff, p0, p1);
-                //FillWithRect(rect, cliff);
             }
-            else // TRANSITION
+            else if (y_diff > 3) // TRANSITION
             { 
                 Rect rect;
                 rect.w = 40 + rand() % 30;
@@ -1317,13 +1189,6 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 {
                     rect.x = p0.x;
                     rect.y = p0.y;
-                    while (rect.w > 0) {
-                        auto m = map.GetMetadata({rect.x + rect.w, rect.y});
-                        if (m.structure != nullptr)
-                            rect.w -= 1;
-                        else
-                            break;
-                    }
                     auto* part = map.GetSurfacePart(rect.x + rect.w);
                     while (part == nullptr) { rect.w -= 1; part = map.GetSurfacePart(rect.x + rect.w); }
                     p = {rect.x + rect.w, part->GetY(rect.x + rect.w)};
@@ -1332,25 +1197,15 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 {
                     rect.x = p1.x - rect.w;
                     rect.y = p1.y; 
-                    while (rect.w > 0) {
-                        auto m = map.GetMetadata({rect.x, rect.y});
-                        if (m.structure != nullptr)
-                        {
-                            rect.w -= 1;
-                            rect.x += 1;
-                        }
-                        else
-                            break;
-                    }
                     auto* part = map.GetSurfacePart(rect.x);
+                    while (part == nullptr) { rect.x += 1; rect.w -= 1; part = map.GetSurfacePart(rect.x); }
                     p = {rect.x, part->GetY(rect.x)};
                 }
 
-                if (abs(rect.y - p.y) > 2)
+                if ((p.y - rect.y) > 2)
                 {
                     auto& transition = map.SurfaceStructure(Structures::TRANSITION);
                     CreateTransition(rect, transition, p); 
-                    //FillWithRect(rect, transition);
                 }
             }
         }
@@ -1362,17 +1217,17 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
 
 EXPORT inline void GenerateChasms(Map& map)
 {
-    printf("GenerateChasms");
+    printf("GenerateChasms\n");
 
-    auto Surface = map.Surface();
-    auto& ocean_left = map.Biome(Biomes::OCEAN_LEFT);
-    auto ocean_left_rect = ocean_left.bbox();
-    auto& ocean_right = map.Biome(Biomes::OCEAN_LEFT);
-    auto ocean_right_rect = ocean_right.bbox();
     auto width = map.Width();
+    auto Surface = map.Surface();
+    auto* ocean_left = map.GetBiome(Biomes::OCEAN_LEFT);
+    auto ocean_left_rect = ocean_left->bbox();
+    auto* ocean_right = map.GetBiome(Biomes::OCEAN_LEFT);
+    auto ocean_right_rect = ocean_right->bbox();
     auto surface_rect = Surface.bbox();
-    auto chasms_count = 2 + (int)(map.ChasmFrequency() * 10);
-    auto chasm_width = 50;
+    auto chasms_count = 2 + (int)(map.ChasmFrequency() * 15);
+    auto chasm_width = 70;
 
     for (auto c = 0; c < chasms_count + 1; ++c)
     {
@@ -1407,20 +1262,19 @@ EXPORT inline void GenerateGrass(Map& map)
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
     auto& grass = map.SurfaceStructure(Structures::GRASS);
-    auto* surface_part = map.GetSurfaceBegin();
-
     auto A_STRUCT = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
                 Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL |
                 Structures::CHASM;
     auto A_BIOMES = Biomes::FOREST | Biomes::JUNGLE;
+
     std::unordered_set<Pixel, PixelHash, PixelEqual> visited;
     std::vector<Pixel> queue;
     auto traverse = [&](Pixel start)
     {
-       queue.push_back(start); 
+        queue.push_back(start); 
 
-       while (queue.size() > 0)
-       {
+        while (queue.size() > 0)
+        {
             auto p = queue.back();
             queue.pop_back();
             if (visited.count(p) == 1)
@@ -1449,41 +1303,32 @@ EXPORT inline void GenerateGrass(Map& map)
                 queue.push_back({p.x + 1, p.y + 1});
                 queue.push_back({p.x + 1, p.y - 1});
             }
-       }
+        }
     };
 
-    do 
+    auto* start_part = map.GetSurfaceBegin();
+    auto* end_part = map.GetSurfaceEnd();
+    for (auto x = start_part->StartX(); x < end_part->EndX(); ++x)
     {
-        auto sp = (Pixel){surface_part->StartX(), surface_rect.y};
-        while (sp.y < (surface_rect.y + surface_rect.h - 1)) 
+        auto p = (Pixel){x, surface_rect.y + surface_rect.h / 3};
+        auto found = false;
+        while (!found && (p.y < (surface_rect.y + surface_rect.h - 1))) 
         {
-            auto meta = map.GetMetadata(sp);
+            auto meta = map.GetMetadata(p);
             if (meta.surface_structure == nullptr)
-                sp.y += 1;
+                p.y += 1;
             else
-                break;
+                found = true;
         }
-        auto ep = (Pixel){surface_part->EndX(), surface_rect.y};
-        while (ep.y < (surface_rect.y + surface_rect.h - 1)) 
-        {
-            auto meta = map.GetMetadata(ep);
-            if (meta.surface_structure == nullptr)
-                ep.y += 1;
-            else
-                break;
-        }
- 
-        traverse(sp);
-        traverse(ep);
-        surface_part = surface_part->Next();
+
+        if (found) traverse(p);
     } 
-    while (surface_part != nullptr);
 };
 
 EXPORT inline void GenerateTrees(Map& map)
 {
     printf("Generate Trees\n");
-    auto count = 150;
+    auto count = 100 + (int)(map.TreeFrequency() * 200);
 
     auto* grass = map.GetSurfaceStructures(Structures::GRASS)[0];
     auto size = grass->size(); 

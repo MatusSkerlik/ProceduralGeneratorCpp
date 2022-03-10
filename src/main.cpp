@@ -56,6 +56,7 @@ using namespace std::chrono_literals;
 #define ICE               (Color){255, 255, 255, 255}
 #define C_GRASS           (Color){28, 216, 94, 255}
 #define C_JGRASS          (Color){143, 215, 29, 255}
+#define CAVE_BG           (Color){87, 60, 48, 255}
 
 #define C_SPACE           (Color){51, 102, 153, 255}
 #define C_SURFACE         (Color){155, 209, 255, 255}
@@ -197,6 +198,8 @@ void DrawSurface(Map& map)
             auto meta = map.GetMetadata({x, y});
             if (meta.surface_structure != nullptr)
             {
+
+                // BIOME RELATED
                 if (meta.biome != nullptr)
                 {
                     if (meta.biome->GetType() == Biomes::JUNGLE)
@@ -216,14 +219,22 @@ void DrawSurface(Map& map)
                         else
                             DrawPixel(x, y, DIRT);
                 }
-                else 
+                else
                 {
                     DrawPixel(x, y, DIRT);
                 }
-
+                
+                // BIOME NOT PRESENT 
                 if (meta.surface_structure->GetType() == Structures::TREE)
-                {
                     DrawPixel(x, y, (Color){191, 143, 111, 255});
+            }
+            else
+            {
+                // DRAW CAVE BACKGROUND WHERE CHASM IS BELOWE SURFACE LEVEL
+                if ((meta.structure != nullptr) && (meta.structure->GetType() == Structures::CHASM))
+                {
+                    auto* part = map.GetSurfacePart(x);
+                    if ((part != nullptr) && (y > part->GetY(x))) DrawPixel(x, y, CAVE_BG);
                 }
             }
         }
@@ -484,9 +495,11 @@ void PCGRegenerateHorizontalAreas(Map& map)
 *
 **************************************************/
 
-void ChangeSeed()
+void ChangeSeed(char* SeedTextBoxText)
 {
-
+    auto seed = (rand() * rand()) % INT_MAX;
+    srand(seed);
+    strcpy(SeedTextBoxText, std::to_string(seed).c_str());
 };
 
 void Pass(){};
@@ -521,7 +534,8 @@ int main(void)
     Rectangle map_view {map_view_anchor.x, map_view_anchor.y, map_view_width, map_view_height};
 
     bool SeedTextBoxEditMode = false;
-    char SeedTextBoxText[128] = "0";
+    char SeedTextBoxText[128];
+    ChangeSeed(SeedTextBoxText);
     int TabActive = 0;
 
     Rectangle ScrollView = {0, 0, 0, 0};
@@ -616,7 +630,10 @@ int main(void)
                 GuiGroupBox((Rectangle){em, em, 2 * em + 300, height - 2 * em}, "SETTINGS");
 
                 if (GuiButton((Rectangle){2 * em + im + 92, 2 * em, 64, 24}, "Seed"))
-                    ChangeSeed();
+                {
+                    ChangeSeed(SeedTextBoxText);
+                    PCGRegenerateHorizontalAreas(map);
+                }
 
                 if (GuiTextBox((Rectangle){ 2 * em, 2 * em, 92, 24}, SeedTextBoxText, 128, SeedTextBoxEditMode))
                     SeedTextBoxEditMode = !SeedTextBoxEditMode;
@@ -673,7 +690,7 @@ int main(void)
                         PCGRegenerateStructureDefinition(map);
                     if (map.ChasmFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * im + 8 * 24, 92, 24}, "", "", map.ChasmFrequency(), 0.0, 1.0)))
                         PCGRegenerateStructureDefinition(map);
-                }
+                 }
                 else
                 {
                     GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "");
@@ -683,12 +700,15 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "PARTS");
                     GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "FREQUENCY");
                     GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "OCTAVES");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "TREES");
 
                     if (map.SurfacePartsCount(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.SurfacePartsCount(), 0.0, 1.0)))
                         PCGRegenerateSurface(map);
                     if (map.SurfacePartsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.SurfacePartsFrequency(), 0.0, 1.0)))
                         PCGRegenerateSurface(map);
                     if (map.SurfacePartsOctaves(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SurfacePartsOctaves(), 0.0, 1.0)))
+                        PCGRegenerateSurface(map);
+                    if (map.TreeFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.TreeFrequency(), 0.0, 1.0)))
                         PCGRegenerateSurface(map);
                }
 

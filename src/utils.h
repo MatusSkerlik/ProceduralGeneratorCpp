@@ -302,14 +302,15 @@ class Map {
         float _GOLD_SIZE = 0.5;
 
         float _HILLS_FREQUENCY = 0.5;
-        float _HOLES_FREQUENCY = 0.5;
+        float _HOLES_FREQUENCY = 0.2;
         float _CABINS_FREQUENCY = 0;
         float _ISLANDS_FREQUENCY = 0.5;
         float _CHASM_FREQUENCY = 0.0;
+        float _TREE_FREQUENCY = 0.4;
 
-        float _SURFACE_PARTS_COUNT = 0;
+        float _SURFACE_PARTS_COUNT = 0.5;
         float _SURFACE_PARTS_FREQUENCY = 0.5;
-        float _SURFACE_PARTS_OCTAVES = 0;
+        float _SURFACE_PARTS_OCTAVES = 0.25;
 
         std::atomic_bool _initialized { false };
         std::atomic_bool _force_stop {false };
@@ -582,6 +583,24 @@ class Map {
             return false;
         };
 
+        auto TreeFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _TREE_FREQUENCY;
+        };
+
+        auto TreeFrequency(float fq)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_TREE_FREQUENCY != fq)
+            {
+                _TREE_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
+
+
         auto SurfacePartsCount()
         {
             const std::lock_guard<std::mutex> lock(mutex);
@@ -819,8 +838,7 @@ class Map {
         Structures::SurfacePart* GetSurfacePart(int sx)
         {
             Structures::SurfacePart* s_part = GetSurfaceBegin();
-            if (s_part == nullptr) return nullptr;
-            while (!((s_part->StartX() <= sx) && (s_part->EndX() >= sx))) { s_part = s_part->Next(); }
+            while ((s_part != nullptr) && !((s_part->StartX() <= sx) && (s_part->EndX() >= sx))) { s_part = s_part->Next(); }
             return s_part;
         };
 
