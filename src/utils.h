@@ -177,7 +177,9 @@ namespace Biomes {
         JUNGLE = 2, 
         TUNDRA = 4, 
         OCEAN_LEFT = 8, 
-        OCEAN_RIGHT = 16 
+        OCEAN_RIGHT = 16,
+        OCEAN_DESERT_LEFT = 32,
+        OCEAN_DESERT_RIGHT = 64
     };
 
     class Biome: public PixelArray 
@@ -213,7 +215,9 @@ namespace Structures {
         GRASS = 512, 
         CASTLE = 1024,
         TREE = 2048,
-        CHASM = 4096
+        CHASM = 4096,
+        SAND = 8192,
+        WATER = 16384
     }; 
     
     class Structure: public PixelArray 

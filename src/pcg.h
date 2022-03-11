@@ -602,10 +602,11 @@ EXPORT inline void DefineBiomes(Map& map)
 {
     printf("DefineBiomes\n");
 
-    int width = map.Width();
-    int ocean_width = 250;
-    int tundra_width = 500;
-    int jungle_width = 500;
+    auto width = map.Width();
+    auto ocean_width = 250;
+    auto ocean_desert_width = 100; 
+    auto tundra_width = 500;
+    auto jungle_width = 500;
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
     auto& Hell = map.Hell();
@@ -617,12 +618,18 @@ EXPORT inline void DefineBiomes(Map& map)
     auto& ocean_right = map.Biome(Biomes::OCEAN_RIGHT);
     PixelsOfRect(width - ocean_width, surface_rect.y, ocean_width, surface_rect.h, ocean_right);
 
+    auto& ocean_desert_left = map.Biome(Biomes::OCEAN_DESERT_LEFT);
+    PixelsOfRect(ocean_width, surface_rect.y, ocean_desert_width, surface_rect.h, ocean_desert_left); 
+
+    auto& ocean_desert_right = map.Biome(Biomes::OCEAN_DESERT_RIGHT);
+    PixelsOfRect(width - ocean_width - ocean_desert_width, surface_rect.y, ocean_desert_width, surface_rect.h, ocean_desert_right); 
+
     // USE CSP TO FIND LOCATIONS FOR JUNGLE AND TUNDRA 
     // DEFINITION OF VARIABLES
     std::unordered_set<std::string> variables {"jungle", "tundra"};
     
     // DEFINITION OF DOMAIN
-    auto domain = Domain(ocean_width + 50, width - 2 * ocean_width - 50, 50);
+    auto domain = Domain(ocean_width + ocean_desert_width + 50, width - (2 * ocean_width + 2 * ocean_desert_width) - 50, 50);
     
     // DEFINITION OF DOMAIN FOR EACH VARIABLE
     std::unordered_map<std::string, std::unordered_set<int>> domains;
@@ -675,7 +682,9 @@ EXPORT inline void DefineBiomes(Map& map)
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
         for (auto pixel: ocean_left) { forests.remove(pixel); }
+        for (auto pixel: ocean_desert_left) { forests.remove(pixel); }
         for (auto pixel: ocean_right) { forests.remove(pixel); }
+        for (auto pixel: ocean_desert_right) { forests.remove(pixel); }
         for (auto pixel: jungle) { forests.remove(pixel); }
         for (auto pixel: tundra) { forests.remove(pixel); }
 
@@ -703,6 +712,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
     int floating_island_count = map.IslandsFrequency() * 8;
 
     int ocean_width = 250;
+    int ocean_desert_width = 100;
     int hill_width = 80;
     int hole_width = 80;
     int island_width = 120;
@@ -717,7 +727,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
     auto variables = JoinVariables(hills, JoinVariables(holes, islands));
     
     // DEFINITION OF DOMAIN
-    auto domain = Domain(ocean_width + 50, width - 2 * ocean_width - 50, 50);
+    auto domain = Domain(ocean_width + ocean_desert_width + 50, width - (2 * ocean_width + 2 * ocean_desert_width) - 50, 50);
     
     // DEFINITION OF DOMAIN FOR EACH VARIABLE
     std::unordered_map<std::string, std::unordered_set<int>> domains;
@@ -1105,6 +1115,118 @@ EXPORT inline void DefineSurface(Map& map)
     }
 };
 
+EXPORT inline void GenerateOceanLeft(Map& map)
+{
+    printf("GenerateOceanLeft\n");
+
+    auto* Ocean = map.GetBiome(Biomes::OCEAN_LEFT);
+    auto ocean_rect = Ocean->bbox();
+    auto* OceanDesert = map.GetBiome(Biomes::OCEAN_DESERT_LEFT);
+    auto ocean_desert_rect = OceanDesert->bbox();
+    
+    auto* part = map.GetSurfaceBegin();
+    auto ocean_start_y = ocean_rect.y + ocean_rect.h;
+    auto ocean_end_y = part->GetY(part->StartX());
+    part = map.GetSurfacePart(ocean_desert_rect.x + ocean_desert_rect.w);
+    auto desert_end_y = part->GetY(ocean_desert_rect.x + ocean_desert_rect.w); 
+    auto ocean_sand_thickness = 25;
+
+    auto m_ocean = (float)(ocean_start_y - ocean_end_y) / ocean_rect.w;
+    auto m_desert = (float)(ocean_start_y - desert_end_y) / (ocean_rect.w + ocean_desert_rect.w);
+
+    // GENERATE SAND IN ONEAN BIOME
+    auto& ocean_sand = map.SurfaceStructure(Structures::SAND);
+    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    {
+        auto y0 = (int)(ocean_start_y - (x * m_ocean));
+        auto y1 = (int)(ocean_start_y - (x * m_desert) + ocean_sand_thickness + rand() % 5);
+        for (auto y = y0; y < y1; ++y)
+        {
+            ocean_sand.add({x, y});
+        }
+    }
+
+    // GENERATE SAND IN DESERT BIOME
+    for (auto x = ocean_desert_rect.x; x < ocean_desert_rect.x + ocean_desert_rect.w + 1; x++)
+    {
+        part = map.GetSurfacePart(x);
+        auto thickness_ratio = (float)1 - ((float)(x - ocean_desert_rect.x) / ocean_desert_rect.w);
+        auto y0 = part->GetY(x); 
+        auto y1 = (int)(ocean_start_y - (x * m_desert) + ((ocean_sand_thickness + rand() % 5) * thickness_ratio)); 
+        for (auto y = y0; y < y1; ++y)
+        {
+            ocean_sand.add({x, y});
+        }
+    }
+
+    // GENERATE WATER IN OCEAN
+    auto& ocean_water = map.SurfaceStructure(Structures::WATER);
+    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    {
+        auto y0 = (int)(ocean_start_y - (x * m_ocean));
+        for (auto y = y0; y > ocean_end_y; --y)
+        {
+            ocean_water.add({x, y});
+        }
+    }
+};
+
+EXPORT inline void GenerateOceanRight(Map& map)
+{
+    printf("GenerateOceanRight\n");
+
+    auto* Ocean = map.GetBiome(Biomes::OCEAN_RIGHT);
+    auto ocean_rect = Ocean->bbox();
+    auto* OceanDesert = map.GetBiome(Biomes::OCEAN_DESERT_RIGHT);
+    auto ocean_desert_rect = OceanDesert->bbox();
+    
+    auto* part = map.GetSurfaceEnd();
+    auto ocean_start_y = part->GetY(part->EndX());
+    auto ocean_end_y = ocean_rect.y + ocean_rect.h;
+    part = map.GetSurfacePart(ocean_desert_rect.x);
+    auto desert_start_y = part->GetY(ocean_desert_rect.x); 
+    auto ocean_sand_thickness = 25;
+
+    auto m_ocean = (float)(ocean_start_y - ocean_end_y) / ocean_rect.w;
+    auto m_desert = (float)(desert_start_y - ocean_end_y) / (ocean_rect.w + ocean_desert_rect.w);
+
+    // GENERATE SAND IN ONEAN BIOME
+    auto& ocean_sand = map.SurfaceStructure(Structures::SAND);
+    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    {
+        auto y0 = (int)(ocean_start_y - ((x - ocean_rect.x) * m_ocean));
+        auto y1 = (int)(desert_start_y - ((x - ocean_desert_rect.x) * m_desert) + ocean_sand_thickness + rand() % 5);
+        for (auto y = y0; y < y1; ++y)
+        {
+            ocean_sand.add({x, y});
+        }
+    }
+
+    // GENERATE SAND IN DESERT BIOME
+    for (auto x = ocean_desert_rect.x; x < ocean_desert_rect.x + ocean_desert_rect.w + 1; x++)
+    {
+        part = map.GetSurfacePart(x);
+        auto thickness_ratio = (float)(x - ocean_desert_rect.x) / ocean_desert_rect.w;
+        auto y0 = part->GetY(x); 
+        auto y1 = (int)(desert_start_y - ((x - ocean_desert_rect.x) * m_desert)) + ((ocean_sand_thickness + rand() % 5) * thickness_ratio); 
+        for (auto y = y0; y < y1; ++y)
+        {
+            ocean_sand.add({x, y});
+        }
+    }
+
+    // GENERATE WATER IN OCEAN
+    auto& ocean_water = map.SurfaceStructure(Structures::WATER);
+    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    {
+        auto y0 = (int)(ocean_start_y + ((ocean_rect.x - x) * m_ocean));
+        for (auto y = y0; y > ocean_start_y; --y)
+        {
+            ocean_water.add({x, y});
+        }
+    }
+};
+
 EXPORT inline void GenerateHills(Map& map)
 {
     printf("GenerateHills\n");
@@ -1183,6 +1305,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
     printf("GenerateCliffsTransitions\n");
 
     auto D_STRUCTURES = Structures::HOLE;
+    auto A_BIOMES = Biomes::FOREST | Biomes::JUNGLE;
     auto surface_rect = map.Surface().bbox();
     auto* s_one = map.GetSurfaceBegin();
     auto* s_two = s_one->Next(); 
@@ -1200,7 +1323,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
             auto sign = 1 ? p0.y < p1.y : -1;
             auto y_diff = abs(p0.y - p1.y);
 
-            if (y_diff >= 20 && y_diff <= 35) // CLIFF
+            if ((y_diff >= 20) && (y_diff <= 35) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
@@ -1266,19 +1389,27 @@ EXPORT inline void GenerateChasms(Map& map)
     auto Surface = map.Surface();
     auto* ocean_left = map.GetBiome(Biomes::OCEAN_LEFT);
     auto ocean_left_rect = ocean_left->bbox();
+
+    auto* ocean_desert_left = map.GetBiome(Biomes::OCEAN_DESERT_LEFT);
+    auto ocean_desert_left_rect = ocean_desert_left->bbox();
+
     auto* ocean_right = map.GetBiome(Biomes::OCEAN_LEFT);
     auto ocean_right_rect = ocean_right->bbox();
+
+    auto* ocean_desert_right = map.GetBiome(Biomes::OCEAN_DESERT_RIGHT);
+    auto ocean_desert_right_rect = ocean_desert_right->bbox();
+
     auto surface_rect = Surface.bbox();
     auto chasms_count = 2 + (int)(map.ChasmFrequency() * 15);
     auto chasm_width = 70;
 
-    for (auto c = 0; c < chasms_count + 1; ++c)
+    for (auto c = 0; c < chasms_count; ++c)
     {
         auto w = chasm_width + (rand() % 41) - 20;
-        auto a_w = width - ocean_left_rect.w - ocean_right_rect.w - w; 
-        auto x = ocean_left_rect.w + (rand() % a_w);
+        auto a_w = width - ocean_left_rect.w - ocean_right_rect.w - ocean_desert_left_rect.w - ocean_desert_right_rect.w - w; 
+        auto x = ocean_left_rect.w + ocean_desert_left_rect.w + (rand() % a_w);
 
-        Rect chasm_rect = {x - w / 2, surface_rect.y + surface_rect.h / 3, w, surface_rect.h / 2}; 
+        Rect chasm_rect = {x, surface_rect.y + surface_rect.h / 3, w, surface_rect.h / 2}; 
 
         auto& chasm = map.Structure(Structures::CHASM);
         FillWithRect(chasm_rect, chasm);

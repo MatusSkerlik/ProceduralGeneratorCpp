@@ -31,6 +31,8 @@ PCG_FUNC DefineHillsHolesIslands;
 PCG_FUNC DefineCabins;
 PCG_FUNC DefineCastles;
 PCG_FUNC DefineSurface;
+PCG_FUNC GenerateOceanLeft;
+PCG_FUNC GenerateOceanRight;
 PCG_FUNC GenerateHills;
 PCG_FUNC GenerateHoles;
 PCG_FUNC GenerateIslands;
@@ -52,11 +54,12 @@ using namespace std::chrono_literals;
 *************************************************/
 #define DIRT              (Color){151, 107, 75, 255}
 #define MUD               (Color){92, 68, 73, 255}
-#define SAND              (Color){255, 218, 56, 255}
+#define C_SAND            (Color){255, 218, 56, 255}
 #define ICE               (Color){255, 255, 255, 255}
 #define C_GRASS           (Color){28, 216, 94, 255}
 #define C_JGRASS          (Color){143, 215, 29, 255}
 #define CAVE_BG           (Color){87, 60, 48, 255}
+#define C_WATER           (Color){65, 88, 151, 255}
 
 #define C_SPACE           (Color){51, 102, 153, 255}
 #define C_SURFACE         (Color){155, 209, 255, 255}
@@ -215,7 +218,7 @@ void DrawSurface(Map& map)
     auto surface_rect = map.Surface().bbox();
     for (auto x = surface_rect.x; x < surface_rect.x + surface_rect.w; ++x)
     {
-        for (auto y = 0; y < surface_rect.y + surface_rect.h; ++y)
+        for (auto y = 0; y < surface_rect.y + surface_rect.h + 200; ++y)
         {
             auto meta = map.GetMetadata({x, y});
             if (meta.surface_structure != nullptr)
@@ -231,10 +234,6 @@ void DrawSurface(Map& map)
                             DrawPixel(x, y, MUD);
                     else if (meta.biome->GetType() == Biomes::TUNDRA)
                         DrawPixel(x, y, ICE);
-                    else if (meta.biome->GetType() == Biomes::OCEAN_LEFT)
-                        DrawPixel(x, y, SAND);
-                    else if (meta.biome->GetType() == Biomes::OCEAN_RIGHT)
-                        DrawPixel(x, y, SAND);
                     else
                         if (meta.surface_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_GRASS);
@@ -249,6 +248,10 @@ void DrawSurface(Map& map)
                 // BIOME NOT PRESENT 
                 if (meta.surface_structure->GetType() == Structures::TREE)
                     DrawPixel(x, y, (Color){191, 143, 111, 255});
+                if (meta.surface_structure->GetType() == Structures::WATER)
+                    DrawPixel(x, y, C_WATER);
+                if (meta.surface_structure->GetType() == Structures::SAND)
+                    DrawPixel(x, y, C_SAND);
             }
         }
     }
@@ -296,6 +299,8 @@ bool LoadPCG()
     GenerateChasms = (PCG_FUNC) GetProcAddress(module, "GenerateChasms");
     GenerateGrass = (PCG_FUNC) GetProcAddress(module, "GenerateGrass");
     GenerateTrees = (PCG_FUNC) GetProcAddress(module, "GenerateTrees");
+    GenerateOceanLeft = (PCG_FUNC) GetProcAddress(module, "GenerateOceanLeft");
+    GenerateOceanRight = (PCG_FUNC) GetProcAddress(module, "GenerateOceanRight");
     return true;
 };
 
@@ -401,6 +406,10 @@ void _PCGGen(Map& map)
         GenerateHoles(map);
         map.SetGenerationMessage("GENERATION OF CLIFFS AND TRANSITIONS...");
         GenerateCliffsTransitions(map);
+        map.SetGenerationMessage("GENERATION OF LEFT OCEAN...");
+        GenerateOceanLeft(map);
+        map.SetGenerationMessage("GENERATION OF RIGHT OCEAN...");
+        GenerateOceanRight(map);
         map.SetGenerationMessage("GENERATION OF CHASMS...");
         GenerateChasms(map);
         map.SetGenerationMessage("GENERATION OF ISLANDS...");
@@ -768,6 +777,12 @@ int main(void)
                                     break;
                                 case Biomes::OCEAN_RIGHT:
                                     DrawText("OCEAN", mx, my - 32, 16, RED);
+                                    break;
+                                case Biomes::OCEAN_DESERT_LEFT:
+                                    DrawText("DESERT", mx, my - 32, 16, RED);
+                                    break;
+                                case Biomes::OCEAN_DESERT_RIGHT:
+                                    DrawText("DESERT", mx, my - 32, 16, RED);
                                     break;
                             }
                         }
