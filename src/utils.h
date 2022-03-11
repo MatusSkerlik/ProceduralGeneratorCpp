@@ -134,7 +134,7 @@ class PixelArray
         virtual void remove(int x, int y) { remove((Pixel){x, y}); };
         virtual void clear() { _set_pixels.clear(); };
 
-        Rect bbox()
+        Rect bbox() const 
         {
             int minx = std::numeric_limits<int>::max();
             int miny = std::numeric_limits<int>::max();
@@ -191,7 +191,7 @@ namespace Biomes {
             Biome(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
             ~Biome() { clear(); };
 
-            auto GetType(){ return type; }
+            auto GetType() const { return type; }
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
@@ -227,7 +227,7 @@ namespace Structures {
             Structure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
             ~Structure(){ clear(); };
             
-            auto GetType(){ return type; }
+            auto GetType() const { return type; }
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
@@ -244,7 +244,7 @@ namespace Structures {
             SurfaceStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
             ~SurfaceStructure(){ clear(); };
             
-            auto GetType(){ return type; }
+            auto GetType() const { return type; }
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
@@ -270,20 +270,21 @@ namespace Structures {
             before{_before}, next{_next} 
             {};
 
-            auto StartX() { return sx; };
-            auto EndX() { return ex; };
-            auto StartY() { return sy; };
-            auto EndY() { return ey; };
-            auto BaseY() { return by; };
+            auto StartX() const { return sx; };
+            auto EndX() const { return ex; };
+            auto StartY() const { return sy; };
+            auto EndY() const { return ey; };
+            auto BaseY() const { return by; };
 
-            auto Before() { return before; };
+            auto Before() const { return before; };
             void SetBefore(SurfacePart* _before) { before = _before; };
-            auto Next() { return next; };
+            auto Next() const { return next; };
             void SetNext(SurfacePart* _next) { next = _next; };
 
             void AddY(int y) { ypsilons.push_back(y); };
-            auto GetY(int x) { return ypsilons.at(x - sx); };
-            auto GetYpsilons() { return ypsilons; };
+            void SetY(int x, int y) { ypsilons[x - sx] = y; };
+            auto GetY(int x) const { return ypsilons.at(x - sx); };
+            auto GetYpsilons() const { return ypsilons; };
    };
 };
 

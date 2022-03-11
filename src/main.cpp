@@ -172,6 +172,28 @@ void DrawSurfaceStructures(Map& map)
     }
 };
 
+void DrawSurfaceBg(Map& map)
+{
+    auto Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+    auto* part = map.GetSurfaceBegin();
+
+    while (part != nullptr)
+    {
+        for (auto x = part->StartX(); x < part->EndX() + 1; ++x)
+        {
+            auto y = part->GetY(x) + 1;
+
+            for (auto _y = y; _y < surface_rect.y + surface_rect.h; ++_y)
+            {
+                DrawPixel(x, _y, CAVE_BG);
+            }
+
+        }
+        part = part->Next();
+    }
+};
+
 void DrawSurfaceDebug(Map& map)
 {
     auto surface_rect = map.Surface().bbox();
@@ -227,15 +249,6 @@ void DrawSurface(Map& map)
                 // BIOME NOT PRESENT 
                 if (meta.surface_structure->GetType() == Structures::TREE)
                     DrawPixel(x, y, (Color){191, 143, 111, 255});
-            }
-            else
-            {
-                // DRAW CAVE BACKGROUND WHERE CHASM IS BELOWE SURFACE LEVEL
-                if ((meta.structure != nullptr) && (meta.structure->GetType() == Structures::CHASM))
-                {
-                    auto* part = map.GetSurfacePart(x);
-                    if ((part != nullptr) && (y > part->GetY(x))) DrawPixel(x, y, CAVE_BG);
-                }
             }
         }
     }
@@ -327,7 +340,6 @@ void _PCGGen(Map& map)
     {
         map.ClearStage0();
         map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
-        printf("DefineHorizontal\n");
         DefineHorizontal(map);
     }
     DrawStage0 = true;
@@ -594,6 +606,7 @@ int main(void)
                 DrawHorizontal(map);
                 //DrawStructures(map);
                 //DrawSurfaceStructures(map);
+                DrawSurfaceBg(map);
                 DrawSurface(map);
                 DrawSurfaceDebug(map);
             EndTextureMode();

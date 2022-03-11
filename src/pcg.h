@@ -234,16 +234,30 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
     Point polygon[size]; 
     for (auto t = 0; t < size; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
 
+    PixelArray a0;
+    PixelArray a1;
     for (auto x = rect.x; x < rect.x + rect.w; ++x)
+    {
         for (auto y = rect.y; y < rect.y + rect.h; ++y)
-            if (s.y < e.y)
+        {
+            Pixel p {x, y};
+            if (CNPnPoly({x, y}, polygon, size))
             {
-                if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
+                a0.add(p);
             }
             else
             {
-                if (!CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
+                a1.add(p);
             }
+        }
+    }
+
+    if (a0.contains(s) || a0.contains(e))
+        for (auto p: a0)
+            arr.add(p);
+    else
+        for (auto p: a1)
+            arr.add(p);
 };
 
 /*
@@ -337,13 +351,15 @@ namespace Chasm
             {
                 if (acid_visited.count(p) == 0)
                 {
-                    auto diff_v = Pixel(x - p.x, y - p.y);
-                    auto distance = sqrt((diff_v.x * diff_v.x) + (diff_v.y * diff_v.y));
-                    if (distance < 5)
+                    if (p.x == x && p.y == y)
                     {
                         acid_visited.insert(p);
+                        continue;
                     }
-                    else if (distance < min_distance)
+
+                    auto diff_v = Pixel(x - p.x, y - p.y);
+                    auto distance = sqrt((diff_v.x * diff_v.x) + (diff_v.y * diff_v.y));
+                    if (distance < min_distance)
                     {
                         min_distance = distance;
                         p_v = diff_v;
@@ -365,7 +381,7 @@ namespace Chasm
                 if (p_v.y > 0) for (auto i = 0; i < p_v.y; ++i) dirs.push_back(Chasm::Direction::TOP);
                 if (p_v.y < 0) for (auto i = 0; i < -p_v.y; ++i) dirs.push_back(Chasm::Direction::BOTTOM);
 
-                auto direction = dirs[rand() % (dirs.size() - 1)];
+                auto direction = dirs[rand() % dirs.size()];
                 Pixel nb_p {0, 0};
 
                 // CHOOSE VALID DIRECTION
@@ -395,7 +411,6 @@ namespace Chasm
                 auto& nb_visited = visited_points[nb_p];
                 auto nb_is_wall = walls.count(nb_p) > 0;
                 auto nb_is_acid = acids.count(nb_p) > 0;
-                auto nb_is_void = !nb_is_acid && !nb_is_wall;
 
                 if (nb_is_wall)
                 {
@@ -405,7 +420,11 @@ namespace Chasm
                     acid_removal.push_back(acid_p);
                     acid_insert.push_back(nb_p); 
                 }
-                else if (nb_is_void)
+                else if (nb_is_acid)
+                {
+                    nb_visited.swap(acid_visited);
+                }
+                else
                 {
                     nb_visited.swap(acid_visited);
                     acid_visited.clear();
@@ -529,6 +548,24 @@ inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int 
         if (arr.contains({x, y})) domain.insert(v);
     } 
     return domain;
+};
+
+void UpdateSurfaceParts(const PixelArray& arr, Map& map)
+{
+    auto rect = arr.bbox();
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+    {
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+        {
+            Pixel p {x, y};
+            if (arr.contains(p))
+            {
+                auto* part = map.GetSurfacePart(x);
+                part->SetY(x, y);
+                break;
+            }
+        }
+    }
 };
 
 
@@ -1089,6 +1126,8 @@ EXPORT inline void GenerateHills(Map& map)
 
         auto& s_hill = map.SurfaceStructure(Structures::HILL);
         CreateHill(hill_rect, s_hill, sy, ey);
+
+        UpdateSurfaceParts(s_hill, map);
     }
 };
 
@@ -1121,6 +1160,8 @@ EXPORT inline void GenerateHoles(Map& map)
 
         auto& s_hole = map.SurfaceStructure(Structures::HOLE);
         CreateHole(hole_rect, s_hole, sy, ey);
+
+        UpdateSurfaceParts(s_hole, map);
     }
 };
 
@@ -1206,6 +1247,8 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 {
                     auto& transition = map.SurfaceStructure(Structures::TRANSITION);
                     CreateTransition(rect, transition, p); 
+
+                    UpdateSurfaceParts(transition, map);
                 }
             }
         }
