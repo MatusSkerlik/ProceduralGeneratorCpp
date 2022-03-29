@@ -269,10 +269,14 @@ inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
     std::vector<double> Y;
 
     double h = abs(rect.y - p.y);
+
+    int y_offset = 0 ;
+    if (h > 2) y_offset = rand() % (int)(h / 2);
+
     if (rect.x == p.x) // LEFT
-        Y = {(double)p.y, (double)rect.y + (h / 4) + (rand() % (int)(h / 2)), (double)rect.y}; 
+        Y = {(double)p.y, (double)rect.y + (h / 4) + y_offset, (double)rect.y}; 
     else
-        Y = {(double)rect.y, (double)rect.y + (h / 4) + (rand() % (int)(h / 2)), (double)p.y}; 
+        Y = {(double)rect.y, (double)rect.y + (h / 4) + y_offset, (double)p.y}; 
     
     tk::spline s(X, Y);
     for (int x = rect.x; x < rect.x + rect.w; ++x)
@@ -550,7 +554,7 @@ inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int 
     return domain;
 };
 
-void UpdateSurfaceParts(const PixelArray& arr, Map& map)
+inline void UpdateSurfaceParts(const PixelArray& arr, Map& map)
 {
     auto rect = arr.bbox();
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
@@ -1320,7 +1324,6 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
         if (((meta0.structure == nullptr) || (meta0.structure != nullptr && meta0.structure->GetType() != D_STRUCTURES)) &&
             ((meta1.structure == nullptr) || (meta1.structure != nullptr && meta1.structure->GetType() != D_STRUCTURES)))
         { 
-            auto sign = 1 ? p0.y < p1.y : -1;
             auto y_diff = abs(p0.y - p1.y);
 
             if ((y_diff >= 20) && (y_diff <= 35) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
@@ -1328,7 +1331,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
                 rect.w = rect.h + rand() % 20;
-                if (sign > 0) // RIGHT
+                if (p0.y < p1.y) // RIGHT
                 {
                     rect.x = p0.x;
                     rect.y = p0.y;
@@ -1342,14 +1345,14 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 auto& cliff = map.SurfaceStructure(Structures::CLIFF);
                 CreateCliff(rect, cliff, p0, p1);
             }
-            else if (y_diff > 3) // TRANSITION
+            else // TRANSITION
             { 
                 Rect rect;
-                rect.w = 40 + rand() % 30;
+                rect.w = 4 + y_diff + (rand() % (y_diff + 1));
                 rect.h = surface_rect.y + surface_rect.h - std::min(p0.y, p1.y); 
 
                 Pixel p {0, 0};
-                if (sign > 0) // RIGHT
+                if (p0.y < p1.y) // RIGHT
                 {
                     rect.x = p0.x;
                     rect.y = p0.y;
@@ -1366,13 +1369,10 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                     p = {rect.x, part->GetY(rect.x)};
                 }
 
-                if ((p.y - rect.y) > 2)
-                {
-                    auto& transition = map.SurfaceStructure(Structures::TRANSITION);
-                    CreateTransition(rect, transition, p); 
+                auto& transition = map.SurfaceStructure(Structures::TRANSITION);
+                CreateTransition(rect, transition, p); 
 
-                    UpdateSurfaceParts(transition, map);
-                }
+                UpdateSurfaceParts(transition, map);
             }
         }
 
