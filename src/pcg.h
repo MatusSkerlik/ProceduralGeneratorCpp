@@ -259,8 +259,15 @@ inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel s, Pixel e
     std::vector<double> X {(double)rect.x, (double)rect.x + (double)rect.w / 4 + (rand() % (int)(rect.w / 2)), (double)rect.x + rect.w};
     std::vector<double> Y;
 
-    double diff = s.y - e.y;
-    Y = {(double)s.y, (double) s.y - (diff / 2), (double)e.y}; 
+    double h = abs(rect.y - p.y);
+  
+    int y_offset = 0;
+    if (h > 2) y_offset = rand() % (int)(h / 2);
+  
+    if (rect.x == p.x) // LEFT
+        Y = {(double)p.y, (double)rect.y + (h / 4) + y_offset, (double)rect.y}; 
+    else
+        Y = {(double)rect.y, (double)rect.y + (h / 4) + y_offset, (double)p.y}; 
     
     tk::spline sp(X, Y);
     for (int x = rect.x; x <= rect.x + rect.w; ++x)
@@ -1304,14 +1311,14 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
             ((meta1.structure == nullptr) || (meta1.structure != nullptr && (meta1.structure->GetType() & D_STRUCTURES) == 0)) &&
             y_diff > 2)
         { 
-            auto sign = 1 ? p0.y < p1.y : -1;
+            auto y_diff = abs(p0.y - p1.y);
 
             if ((y_diff >= 20) && (y_diff <= 30) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
                 rect.w = rect.h + rand() % 20;
-                if (sign > 0) // RIGHT
+                if (p0.y < p1.y) // RIGHT
                 {
                     rect.x = p0.x;
                     rect.y = p0.y;
@@ -1328,12 +1335,11 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
             else // TRANSITION
             { 
                 Rect rect;
-                auto min_width = y_diff + rand() % 10;
-                auto max_widht = min_width + rand() % 20;
+                rect.w = 4 + y_diff + (rand() % (y_diff + 1));
+                rect.h = surface_rect.y + surface_rect.h - std::min(p0.y, p1.y); 
 
-                Pixel s {0, 0};
-                Pixel e {0, 0};
-                if (sign > 0) // RIGHT
+                Pixel p {0, 0};
+                if (p0.y < p1.y) // RIGHT
                 {
                     rect.x = p0.x;
                     rect.w = min_width;
@@ -1364,33 +1370,10 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                     auto max_w = rect.w;
                     rect.w = min_width;
                     rect.x = p1.x - rect.w - 1;
-
-                    e = {p1.x, p1.y + 1};
-                    while (rect.w < max_w)
-                    {
-                        s = {rect.x, map.GetSurfaceY(rect.x) + 1};
-                        if (abs(s.y - e.y) > 2)
-                            break;
-                        else
-                        {
-                            rect.x -= 1;
-                            rect.w += 1;
-                        }
-                    }
-
-                    if (s.x == 0 && s.y == 0)
-                    {
-                        s = {p0.x - min_width, p0.y + 1};
-                        rect.x = s.x;
-                        rect.w = min_width;
-                    }
                 }
-                rect.y = std::min(s.y, e.y);
-                rect.h = surface_rect.y + surface_rect.h - std::min(s.y, e.y); 
-
+              
                 auto& transition = map.SurfaceStructure(Structures::TRANSITION);
-                CreateTransition(rect, transition, s, e); 
-
+                CreateTransition(rect, transition, p); 
                 UpdateSurfaceParts(transition, map);
             }
         }
