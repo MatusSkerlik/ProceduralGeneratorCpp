@@ -260,25 +260,21 @@ namespace Structures {
         protected:
             int sx {0}; // START X
             int ex {0}; // END X 
-            int sy {0}; // START Y
-            int ey {0}; // END Y
-            int by {0}; // BASE Y
 
             SurfacePart* before {nullptr};
             SurfacePart* next {nullptr};
             std::vector<int> ypsilons;
 
         public:
-            SurfacePart(Map& _map, int _sx, int _ex, int _sy, int _ey, int _by, SurfacePart* _before, SurfacePart* _next): SurfaceStructure(_map, SURFACE_PART),
-            sx{_sx}, ex{_ex}, sy{_sy}, ey{_ey}, by{_by}, 
+            SurfacePart(Map& _map, int _sx, int _ex, SurfacePart* _before, SurfacePart* _next): SurfaceStructure(_map, SURFACE_PART),
+            sx{_sx}, ex{_ex}, 
             before{_before}, next{_next} 
             {};
 
             auto StartX() const { return sx; };
             auto EndX() const { return ex; };
-            auto StartY() const { return sy; };
-            auto EndY() const { return ey; };
-            auto BaseY() const { return by; };
+            auto StartY() const { return GetY(sx); };
+            auto EndY() const { return GetY(ex); };
 
             auto Before() const { return before; };
             void SetBefore(SurfacePart* _before) { before = _before; };
@@ -287,7 +283,7 @@ namespace Structures {
 
             void AddY(int y) { ypsilons.push_back(y); };
             void SetY(int x, int y) { ypsilons[x - sx] = y; };
-            auto GetY(int x) const { return ypsilons.at(x - sx); };
+            int GetY(int x) const { return ypsilons.at(x - sx); };
             auto GetYpsilons() const { return ypsilons; };
    };
 };
@@ -344,8 +340,8 @@ class Map {
 
         void Init()
         {
-            for (auto x = 0; x < this->Width(); ++x)
-                for (auto y = 0; y < this->Height(); ++y) 
+            for (auto x = 0; x <= this->Width(); ++x)
+                for (auto y = 0; y <= this->Height(); ++y) 
                     _pixel_map.emplace(std::make_pair((Pixel){x, y}, PixelMetadata()));
             _initialized = true;
         };
@@ -808,10 +804,10 @@ class Map {
             return structures;
         }
 
-        auto& SurfacePart(int sx, int ex, int sy, int ey, int by)
+        auto& SurfacePart(int sx, int ex)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _surface_structures.emplace_back(new Structures::SurfacePart(*this, sx, ex, sy, ey, by, nullptr, nullptr));
+            _surface_structures.emplace_back(new Structures::SurfacePart(*this, sx, ex, nullptr, nullptr));
             return static_cast<Structures::SurfacePart&>(*_surface_structures.back());
         };
 
@@ -840,11 +836,16 @@ class Map {
             return surface_part;
         };
 
-        Structures::SurfacePart* GetSurfacePart(int sx)
+        Structures::SurfacePart* GetSurfacePart(int x)
         {
             Structures::SurfacePart* s_part = GetSurfaceBegin();
-            while ((s_part != nullptr) && !((s_part->StartX() <= sx) && (s_part->EndX() >= sx))) { s_part = s_part->Next(); }
+            while ((s_part != nullptr) && !((s_part->StartX() <= x) && (s_part->EndX() >= x))) { s_part = s_part->Next(); }
             return s_part;
+        };
+
+        auto GetSurfaceY(int x)
+        {
+            return GetSurfacePart(x)->GetY(x);
         };
 
         void ClearStage0()
@@ -1009,14 +1010,6 @@ inline void Structures::SurfaceStructure::clear()
     PixelArray::clear();
 };
 
-
-inline void FillWithRect(const Rect& rect, PixelArray& arr)
-{
-    for (int x = rect.x; x < rect.x + rect.w; ++x)
-        for (int y = rect.y; y < rect.y + rect.h; ++y)
-            arr.add(x, y);
-}
-
 inline void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
 {
     std::vector<Pixel> queue {Pixel(x, y)};
@@ -1056,9 +1049,9 @@ inline void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
     int miny = y - radius;
     int maxy = y + radius;
 
-    for (int i = minx; i < maxx; i++)
+    for (int i = minx; i <= maxx; ++i)
     {
-        for (int j = miny; j < maxy; j++)
+        for (int j = miny; j <= maxy; ++j)
         {
             from.x = i;
             from.y = j;
@@ -1076,14 +1069,19 @@ inline void PixelsAroundRect(int x, int y, int w, int h, PixelArray& array)
     int miny = y - h / 2;
     int maxy = y + h / 2;
 
-    for (int i = minx; i < maxx; i++)
-        for (int j = miny; j < maxy; j++)
+    for (int i = minx; i <= maxx; ++i)
+        for (int j = miny; j <= maxy; ++j)
             array.add(i, j);
 };
 
 inline void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
 {
-   for (int i = x; i < x + w; i++)
-        for (int j = y; j < y + h; j++)
+   for (int i = x; i <= x + w; ++i)
+        for (int j = y; j <= y + h; ++j)
             array.add(i, j);
+};
+
+inline void PixelsOfRect(const Rect& rect, PixelArray& array)
+{
+    PixelsOfRect(rect.x, rect.y, rect.w, rect.h, array);
 };
