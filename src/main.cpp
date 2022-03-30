@@ -347,6 +347,7 @@ void _PCGGen(Map& map)
         map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
         DefineHorizontal(map);
     }
+    //while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
     DrawStage0 = true;
 
     // STAGE 1
@@ -356,6 +357,7 @@ void _PCGGen(Map& map)
         map.SetGenerationMessage("DEFINITION OF BIOMES...");
         DefineBiomes(map);
     }
+    //while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
     //DrawStage1 = true;
 
     // STAGE 2
@@ -388,6 +390,7 @@ void _PCGGen(Map& map)
             map.Error("DEFINITION OF UNDERGROUND CASTLES INFEASIBLE");
         }
     }
+    //while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
     //DrawStage2 = true;
 
     if (!map.ShouldForceStop() && GenerateStage3)
@@ -396,6 +399,7 @@ void _PCGGen(Map& map)
         map.SetGenerationMessage("DEFINITION OF SURFACE...");
         DefineSurface(map);
     }
+    //while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
     //DrawStage3 = true;
 
     if (!map.ShouldForceStop() && GenerateStage4)
@@ -425,6 +429,7 @@ void _PCGGen(Map& map)
             map.Error("DEFINITION OF TREES INFEASIBLE"); 
         }
     }
+    //while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
     DrawStage4 = true;
 
     if (!map.ShouldForceStop())
@@ -435,9 +440,6 @@ void _PCGGen(Map& map)
         GenerateStage3 = false;
         GenerateStage4 = false;
     }
-
-    // FINALIZE
-    while (map.ThreadCount() > 0) std::this_thread::sleep_for(0s);
 
     FreePCG();
     printf("Free DLL\n");
@@ -635,13 +637,13 @@ int main(void)
         if (IsKeyDown(KEY_E))
             camera.zoom *= 1.05;
         if (IsKeyDown(KEY_A))
-            ScrollOffset.x += 20;
+            ScrollOffset.x += 15;
         if (IsKeyDown(KEY_D))
-            ScrollOffset.x -= 20;
+            ScrollOffset.x -= 15;
         if (IsKeyDown(KEY_W))
-            ScrollOffset.y += 20;
+            ScrollOffset.y += 15;
         if (IsKeyDown(KEY_S))
-            ScrollOffset.y -= 20;
+            ScrollOffset.y -= 15;
 
         // DRAW LOGIC
         BeginDrawing();

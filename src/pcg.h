@@ -231,58 +231,49 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
     tk::spline sx(T,X), sy(T,Y);
 
     auto size = (int)ceil(T.back()) + 1;
-    Point polygon[size]; 
-    for (auto t = 0; t < size; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
-
-    PixelArray a0;
-    PixelArray a1;
-    for (auto x = rect.x; x < rect.x + rect.w; ++x)
+    float xs[size];
+    float ys[size];
+    for (auto t = 0; t < size; ++t) 
     {
-        for (auto y = rect.y; y < rect.y + rect.h; ++y)
+        xs[t] = sx(t);
+        ys[t] = sy(t);
+    }
+
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+    {
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
         {
-            Pixel p {x, y};
-            if (CNPnPoly({x, y}, polygon, size))
+            if (pnpoly(size, xs, ys, (float)x, (float)y)) 
             {
-                a0.add(p);
-            }
-            else
-            {
-                a1.add(p);
+                arr.add(x, y);
             }
         }
     }
-
-    if (a0.contains(s) || a0.contains(e))
-        for (auto p: a0)
-            arr.add(p);
-    else
-        for (auto p: a1)
-            arr.add(p);
 };
 
 /*
  * Create surface transition from one surface part to another
  */
-inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
+inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
 {
     std::vector<double> X {(double)rect.x, (double)rect.x + (double)rect.w / 4 + (rand() % (int)(rect.w / 2)), (double)rect.x + rect.w};
     std::vector<double> Y;
 
     double h = abs(rect.y - p.y);
-
-    int y_offset = 0 ;
+  
+    int y_offset = 0;
     if (h > 2) y_offset = rand() % (int)(h / 2);
-
+  
     if (rect.x == p.x) // LEFT
         Y = {(double)p.y, (double)rect.y + (h / 4) + y_offset, (double)rect.y}; 
     else
         Y = {(double)rect.y, (double)rect.y + (h / 4) + y_offset, (double)p.y}; 
     
-    tk::spline s(X, Y);
-    for (int x = rect.x; x < rect.x + rect.w; ++x)
+    tk::spline sp(X, Y);
+    for (int x = rect.x; x <= rect.x + rect.w; ++x)
     {
-       int _y = (int) s(x);
-       for (int y = _y; y < rect.y + rect.h; ++y)
+       int _y = (int) sp(x);
+       for (int y = _y; y <= rect.y + rect.h; ++y)
        {
             arr.add({x, y});
        }
@@ -301,7 +292,7 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
     auto half_x = rect.x + rect.w / 2;
     //auto half_y = rect.y + rect.h / 2;
     auto quater_y = rect.y + rect.h / 3;
-    auto full_y = rect.y + rect.h + 5;
+    auto full_y = rect.y + rect.h;
 
     X = {(double)half_x, (double)rect.x + rect.w, (double)half_x + ((rand() % 11) - 5), (double)rect.x, (double)half_x};
     Y = {(double)full_y, (double)quater_y + ((rand() % 5) - 3), (double) quater_y + ((rand() % 5) - 3), (double)quater_y + ((rand() % 5) - 3), (double)full_y};
@@ -312,12 +303,18 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
     tk::spline sx(T,X), sy(T,Y);
 
     auto size = (int)T.back();
-    Point polygon[size]; 
-    for (auto t = 0; t < size; ++t) polygon[t] = {(int)sx(t),(int)sy(t)};
-    
+    float xs[size];
+    float ys[size];
+    for (auto t = 0; t < size; ++t) 
+    {
+        xs[t] = sx(t);
+        ys[t] = sy(t);
+    }
+
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
-            if (CNPnPoly({x, y}, polygon, size)) arr.add({x, y});
+            if (pnpoly(size, xs, ys, (float)x, (float)y)) 
+                arr.add({x, y});
 };
 
 /*
@@ -454,11 +451,11 @@ namespace Chasm
 
             if (x == rect.x)
                 continue;
-            if (x == rect.x + rect.w - 1)
+            if (x == rect.x + rect.w)
                 continue;
             if (y == rect.y)
                 continue;
-            if (y == rect.y + rect.h - 1)
+            if (y == rect.y + rect.h)
                 continue;
 
             auto alive = 0;        
@@ -500,9 +497,9 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
     std::unordered_set<Pixel, PixelHash, PixelEqual> points;
     std::unordered_set<Pixel, PixelHash, PixelEqual> acids;
 
-    for (auto x = rect.x; x < rect.x + rect.w; ++x)
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
     {
-        for (auto y = rect.y; y < rect.y + rect.h; ++y)
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
         {
             Pixel p = {x, y};
             auto meta = map.GetMetadata(p);
@@ -520,7 +517,7 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
     // SPAWN ACID FROM TOP
     // TODO different strategy
     auto spawn_acid = [&](){
-        for (auto x = rect.x; x < rect.x + rect.w; ++x)
+        for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         {
             auto p = (Pixel){x, rect.y};
             acids.insert(p);
@@ -592,11 +589,11 @@ EXPORT inline void DefineHorizontal(Map& map)
     Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 7 * height / 20);
     Rect Hell = Rect(0, Cavern.y + Cavern.h, width, (int) 3 * height / 20);
     
-    FillWithRect(Space, map.Space());
-    FillWithRect(Surface, map.Surface());
-    FillWithRect(Underground, map.Underground());
-    FillWithRect(Cavern, map.Cavern());
-    FillWithRect(Hell, map.Hell());
+    PixelsOfRect(Space, map.Space());
+    PixelsOfRect(Surface, map.Surface());
+    PixelsOfRect(Underground, map.Underground());
+    PixelsOfRect(Cavern, map.Cavern());
+    PixelsOfRect(Hell, map.Hell());
 }
 
 /**
@@ -620,13 +617,13 @@ EXPORT inline void DefineBiomes(Map& map)
     PixelsOfRect(0, surface_rect.y, ocean_width, surface_rect.h, ocean_left); 
 
     auto& ocean_right = map.Biome(Biomes::OCEAN_RIGHT);
-    PixelsOfRect(width - ocean_width, surface_rect.y, ocean_width, surface_rect.h, ocean_right);
+    PixelsOfRect(width - ocean_width - 1, surface_rect.y, ocean_width, surface_rect.h, ocean_right);
 
     auto& ocean_desert_left = map.Biome(Biomes::OCEAN_DESERT_LEFT);
     PixelsOfRect(ocean_width, surface_rect.y, ocean_desert_width, surface_rect.h, ocean_desert_left); 
 
     auto& ocean_desert_right = map.Biome(Biomes::OCEAN_DESERT_RIGHT);
-    PixelsOfRect(width - ocean_width - ocean_desert_width, surface_rect.y, ocean_desert_width, surface_rect.h, ocean_desert_right); 
+    PixelsOfRect(width - ocean_width - ocean_desert_width - 1, surface_rect.y, ocean_desert_width, surface_rect.h, ocean_desert_right); 
 
     // USE CSP TO FIND LOCATIONS FOR JUNGLE AND TUNDRA 
     // DEFINITION OF VARIABLES
@@ -682,7 +679,8 @@ EXPORT inline void DefineBiomes(Map& map)
 
         // DEFINITION OF FORESTS
         PixelArray forests;
-        FillWithRect(Rect(0, surface_rect.y, width, hell_rect.y - surface_rect.y), forests);
+        Rect forests_rect {0, surface_rect.y, width, hell_rect.y - surface_rect.y};
+        PixelsOfRect(forests_rect, forests);
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
         for (auto pixel: ocean_left) { forests.remove(pixel); }
@@ -1072,21 +1070,7 @@ EXPORT inline void DefineSurface(Map& map)
         auto w = std::get<0>(part);
         auto h = std::get<1>(part);
 
-        float nsy = 0.0;
-        auto fq = 2;
-        auto lq = 0.5;
-        for (auto o = 0; o < octaves; ++o) { nsy += ypsilons[(tmp_x * fq) % ypsilons.size()] * lq;    fq = pow(fq, o); lq = pow(lq, o); }
-        float ney = 0.0;
-        fq = 2;
-        lq = 0.5;
-        for (auto o = 0; o < octaves; ++o) { ney += ypsilons[((tmp_x + w) * fq) % ypsilons.size()] * lq;    fq = pow(fq, o); lq = pow(lq, o); }
-        // CALLCULATE START AND END Y
-        //                                           NOISE WIDTH   CENTER CORECTION 
-        //                                                     N   C
-        auto sy = surface_rect.y + surface_rect.h - h - (nsy * 8 - 4);
-        auto ey = surface_rect.y + surface_rect.h - h - (ney * 8 - 4);
-
-        auto& surface_part = map.SurfacePart(tmp_x, tmp_x + w - 1, sy, ey, surface_rect.y + surface_rect.h - h); 
+        auto& surface_part = map.SurfacePart(tmp_x, tmp_x + w - 1); 
         
         if (surface_part_before != nullptr) 
         { 
@@ -1140,24 +1124,24 @@ EXPORT inline void GenerateOceanLeft(Map& map)
 
     // GENERATE SAND IN ONEAN BIOME
     auto& ocean_sand = map.SurfaceStructure(Structures::SAND);
-    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y - (x * m_ocean));
         auto y1 = (int)(ocean_start_y - (x * m_desert) + ocean_sand_thickness + rand() % 5);
-        for (auto y = y0; y < y1; ++y)
+        for (auto y = y0; y <= y1; ++y)
         {
             ocean_sand.add({x, y});
         }
     }
 
     // GENERATE SAND IN DESERT BIOME
-    for (auto x = ocean_desert_rect.x; x < ocean_desert_rect.x + ocean_desert_rect.w + 1; x++)
+    for (auto x = ocean_desert_rect.x; x <= ocean_desert_rect.x + ocean_desert_rect.w; ++x)
     {
         part = map.GetSurfacePart(x);
         auto thickness_ratio = (float)1 - ((float)(x - ocean_desert_rect.x) / ocean_desert_rect.w);
         auto y0 = part->GetY(x); 
         auto y1 = (int)(ocean_start_y - (x * m_desert) + ((ocean_sand_thickness + rand() % 5) * thickness_ratio)); 
-        for (auto y = y0; y < y1; ++y)
+        for (auto y = y0; y <= y1; ++y)
         {
             ocean_sand.add({x, y});
         }
@@ -1165,10 +1149,10 @@ EXPORT inline void GenerateOceanLeft(Map& map)
 
     // GENERATE WATER IN OCEAN
     auto& ocean_water = map.SurfaceStructure(Structures::WATER);
-    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y - (x * m_ocean));
-        for (auto y = y0; y > ocean_end_y; --y)
+        for (auto y = y0; y >= ocean_end_y; --y)
         {
             ocean_water.add({x, y});
         }
@@ -1196,24 +1180,24 @@ EXPORT inline void GenerateOceanRight(Map& map)
 
     // GENERATE SAND IN ONEAN BIOME
     auto& ocean_sand = map.SurfaceStructure(Structures::SAND);
-    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y - ((x - ocean_rect.x) * m_ocean));
         auto y1 = (int)(desert_start_y - ((x - ocean_desert_rect.x) * m_desert) + ocean_sand_thickness + rand() % 5);
-        for (auto y = y0; y < y1; ++y)
+        for (auto y = y0; y <= y1; ++y)
         {
             ocean_sand.add({x, y});
         }
     }
 
     // GENERATE SAND IN DESERT BIOME
-    for (auto x = ocean_desert_rect.x; x < ocean_desert_rect.x + ocean_desert_rect.w + 1; x++)
+    for (auto x = ocean_desert_rect.x; x <= ocean_desert_rect.x + ocean_desert_rect.w; ++x)
     {
         part = map.GetSurfacePart(x);
         auto thickness_ratio = (float)(x - ocean_desert_rect.x) / ocean_desert_rect.w;
         auto y0 = part->GetY(x); 
         auto y1 = (int)(desert_start_y - ((x - ocean_desert_rect.x) * m_desert)) + ((ocean_sand_thickness + rand() % 5) * thickness_ratio); 
-        for (auto y = y0; y < y1; ++y)
+        for (auto y = y0; y <= y1; ++y)
         {
             ocean_sand.add({x, y});
         }
@@ -1221,10 +1205,10 @@ EXPORT inline void GenerateOceanRight(Map& map)
 
     // GENERATE WATER IN OCEAN
     auto& ocean_water = map.SurfaceStructure(Structures::WATER);
-    for (auto x = ocean_rect.x; x < ocean_rect.x + ocean_rect.w + 1; x++)
+    for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y + ((ocean_rect.x - x) * m_ocean));
-        for (auto y = y0; y > ocean_start_y; --y)
+        for (auto y = y0; y >= ocean_start_y; --y)
         {
             ocean_water.add({x, y});
         }
@@ -1308,7 +1292,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
 {
     printf("GenerateCliffsTransitions\n");
 
-    auto D_STRUCTURES = Structures::HOLE;
+    auto D_STRUCTURES = Structures::HOLE | Structures::HILL;
     auto A_BIOMES = Biomes::FOREST | Biomes::JUNGLE;
     auto surface_rect = map.Surface().bbox();
     auto* s_one = map.GetSurfaceBegin();
@@ -1321,12 +1305,15 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
         auto meta0 = map.GetMetadata(p0);
         auto meta1 = map.GetMetadata(p1);
 
-        if (((meta0.structure == nullptr) || (meta0.structure != nullptr && meta0.structure->GetType() != D_STRUCTURES)) &&
-            ((meta1.structure == nullptr) || (meta1.structure != nullptr && meta1.structure->GetType() != D_STRUCTURES)))
+        auto y_diff = abs(p0.y - p1.y);
+
+        if (((meta0.structure == nullptr) || (meta0.structure != nullptr && (meta0.structure->GetType() & D_STRUCTURES) == 0)) &&
+            ((meta1.structure == nullptr) || (meta1.structure != nullptr && (meta1.structure->GetType() & D_STRUCTURES) == 0)) &&
+            y_diff > 2)
         { 
             auto y_diff = abs(p0.y - p1.y);
 
-            if ((y_diff >= 20) && (y_diff <= 35) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
+            if ((y_diff >= 20) && (y_diff <= 30) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
             {
                 Rect rect;
                 rect.h = abs(p0.y - p1.y);
@@ -1355,23 +1342,38 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 if (p0.y < p1.y) // RIGHT
                 {
                     rect.x = p0.x;
-                    rect.y = p0.y;
+                    rect.w = min_width;
                     auto* part = map.GetSurfacePart(rect.x + rect.w);
                     while (part == nullptr) { rect.w -= 1; part = map.GetSurfacePart(rect.x + rect.w); }
-                    p = {rect.x + rect.w, part->GetY(rect.x + rect.w)};
+                    s = {p0.x, p0.y + 1};
+                    while (rect.w < max_widht) 
+                    {
+                        e = {rect.x + rect.w, map.GetSurfaceY(rect.x + rect.w) + 1};
+                        if (abs(s.y - e.y) > 2)
+                            break;
+                        else
+                            rect.w += 1;
+                    }
+
+                    if (e.x == 0 && e.y == 0)
+                    {
+                        e = {p0.x + min_width, p1.y + 1};
+                        rect.w = min_width;
+                    }
                 }
                 else // LEFT
                 {
-                    rect.x = p1.x - rect.w;
-                    rect.y = p1.y; 
+                    rect.w = max_widht;
+                    rect.x = p1.x - rect.w - 1;
                     auto* part = map.GetSurfacePart(rect.x);
                     while (part == nullptr) { rect.x += 1; rect.w -= 1; part = map.GetSurfacePart(rect.x); }
-                    p = {rect.x, part->GetY(rect.x)};
+                    auto max_w = rect.w;
+                    rect.w = min_width;
+                    rect.x = p1.x - rect.w - 1;
                 }
-
+              
                 auto& transition = map.SurfaceStructure(Structures::TRANSITION);
                 CreateTransition(rect, transition, p); 
-
                 UpdateSurfaceParts(transition, map);
             }
         }
@@ -1412,7 +1414,7 @@ EXPORT inline void GenerateChasms(Map& map)
         Rect chasm_rect = {x, surface_rect.y + surface_rect.h / 3, w, surface_rect.h / 2}; 
 
         auto& chasm = map.Structure(Structures::CHASM);
-        FillWithRect(chasm_rect, chasm);
+        PixelsOfRect(chasm_rect, chasm);
 
         auto& s_chasm = map.SurfaceStructure(Structures::CHASM);
         CreateChasm(chasm_rect, s_chasm, map);
@@ -1509,8 +1511,7 @@ EXPORT inline void GenerateTrees(Map& map)
 
     auto check_placement = [&](Pixel start, int height) -> bool
     {
-        int h = 1; 
-        while (h < height + 1)
+        for (auto h = 1; h < height; ++h)
         {
             Pixel p = {start.x, start.y - h};
             auto info_this = map.GetMetadata(p); 
@@ -1519,7 +1520,6 @@ EXPORT inline void GenerateTrees(Map& map)
             
             if (info_this.surface_structure != nullptr || info_left.surface_structure != nullptr || info_right.surface_structure != nullptr)
                 return false;
-            ++h;
         };
 
         return true;
