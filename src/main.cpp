@@ -216,9 +216,9 @@ void DrawSurfaceDebug(Map& map)
 void DrawSurface(Map& map)
 {
     auto surface_rect = map.Surface().bbox();
-    for (auto x = surface_rect.x; x < surface_rect.x + surface_rect.w; ++x)
+    for (auto x = surface_rect.x; x <= surface_rect.x + surface_rect.w; ++x)
     {
-        for (auto y = 0; y < surface_rect.y + surface_rect.h + 200; ++y)
+        for (auto y = 0; y <= surface_rect.y + surface_rect.h + 200; ++y)
         {
             auto meta = map.GetMetadata({x, y});
             if (meta.surface_structure != nullptr)
@@ -245,16 +245,32 @@ void DrawSurface(Map& map)
                     DrawPixel(x, y, DIRT);
                 }
                 
-                // BIOME NOT PRESENT 
+                // FOR EVERY SURFACE STRUCTURE
                 if (meta.surface_structure->GetType() == Structures::TREE)
                     DrawPixel(x, y, (Color){191, 143, 111, 255});
                 if (meta.surface_structure->GetType() == Structures::WATER)
                     DrawPixel(x, y, C_WATER);
                 if (meta.surface_structure->GetType() == Structures::SAND)
                     DrawPixel(x, y, C_SAND);
+                // DEBUG
+                /*
+                if (meta.surface_structure->GetType() == Structures::TRANSITION)
+                    DrawPixel(x, y, RED);
+                if (meta.surface_structure->GetType() == Structures::HILL)
+                    DrawPixel(x, y, BLUE);
+                */
             }
         }
     }
+
+    // DEBUG SURFACE Y
+    /*
+    for (auto x = surface_rect.x; x <= surface_rect.x + surface_rect.w; ++x)
+    {
+        auto* part = map.GetSurfacePart(x);
+        if (part != nullptr) DrawPixel(x, part->GetY(x), ORANGE);
+    }
+    */
 };
 /**************************************************
 *

@@ -254,26 +254,26 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
 /*
  * Create surface transition from one surface part to another
  */
-inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
+inline void CreateTransition(const Rect& rect, PixelArray& arr, Pixel p)
 {
     std::vector<double> X {(double)rect.x, (double)rect.x + (double)rect.w / 4 + (rand() % (int)(rect.w / 2)), (double)rect.x + rect.w};
     std::vector<double> Y;
 
     double h = abs(rect.y - p.y);
-  
-    int y_offset = 0;
+
+    int y_offset = 0 ;
     if (h > 2) y_offset = rand() % (int)(h / 2);
-  
+
     if (rect.x == p.x) // LEFT
         Y = {(double)p.y, (double)rect.y + (h / 4) + y_offset, (double)rect.y}; 
     else
         Y = {(double)rect.y, (double)rect.y + (h / 4) + y_offset, (double)p.y}; 
     
-    tk::spline sp(X, Y);
-    for (int x = rect.x; x <= rect.x + rect.w; ++x)
+    tk::spline s(X, Y);
+    for (int x = rect.x; x < rect.x + rect.w; ++x)
     {
-       int _y = (int) sp(x);
-       for (int y = _y; y <= rect.y + rect.h; ++y)
+       int _y = (int) s(x);
+       for (int y = _y; y < rect.y + rect.h; ++y)
        {
             arr.add({x, y});
        }
@@ -554,6 +554,7 @@ inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int 
 inline void UpdateSurfaceParts(const PixelArray& arr, Map& map)
 {
     auto rect = arr.bbox();
+    std::unordered_set<Structures::SurfacePart*> invalid_parts;
     for (auto x = rect.x; x <= rect.x + rect.w; ++x)
     {
         for (auto y = rect.y; y <= rect.y + rect.h; ++y)
@@ -563,7 +564,24 @@ inline void UpdateSurfaceParts(const PixelArray& arr, Map& map)
             {
                 auto* part = map.GetSurfacePart(x);
                 part->SetY(x, y);
+                invalid_parts.insert(part);
                 break;
+            }
+        }
+    }
+
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+    for (auto* part: invalid_parts)
+    {
+        for (auto x = part->StartX(); x <= part->EndX(); ++x)
+        {
+            for (auto y = part->GetY(x); y > surface_rect.y; --y)
+            {
+                Pixel p {x, y};
+                auto meta = map.GetMetadata(p);
+                if (meta.surface_structure != nullptr && meta.surface_structure->GetType() == Structures::SURFACE_PART)
+                    part->remove({x, y});
             }
         }
     }
@@ -1292,7 +1310,6 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
 {
     printf("GenerateCliffsTransitions\n");
 
-    auto D_STRUCTURES = Structures::HOLE | Structures::HILL;
     auto A_BIOMES = Biomes::FOREST | Biomes::JUNGLE;
     auto surface_rect = map.Surface().bbox();
     auto* s_one = map.GetSurfaceBegin();
@@ -1307,76 +1324,54 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
 
         auto y_diff = abs(p0.y - p1.y);
 
-        if (((meta0.structure == nullptr) || (meta0.structure != nullptr && (meta0.structure->GetType() & D_STRUCTURES) == 0)) &&
-            ((meta1.structure == nullptr) || (meta1.structure != nullptr && (meta1.structure->GetType() & D_STRUCTURES) == 0)) &&
-            y_diff > 2)
-        { 
-            auto y_diff = abs(p0.y - p1.y);
-
-            if ((y_diff >= 20) && (y_diff <= 30) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
+        if ((y_diff >= 20) && (y_diff <= 30) && (meta0.biome->GetType() & A_BIOMES) && (meta1.biome->GetType() & A_BIOMES)) // CLIFF
+        {
+            Rect rect;
+            rect.h = abs(p0.y - p1.y);
+            rect.w = rect.h + rand() % 20;
+            if (p0.y < p1.y) // RIGHT
             {
-                Rect rect;
-                rect.h = abs(p0.y - p1.y);
-                rect.w = rect.h + rand() % 20;
-                if (p0.y < p1.y) // RIGHT
-                {
-                    rect.x = p0.x;
-                    rect.y = p0.y;
-                }
-                else // LEFT
-                {
-                    rect.x = p1.x - rect.w;
-                    rect.y = p1.y;
-                }
-
-                auto& cliff = map.SurfaceStructure(Structures::CLIFF);
-                CreateCliff(rect, cliff, p0, p1);
+                rect.x = p0.x;
+                rect.y = p0.y;
             }
-            else // TRANSITION
-            { 
-                Rect rect;
-                rect.w = 4 + y_diff + (rand() % (y_diff + 1));
-                rect.h = surface_rect.y + surface_rect.h - std::min(p0.y, p1.y); 
-
-                Pixel p {0, 0};
-                if (p0.y < p1.y) // RIGHT
-                {
-                    rect.x = p0.x;
-                    rect.w = min_width;
-                    auto* part = map.GetSurfacePart(rect.x + rect.w);
-                    while (part == nullptr) { rect.w -= 1; part = map.GetSurfacePart(rect.x + rect.w); }
-                    s = {p0.x, p0.y + 1};
-                    while (rect.w < max_widht) 
-                    {
-                        e = {rect.x + rect.w, map.GetSurfaceY(rect.x + rect.w) + 1};
-                        if (abs(s.y - e.y) > 2)
-                            break;
-                        else
-                            rect.w += 1;
-                    }
-
-                    if (e.x == 0 && e.y == 0)
-                    {
-                        e = {p0.x + min_width, p1.y + 1};
-                        rect.w = min_width;
-                    }
-                }
-                else // LEFT
-                {
-                    rect.w = max_widht;
-                    rect.x = p1.x - rect.w - 1;
-                    auto* part = map.GetSurfacePart(rect.x);
-                    while (part == nullptr) { rect.x += 1; rect.w -= 1; part = map.GetSurfacePart(rect.x); }
-                    auto max_w = rect.w;
-                    rect.w = min_width;
-                    rect.x = p1.x - rect.w - 1;
-                }
-              
-                auto& transition = map.SurfaceStructure(Structures::TRANSITION);
-                CreateTransition(rect, transition, p); 
-                UpdateSurfaceParts(transition, map);
+            else // LEFT
+            {
+                rect.x = p1.x - rect.w;
+                rect.y = p1.y;
             }
+
+            auto& cliff = map.SurfaceStructure(Structures::CLIFF);
+            CreateCliff(rect, cliff, p0, p1);
         }
+        else // TRANSITION
+        { 
+            Rect rect;
+            rect.w = 4 + y_diff + (rand() % (y_diff + 1));
+            rect.h = surface_rect.y + surface_rect.h - std::min(p0.y, p1.y); 
+
+            Pixel p {0, 0};
+            if (p0.y < p1.y) // RIGHT
+            {
+                rect.x = p0.x;
+                rect.y = p0.y;
+                auto* part = map.GetSurfacePart(rect.x + rect.w);
+                while (part == nullptr) { rect.w -= 1; part = map.GetSurfacePart(rect.x + rect.w); }
+                p = {rect.x + rect.w, part->GetY(rect.x + rect.w)};
+            }
+            else // LEFT
+            {
+                rect.x = p1.x - rect.w;
+                rect.y = p1.y; 
+                auto* part = map.GetSurfacePart(rect.x);
+                while (part == nullptr) { rect.x += 1; rect.w -= 1; part = map.GetSurfacePart(rect.x); }
+                p = {rect.x, part->GetY(rect.x)};
+            }
+
+            auto& transition = map.SurfaceStructure(Structures::TRANSITION);
+            CreateTransition(rect, transition, p); 
+
+            UpdateSurfaceParts(transition, map);
+        } 
 
         s_one = s_one->Next();
         s_two = s_two->Next();
