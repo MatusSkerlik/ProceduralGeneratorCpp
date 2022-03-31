@@ -539,6 +539,145 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
     for (auto& p: walls) arr.add(p);
 };
 
+namespace Water
+{
+    inline void Step(
+            const Rect& rect, 
+            Pixel p, 
+            std::unordered_set<Pixel, PixelHash, PixelEqual>& walls, 
+            PixelArray& arr,
+            bool leak = true 
+    ){
+        std::unordered_set<Pixel, PixelHash, PixelEqual> queue;
+
+        auto left_end = false;
+        Pixel left_p {0, 0};
+
+        auto right_end = false; 
+        Pixel right_p {0, 0};
+        
+        while (true)
+        {
+            // CHECK EVERY POINT IN QUEUE AND TELL IF WE CAN GET LOWER OR WE ARE AT LOWEST POINT
+            // IF WE ARE AT LOWEST POINT, LOOP WILL SET LEFT AND RIGHT POINTS
+            while (!queue.empty())
+            {
+                auto point = *queue.begin();
+                queue.erase(queue.begin());
+                
+                // WATER LEAK
+                if (point.x < rect.x)
+                {
+                    if (leak)
+                        return;
+
+                    left_end = true;
+                    left_p = {point.x + 1, point.y};
+                    continue;
+                }
+
+                // WATER LEAK
+                if (point.x >= rect.x + rect.w)
+                {
+                    if (leak)
+                        return;
+
+                    right_end = true;
+                    right_p = {point.x - 1, point.y};
+                    continue;
+                }
+
+                auto bottom_empty = walls.count({point.x, point.y + 1}) == 0; 
+                if (bottom_empty)
+                {
+                    p = {point.x, point.y + 1};
+                    queue.clear();
+                    left_end = false;
+                    right_end = false;
+                    break;
+                }
+
+                if (point.x < p.x) // POINT ON THE LEFT
+                {
+                    auto left_empty = walls.count({point.x - 1, point.y}) == 0;
+                    if (left_empty)
+                    {
+                        queue.insert({point.x - 1, point.y});
+                    } 
+                    else 
+                    {
+                        left_end = true;
+                        left_p = point;
+                    }
+                }
+                else
+                {
+                    auto right_empty = walls.count({point.x + 1, point.y}) == 0;
+                    if (right_empty)
+                    {
+                        queue.insert({point.x + 1, point.y});
+                    }
+                    else
+                    {
+                        right_end = true;
+                        right_p = point;
+                    }
+                }
+            }
+
+            // END OF LOOP
+            // APPEND LINE TO ARRAY
+            if (left_end && right_end)
+            {
+                for (auto x = left_p.x; x <= right_p.x; ++x) arr.add({x, p.y});
+                break;
+            }
+
+            // ENSURE WE ARE ALLWAYS AT BOTTOM
+            auto bottom_empty = walls.count({p.x, p.y + 1}) == 0;
+            while (bottom_empty)
+            {
+                p = {p.x, p.y + 1};
+                bottom_empty = walls.count({p.x, p.y + 1}) == 0;
+            };
+
+            queue.insert({p.x - 1, p.y});
+            queue.insert({p.x + 1, p.y});
+        }
+    };
+};
+
+/**
+ * Create water
+ * It will create water count lines at lowest point available inside rect with start from s
+ */
+inline auto CreateWater(const Rect& rect, PixelArray& arr, Pixel s, int count, Map& map)
+{
+
+    std::unordered_set<Pixel, PixelHash, PixelEqual> walls;
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+    {
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+        {
+            Pixel p = {x, y};
+            auto meta = map.GetMetadata(p);
+            if (meta.surface_structure != nullptr) walls.insert(p);
+        }
+    }
+
+    PixelArray new_water_pixels;
+    for (auto i = 0; i < count; ++i)
+    {
+        Water::Step(rect, s, walls, new_water_pixels);   
+        for (auto p: new_water_pixels)
+        {
+            arr.add(p);
+            walls.insert(p);
+        }
+        new_water_pixels.clear();
+    }
+};
+
 inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int step = 1)
 {
     std::unordered_set<int> domain;
@@ -1423,6 +1562,36 @@ EXPORT inline void GenerateChasms(Map& map)
                 map.SetMetadata(p, meta);
             }
         }
+    }
+};
+
+EXPORT inline void GenerateLakes(Map& map)
+{
+    printf("GenerateLakes\n");
+
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+
+    auto holes = map.GetSurfaceStructures(Structures::HOLE);
+    if (holes.size() == 0)
+        return;
+
+    int count = holes.size() * map.LakeFrequency();
+
+    for (auto* hole: holes)
+    {
+        if (count < 0)
+            break;
+
+        auto hole_rect = hole->bbox();
+        Rect rect {hole_rect.x, surface_rect.y, hole_rect.w, surface_rect.h};
+        Pixel s {rect.x + rect.w / 2, rect.y};
+        auto h = 5 + rand() % 21;
+
+        auto& water = map.SurfaceStructure(Structures::WATER);
+        CreateWater(rect, water, s, h, map); 
+
+        --count;
     }
 };
 

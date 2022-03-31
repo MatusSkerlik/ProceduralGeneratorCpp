@@ -308,6 +308,7 @@ class Map {
         float _ISLANDS_FREQUENCY = 0.5;
         float _CHASM_FREQUENCY = 0.0;
         float _TREE_FREQUENCY = 0.4;
+        float _LAKE_FREQUENCY = 0.5;
 
         float _SURFACE_PARTS_COUNT = 0.5;
         float _SURFACE_PARTS_FREQUENCY = 0.5;
@@ -601,6 +602,22 @@ class Map {
             return false;
         };
 
+        auto LakeFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _LAKE_FREQUENCY;
+        };
+
+        auto LakeFrequency(float fq)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_LAKE_FREQUENCY != fq)
+            {
+                _LAKE_FREQUENCY = fq;
+                return true;
+            }
+            return false;
+        };
 
         auto SurfacePartsCount()
         {

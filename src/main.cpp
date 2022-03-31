@@ -39,6 +39,7 @@ PCG_FUNC GenerateIslands;
 PCG_FUNC GenerateCliffsTransitions;
 PCG_FUNC GenerateGrass;
 PCG_FUNC GenerateTrees;
+PCG_FUNC GenerateLakes;
 
 #else
 #include "pcg.h"
@@ -317,6 +318,7 @@ bool LoadPCG()
     GenerateTrees = (PCG_FUNC) GetProcAddress(module, "GenerateTrees");
     GenerateOceanLeft = (PCG_FUNC) GetProcAddress(module, "GenerateOceanLeft");
     GenerateOceanRight = (PCG_FUNC) GetProcAddress(module, "GenerateOceanRight");
+    GenerateLakes = (PCG_FUNC) GetProcAddress(module, "GenerateLakes");
     return true;
 };
 
@@ -432,6 +434,8 @@ void _PCGGen(Map& map)
         GenerateOceanRight(map);
         map.SetGenerationMessage("GENERATION OF CHASMS...");
         GenerateChasms(map);
+        map.SetGenerationMessage("GENERATION OF LAKES...");
+        GenerateLakes(map);
         map.SetGenerationMessage("GENERATION OF ISLANDS...");
         GenerateIslands(map);
         map.SetGenerationMessage("GENERATION OF GRASS...");
@@ -719,6 +723,8 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "CABINS");
                     GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
                     GuiLabel((Rectangle){2 * em, 2 * em + 4 * im + 8 * 24, 92, 24}, "CHASMS");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 5 * im + 9 * 24, 92, 24}, "TREES");
+                    GuiLabel((Rectangle){2 * em, 2 * em + 6 * im + 10 * 24, 92, 24}, "LAKES");
 
                     if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
                         PCGRegenerateStructureDefinition(map);
@@ -730,6 +736,10 @@ int main(void)
                         PCGRegenerateStructureDefinition(map);
                     if (map.ChasmFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * im + 8 * 24, 92, 24}, "", "", map.ChasmFrequency(), 0.0, 1.0)))
                         PCGRegenerateStructureDefinition(map);
+                    if (map.TreeFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 5 * im + 9 * 24, 92, 24}, "", "", map.TreeFrequency(), 0.0, 1.0)))
+                        PCGRegenerateSurface(map);
+                    if (map.LakeFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 6 * im + 10 * 24, 92, 24}, "", "", map.LakeFrequency(), 0.0, 1.0)))
+                        PCGRegenerateSurface(map);
                  }
                 else
                 {
@@ -740,15 +750,12 @@ int main(void)
                     GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "PARTS");
                     GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "FREQUENCY");
                     GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "OCTAVES");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "TREES");
 
                     if (map.SurfacePartsCount(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.SurfacePartsCount(), 0.0, 1.0)))
                         PCGRegenerateSurface(map);
                     if (map.SurfacePartsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.SurfacePartsFrequency(), 0.0, 1.0)))
                         PCGRegenerateSurface(map);
                     if (map.SurfacePartsOctaves(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SurfacePartsOctaves(), 0.0, 1.0)))
-                        PCGRegenerateSurface(map);
-                    if (map.TreeFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.TreeFrequency(), 0.0, 1.0)))
                         PCGRegenerateSurface(map);
                }
 
