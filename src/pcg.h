@@ -1,3 +1,4 @@
+#include <limits>
 #include <stdio.h>
 #include <cassert>
 #include <iterator>
@@ -1594,6 +1595,52 @@ EXPORT inline void GenerateLakes(Map& map)
         --count;
     }
 };
+
+EXPORT inline void GenerateJungleSwamp(Map& map)
+{
+    printf("GenerateJungleSwamp\n");
+
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+
+    auto jungle = map.GetBiome(Biomes::JUNGLE);
+    if (jungle == nullptr)
+        return;
+
+    auto x0 = std::numeric_limits<int>::max();
+    auto x1 = std::numeric_limits<int>::min();
+    auto y0 = surface_rect.y;
+    auto y1 = surface_rect.y + surface_rect.h; 
+
+    int count = 35; // TODO
+
+    for (auto p: *jungle)
+    {
+        if (p.y == y0 && x0 > p.x) x0 = p.x;
+        if (p.y == y1 && x0 > p.x) x0 = p.x;
+        if (p.y == y0 && x1 < p.x) x1 = p.x; 
+        if (p.y == y1 && x1 < p.x) x1 = p.x; 
+    }
+
+    // IF JUNGLE IS NOT ENDING AT SURFACE.Y AND NOT PASSING SURFACE.Y + SURFACE.H THEN THIS WILL NOT PASS
+    if ((x0 >= surface_rect.x && x0 <= surface_rect.x + surface_rect.w) && 
+        (x1 >= surface_rect.x && x1 <= surface_rect.x + surface_rect.w))
+    {
+        Rect rect = {x0, y0, x1 - x0, y1 - y0};
+        int step = rect.w / count;
+
+        auto& water = map.SurfaceStructure(Structures::WATER);
+        
+        printf("[%d, %d, %d, %d]\n", rect.x, rect.y, rect.w, rect.h);
+        for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+            if (((x - rect.x) % step) == 0)
+                CreateWater(rect, water, {x, rect.y}, 1, map); 
+    }
+    else
+    {
+        printf("GenerateJungleSwamp check error\n");
+    }
+}
 
 EXPORT inline void GenerateGrass(Map& map)
 {

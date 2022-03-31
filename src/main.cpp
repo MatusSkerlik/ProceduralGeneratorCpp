@@ -40,6 +40,7 @@ PCG_FUNC GenerateCliffsTransitions;
 PCG_FUNC GenerateGrass;
 PCG_FUNC GenerateTrees;
 PCG_FUNC GenerateLakes;
+PCG_FUNC GenerateJungleSwamp;
 
 #else
 #include "pcg.h"
@@ -319,6 +320,7 @@ bool LoadPCG()
     GenerateOceanLeft = (PCG_FUNC) GetProcAddress(module, "GenerateOceanLeft");
     GenerateOceanRight = (PCG_FUNC) GetProcAddress(module, "GenerateOceanRight");
     GenerateLakes = (PCG_FUNC) GetProcAddress(module, "GenerateLakes");
+    GenerateJungleSwamp = (PCG_FUNC) GetProcAddress(module, "GenerateJungleSwamp");
     return true;
 };
 
@@ -436,6 +438,8 @@ void _PCGGen(Map& map)
         GenerateChasms(map);
         map.SetGenerationMessage("GENERATION OF LAKES...");
         GenerateLakes(map);
+        map.SetGenerationMessage("GENERATION OF JUNGLE SWAMP...");
+        GenerateJungleSwamp(map);
         map.SetGenerationMessage("GENERATION OF ISLANDS...");
         GenerateIslands(map);
         map.SetGenerationMessage("GENERATION OF GRASS...");
