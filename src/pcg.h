@@ -750,14 +750,12 @@ EXPORT inline void DefineHorizontal(Map& map)
     Rect Space = Rect(0, 0, width, (int) 2 * height / 20);
     Rect Surface = Rect(0, Space.y + Space.h, width, (int) 4 * height / 20);
     Rect Underground = Rect(0, Surface.y + Surface.h, width, (int) 4 * height / 20 + 1);
-    Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 7 * height / 20);
-    Rect Hell = Rect(0, Cavern.y + Cavern.h, width, (int) 3 * height / 20);
+    Rect Cavern = Rect(0, Underground.y + Underground.h, width, (int) 10 * height / 20);
     
     PixelsOfRect(Space, map.Space());
     PixelsOfRect(Surface, map.Surface());
     PixelsOfRect(Underground, map.Underground());
     PixelsOfRect(Cavern, map.Cavern());
-    PixelsOfRect(Hell, map.Hell());
 }
 
 /**
@@ -774,8 +772,8 @@ EXPORT inline void DefineBiomes(Map& map)
     auto jungle_width = 500;
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
-    auto& Hell = map.Hell();
-    auto hell_rect = Hell.bbox();
+    auto& Cavern = map.Cavern();
+    auto cavern_rect = Cavern.bbox();
 
     auto& ocean_left = map.Biome(Biomes::OCEAN_LEFT);
     PixelsOfRect(0, surface_rect.y, ocean_width, surface_rect.h, ocean_left); 
@@ -828,7 +826,7 @@ EXPORT inline void DefineBiomes(Map& map)
         // DEFINITION OF JUNGLE
         auto jungle_x = result["jungle"];  
         auto& jungle = map.Biome(Biomes::JUNGLE);
-        for (int i = surface_rect.y; i < hell_rect.y; i++)
+        for (int i = surface_rect.y; i < cavern_rect.y + cavern_rect.h - 1; ++i)
         {
             PixelsAroundRect(jungle_x - i, i, jungle_width, 2, jungle);
         }
@@ -836,14 +834,14 @@ EXPORT inline void DefineBiomes(Map& map)
         // DEFINITION OF TUNDRA
         auto tundra_x = result["tundra"];
         auto& tundra = map.Biome(Biomes::TUNDRA);
-        for (int i = surface_rect.y; i < hell_rect.y; i++)
+        for (int i = surface_rect.y; i < cavern_rect.y + cavern_rect.h - 1; ++i)
         {
             PixelsAroundRect(tundra_x - i, i, tundra_width, 2, tundra);
         }
 
         // DEFINITION OF FORESTS
         PixelArray forests;
-        Rect forests_rect {0, surface_rect.y, width, hell_rect.y - surface_rect.y};
+        Rect forests_rect {0, surface_rect.y, width, cavern_rect.y + cavern_rect.h - 1 - surface_rect.y};
         PixelsOfRect(forests_rect, forests);
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 
@@ -1075,29 +1073,22 @@ EXPORT inline void DefineCastles(Map& map)
     auto& jungle = *map.GetBiome(Biomes::JUNGLE);
     auto jungle_rect = RectIntersection(UCRect, jungle.bbox());
 
-
-    auto& hell = map.Hell();
-    auto hell_rect = hell.bbox();
-
-    auto variables = CreateVariables({"forest_castle", "jungle_castle", "tundra_castle", "hell_castle"});
+    auto variables = CreateVariables({"forest_castle", "jungle_castle", "tundra_castle"});
 
     // DEFINITION OF UNION DOMAIN
     auto forest_domain = DomainInsidePixelArray(forest_rect, forest, 10);
     auto jungle_domain = DomainInsidePixelArray(jungle_rect, jungle, 10);
     auto tundra_domain = DomainInsidePixelArray(tundra_rect, tundra, 10);
-    auto hell_domain =   DomainInsidePixelArray(hell_rect, hell, 10); 
 
     std::unordered_map<std::string, std::unordered_set<int>> domains;
     domains["forest_castle"] = forest_domain;
     domains["jungle_castle"] = jungle_domain;
     domains["tundra_castle"] = tundra_domain;
-    domains["hell_castle"] = hell_domain;
 
     // DEFINITION OF CONSTRAINTS
     InsidePixelArrayConstraint2D<std::string, int> c0 ("forest_castle", castle_width, castle_height, forest, forest_rect);
     InsidePixelArrayConstraint2D<std::string, int> c1 ("jungle_castle", castle_width, castle_height, jungle, jungle_rect);
     InsidePixelArrayConstraint2D<std::string, int> c2 ("tundra_castle", castle_width, castle_height, tundra, tundra_rect);
-    InsidePixelArrayConstraint2D<std::string, int> c3 ("hell_castle", castle_width, castle_height, hell, hell_rect);
 
     // CREATION OF SOLVER
     CSPSolver<std::string, int> solver {variables, domains};
@@ -1106,7 +1097,6 @@ EXPORT inline void DefineCastles(Map& map)
     solver.add_constraint(c0);
     solver.add_constraint(c1);
     solver.add_constraint(c2);
-    solver.add_constraint(c3);
         
     // SEARCH FOR SOLUTION
     auto result = solver.backtracking_search({}, [&](){ return map.ShouldForceStop(); });
@@ -1138,12 +1128,6 @@ EXPORT inline void DefineCastles(Map& map)
         auto j_y = jungle_rect.y + (jungle_v / jungle_rect.w);
         auto& jungle_castle = map.Structure(Structures::CASTLE);
         PixelsOfRect(j_x, j_y, castle_width, castle_height, jungle_castle);
-
-        auto hell_v = result["hell_castle"];
-        auto h_x = hell_rect.x + (hell_v % hell_rect.w);
-        auto h_y = hell_rect.y + (hell_v / hell_rect.w);
-        auto& hell_castle = map.Structure(Structures::CASTLE);
-        PixelsOfRect(h_x, h_y, castle_width, castle_height, hell_castle);
     }
 };
 

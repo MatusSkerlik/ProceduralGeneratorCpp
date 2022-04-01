@@ -32,7 +32,6 @@
 #define C_SURFACE         (Color){155, 209, 255, 255}
 #define C_UNDERGROUND     (Color){151, 107, 75, 255}
 #define C_CAVERN          (Color){128, 128, 128, 255}
-#define C_HELL            (Color){0, 0, 0, 255}
 
 inline void DrawHorizontal(Map& map)
 {
@@ -53,9 +52,6 @@ inline void DrawHorizontal(Map& map)
                 break;
             case HorizontalAreas::CAVERN:
                 color = C_CAVERN;
-                break;
-            case HorizontalAreas::HELL:
-                color = C_HELL;
                 break;
             default:
                 break;

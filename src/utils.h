@@ -158,7 +158,7 @@ class PixelArray
 
 namespace HorizontalAreas
 {
-    enum Type: unsigned short { SPACE, SURFACE, UNDERGROUND, CAVERN, HELL };
+    enum Type: unsigned short { SPACE, SURFACE, UNDERGROUND, CAVERN };
 
     class Area: public PixelArray
     {
@@ -327,7 +327,6 @@ class Map {
         HorizontalAreas::Area _surface {HorizontalAreas::SURFACE};
         HorizontalAreas::Area _underground {HorizontalAreas::UNDERGROUND};
         HorizontalAreas::Area _cavern {HorizontalAreas::CAVERN};
-        HorizontalAreas::Area _hell {HorizontalAreas::HELL};
 
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
         std::vector<std::unique_ptr<Structures::Structure>> _structures;
@@ -744,16 +743,10 @@ class Map {
             return _cavern; 
         };
         
-        auto& Hell()
-        {
-            const std::lock_guard<std::mutex> lock(mutex);
-            return _hell; 
-        };
-
         std::vector<HorizontalAreas::Area*> HorizontalAreas()
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            return {&_space, &_surface, &_underground, &_cavern, &_hell};
+            return {&_space, &_surface, &_underground, &_cavern};
         }
 
         auto& Biome(Biomes::Type type)
@@ -875,7 +868,6 @@ class Map {
             _surface.clear();
             _underground.clear();
             _cavern.clear();
-            _hell.clear();
         };
 
         void ClearStage1()

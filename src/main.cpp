@@ -254,7 +254,7 @@ int main(void)
             ScheduleGeneration(map);
         }
 
-        if (IsKeyPressed(KEY_S))
+        if (IsKeyPressed(KEY_I))
         {
             auto image = LoadImageFromTexture(canvas.texture);
             ImageFlipVertical(&image);
