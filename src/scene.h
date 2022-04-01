@@ -143,6 +143,7 @@ class DefaultScene: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -206,6 +207,7 @@ class Scene0: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -261,6 +263,8 @@ class Scene1: public Scene
             {
                 map.SetGenerationMessage("GENERATION OF HILLS...");
                 GenerateHills(map);
+                map.SetGenerationMessage("GENERATION OF HOLES...");
+                GenerateHoles(map);
             }
 
             if (!map.ShouldForceStop())
@@ -275,6 +279,7 @@ class Scene1: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -349,6 +354,7 @@ class Scene2: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -428,6 +434,7 @@ class Scene3: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -508,6 +515,7 @@ class Scene4: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -592,6 +600,7 @@ class Scene5: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
@@ -678,6 +687,7 @@ class Scene6: public Scene
         virtual void Render(Map& map) override
         {
             DrawHorizontal(map);
+            DrawSurfaceBg(map);
             DrawSurface(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
