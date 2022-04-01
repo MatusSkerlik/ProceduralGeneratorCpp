@@ -788,8 +788,8 @@ int main(void)
                 auto my = GetMouseY();
                 if ((mx > map_view.x) && (mx < map_view.x + map_view.width) && (my > map_view.y) && (my < map_view.y + map_view.height))
                 {
-                    int x = ScrollOffset.x + (mx - map_view.x) * 1 / camera.zoom;
-                    int y = ScrollOffset.y + (my - map_view.y) * 1 / camera.zoom;
+                    int x = ScrollOffset.x / camera.zoom + (mx - map_view.x) * 1 / camera.zoom;
+                    int y = ScrollOffset.y / camera.zoom + (my - map_view.y) * 1 / camera.zoom;
                     std::string t = "[";
                     t += std::to_string((int)x);
                     t += ":";
