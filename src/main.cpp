@@ -1,13 +1,12 @@
-#include <atomic>
-#include <mutex>
-#include <stdexcept>
 #include <stdio.h>
+#include <functional>
+#include <stdexcept>
+#include <atomic>
 #include <string>
 #include <thread>
 #include <future>
-#include <functional>
 #include <chrono>
-#include <assert.h>
+#include <mutex>
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
@@ -16,14 +15,15 @@
 #include "raygui.h"
 #pragma GCC diagnostic pop
 
+#include "gui.h"
+#include "utils.h"
 
 #define PCG_AS_DLL false 
 
 #if (PCG_AS_DLL)
 #include "libloaderapi.h"
-HMODULE module;
 
-#include "utils.h"
+HMODULE module;
 typedef void (*PCG_FUNC)(Map&);
 PCG_FUNC DefineHorizontal;
 PCG_FUNC DefineBiomes;
@@ -38,17 +38,19 @@ PCG_FUNC GenerateHoles;
 PCG_FUNC GenerateIslands;
 PCG_FUNC GenerateCliffsTransitions;
 PCG_FUNC GenerateGrass;
+PCG_FUNC GenerateChasms;
 PCG_FUNC GenerateTrees;
 PCG_FUNC GenerateLakes;
 PCG_FUNC GenerateJungleSwamp;
-
 #else
+
 #include "pcg.h"
 typedef void (*PCG_FUNC)(Map&);
 #endif
 
 
 using namespace std::chrono_literals;
+
 /************************************************
 * 
 * DRAW LOGIC
@@ -274,6 +276,7 @@ void DrawSurface(Map& map)
     }
     */
 };
+
 /**************************************************
 *
 * PROCEDURAL GENERATION LOGIC 
@@ -542,15 +545,6 @@ void PCGRegenerateHorizontalAreas(Map& map)
 *
 **************************************************/
 
-void ChangeSeed(char* SeedTextBoxText)
-{
-    auto seed = (rand() * rand()) % INT_MAX;
-    srand(seed);
-    strcpy(SeedTextBoxText, std::to_string(seed).c_str());
-};
-
-void Pass(){};
-
 int main(void)
 {
     // BASE CONSTANTS
@@ -568,28 +562,90 @@ int main(void)
     Camera2D camera {{0, 0}, {0, 0}, 0, 1};
    
     // RAYGUI RELATED
-    float em = 8.0; // EXTERNAL MARGIN
-    float im = 8.0; // INTERNAL MARGIN
-    Vector2 settings_anchor = {em, em};
-    Vector2 map_view_anchor = {settings_anchor.x + 300 + im + im + em, settings_anchor.y};
-    float settings_width = map_view_anchor.x - settings_anchor.x;
-    // float settings_height = height - em - settings_anchor.y;
-    float map_view_width = width - settings_width - em - em;
-    float map_view_height = height - map_view_anchor.y - em; 
+    camera.zoom = width / map_width;
 
-    camera.zoom = map_view_width / map_width;
-    Rectangle map_view {map_view_anchor.x, map_view_anchor.y, map_view_width, map_view_height};
-
-    bool SeedTextBoxEditMode = false;
-    char SeedTextBoxText[128];
-    ChangeSeed(SeedTextBoxText);
-    int TabActive = 0;
-
-    Rectangle ScrollView = {0, 0, 0, 0};
+    Rectangle map_view {0, 0, width, height};
     Vector2 ScrollOffset = {0, 0};
 
-    // CORE LOGIC INIT
     Map map;
+    // GUI
+    HeaderLayout StructuresControl(0, 0, 200, 400, "Structures Settings");
+    StructuresControl.CreateLabel(92 + 8, 0, 92, 24, "FREQUENCY");
+    StructuresControl.CreateLabel(0, 24 + 4, 92, 24, "HILLS");
+    StructuresControl.CreateLabel(0, 48 + 8, 92, 24, "HOLES");
+    StructuresControl.CreateLabel(0, 72 + 12, 92, 24, "ISLANDS");
+    StructuresControl.CreateLabel(0, 96 + 16, 92, 24, "CHASMS");
+    StructuresControl.CreateLabel(0, 120 + 20, 92, 24, "LAKES");
+    StructuresControl.CreateLabel(0, 144 + 24, 92, 24, "TREES");
+    StructuresControl.CreateSliderBar(92 + 8, 24 + 4, 92, 24, map.HillsFrequency(), 
+    [&](float fq)
+    { 
+            map.HillsFrequency(fq);
+            PCGRegenerateStructureDefinition(map); 
+    }); 
+    StructuresControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.HolesFrequency(),
+    [&](float fq)
+    {
+        map.HolesFrequency(fq);
+        PCGRegenerateStructureDefinition(map);
+    }); 
+    StructuresControl.CreateSliderBar(92 + 8, 72 + 12, 92, 24, map.IslandsFrequency(), 
+    [&](float fq)
+    {
+        map.IslandsFrequency(fq);
+        PCGRegenerateStructureDefinition(map);
+    }); 
+    StructuresControl.CreateSliderBar(92 + 8, 96 + 16, 92, 24, map.ChasmFrequency(), 
+    [&](float fq)
+    {
+        map.ChasmFrequency(fq);
+        PCGRegenerateSurface(map);
+    }); 
+    StructuresControl.CreateSliderBar(92 + 8, 120 + 20, 92, 24, map.LakeFrequency(), 
+    [&](float fq)
+    {
+        map.LakeFrequency(fq);
+        PCGRegenerateSurface(map);
+    }); 
+    StructuresControl.CreateSliderBar(92 + 8, 144 + 24, 92, 24, map.TreeFrequency(), 
+    [&](float fq)
+    {
+        map.TreeFrequency(fq);
+        PCGRegenerateSurface(map);
+    }); 
+    StructuresControl.Hide();
+
+    HeaderLayout SurfaceControl(200 + 8, 0, 200, 400, "Surface Settings");
+    SurfaceControl.CreateLabel(0, 0, 92, 24, "PARTS");
+    SurfaceControl.CreateLabel(0, 24 + 4, 92, 24, "FREQUENCY");
+    SurfaceControl.CreateLabel(0, 48 + 8, 92, 24, "OCTAVES");
+    SurfaceControl.CreateSliderBar(92 + 8, 0, 92, 24, map.SurfacePartsCount(),
+    [&](float fq)
+    {
+        map.SurfacePartsCount(fq);
+        PCGRegenerateSurface(map);
+    }); 
+    SurfaceControl.CreateSliderBar(92 + 8, 24 + 4, 92, 24, map.SurfacePartsFrequency(),
+    [&](float fq)
+    {
+        map.SurfacePartsFrequency(fq);
+        PCGRegenerateSurface(map);
+    }); 
+    SurfaceControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.SurfacePartsOctaves(),
+    [&](float fq)
+    {
+        map.SurfacePartsOctaves(fq);
+        PCGRegenerateSurface(map);
+    }); 
+    SurfaceControl.Hide();
+
+    HeaderLayout SceneControl {400 + 16, 0, 200, 400, "Scenes"};
+    SceneControl.CreateButton(0, 0, 92, 24, "SCENE0"); 
+    SceneControl.CreateButton(0, 24, 92, 24, "SCENE1"); 
+    SceneControl.CreateButton(0, 48, 92, 24, "SCENE2"); 
+    SceneControl.Hide();
+
+    // CORE LOGIC INIT
     GenerateStage0 = true;
     GenerateStage1 = true;
     GenerateStage2 = true;
@@ -657,17 +713,60 @@ int main(void)
         }
 
         if (IsKeyDown(KEY_Q))
+        {
             camera.zoom *= 0.95;
+        }
         if (IsKeyDown(KEY_E))
+        {
             camera.zoom *= 1.05;
+        }
+
+        if ((map_width * camera.zoom) < width || (map_height * camera.zoom) < height)
+        {
+            camera.offset = {0, 0};
+            camera.target = {0, 0};
+        }
+        else
+        {
+            // TODO
+            camera.offset = {0, 0}; 
+            camera.target = {0 ,0};
+        }
+
         if (IsKeyDown(KEY_A))
-            ScrollOffset.x += 15;
+            ScrollOffset.x -= 20 * camera.zoom;
         if (IsKeyDown(KEY_D))
-            ScrollOffset.x -= 15;
+            ScrollOffset.x += 20 * camera.zoom;
         if (IsKeyDown(KEY_W))
-            ScrollOffset.y += 15;
+            ScrollOffset.y -= 20 * camera.zoom;
         if (IsKeyDown(KEY_S))
-            ScrollOffset.y -= 15;
+            ScrollOffset.y += 20 * camera.zoom;
+
+        if (ScrollOffset.x < 0)
+            ScrollOffset.x = 0;
+
+        if ((map_width * camera.zoom) > width)
+        {
+            if (ScrollOffset.x > ((map_width * camera.zoom) - width))
+                ScrollOffset.x = ((map_width * camera.zoom) - width);
+        }
+        else
+        {
+            ScrollOffset.x = 0;
+        }
+
+        if (ScrollOffset.y < 0)
+            ScrollOffset.y = 0;
+
+        if ((map_height * camera.zoom) > height)
+        {
+            if (ScrollOffset.y > ((map_height * camera.zoom) - height))
+                ScrollOffset.y = ((map_height * camera.zoom) - height);
+        }
+        else
+        {
+            ScrollOffset.y = 0;
+        }
 
         // DRAW LOGIC
         BeginDrawing();
@@ -675,110 +774,22 @@ int main(void)
 
             if (PCGLoaded()) // IF DLL LOADED SHOW SETTINGS WITH MAP
             {
-                GuiGroupBox((Rectangle){em, em, 2 * em + 300, height - 2 * em}, "SETTINGS");
-
-                if (GuiButton((Rectangle){2 * em + im + 92, 2 * em, 64, 24}, "Seed"))
-                {
-                    ChangeSeed(SeedTextBoxText);
-                    PCGRegenerateHorizontalAreas(map);
-                }
-
-                if (GuiTextBox((Rectangle){ 2 * em, 2 * em, 92, 24}, SeedTextBoxText, 128, SeedTextBoxEditMode))
-                    SeedTextBoxEditMode = !SeedTextBoxEditMode;
-
-                TabActive = GuiToggleGroup((Rectangle){2 * em, 2 * em + 2 * 24, 92, 24}, "MATERIALS;ENTITIES;WORLD", TabActive);
-                if (TabActive == 0)
-                {
-                    GuiLabel((Rectangle){2 * em, 2 * em + 24, width - 4 * 8, 24}, "");
-                    
-                    GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
-                    GuiLabel((Rectangle){2 * em + 2 * 92 + im, 5 * em + 2 * 24, 92, 24}, "SIZE");
-
-                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "COPPER ORE");
-                    GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "IRON ORE");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "SILVER ORE");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "GOLD ORE");
-
-                    if (map.CopperFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperFrequency(), 0.0, 1.0)))
-                        Pass();
-                    if (map.IronFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronFrequency(), 0.0, 1.0)))
-                        Pass();
-                    if (map.SilverFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverFrequency(), 0.0, 1.0)))
-                        Pass();
-                    if (map.GoldFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldFrequency(), 0.0, 1.0)))
-                        Pass();
-                    if (map.CopperSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 4 * 24, 92, 24}, "", "", map.CopperSize(), 0.0, 1.0)))
-                        Pass();
-                    if (map.IronSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.IronSize(), 0.0, 1.0)))
-                        Pass();
-                    if (map.SilverSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SilverSize(), 0.0, 1.0)))
-                        Pass();
-                    if (map.GoldSize(GuiSliderBar((Rectangle){2 * em + im + 2 * 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.GoldSize(), 0.0, 1.0)))
-                        Pass();
-                }
-                else if (TabActive == 1)
-                {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "");
-
-                    GuiLabel((Rectangle){2 * em + 92, 5 * em + 2 * 24, 92, 24}, "FREQUENCY");
-
-                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "HILLS");
-                    GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "HOLES");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "CABINS");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 3 * im + 7 * 24, 92, 24}, "ISLANDS");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * im + 8 * 24, 92, 24}, "CHASMS");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 5 * im + 9 * 24, 92, 24}, "TREES");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 6 * im + 10 * 24, 92, 24}, "LAKES");
-
-                    if (map.HillsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.HillsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateStructureDefinition(map);
-                    if (map.HolesFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.HolesFrequency(), 0.0, 1.0)))
-                        PCGRegenerateStructureDefinition(map);
-                    if (map.CabinsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.CabinsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateStructureDefinition(map);
-                    if (map.IslandsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 3 * im + 7 * 24, 92, 24}, "", "", map.IslandsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateStructureDefinition(map);
-                    if (map.ChasmFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * im + 8 * 24, 92, 24}, "", "", map.ChasmFrequency(), 0.0, 1.0)))
-                        PCGRegenerateStructureDefinition(map);
-                    if (map.TreeFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 5 * im + 9 * 24, 92, 24}, "", "", map.TreeFrequency(), 0.0, 1.0)))
-                        PCGRegenerateSurface(map);
-                    if (map.LakeFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 6 * im + 10 * 24, 92, 24}, "", "", map.LakeFrequency(), 0.0, 1.0)))
-                        PCGRegenerateSurface(map);
-                 }
-                else
-                {
-                    GuiLabel((Rectangle){2 * 8, 2 * 8 + 24, width - 4 * 8, 24}, "");
-
-                    GuiLabel((Rectangle){2 * em, 5 * em + 2 * 24, 92, 24}, "SURFACE");
-
-                    GuiLabel((Rectangle){2 * em, 2 * em + 4 * 24, 92, 24}, "PARTS");
-                    GuiLabel((Rectangle){2 * em, 2 * em + im + 5 * 24, 92, 24}, "FREQUENCY");
-                    GuiLabel((Rectangle){2 * em, 2 * em + 2 * im + 6 * 24, 92, 24}, "OCTAVES");
-
-                    if (map.SurfacePartsCount(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 4 * 24, 92, 24}, "", "", map.SurfacePartsCount(), 0.0, 1.0)))
-                        PCGRegenerateSurface(map);
-                    if (map.SurfacePartsFrequency(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + im + 5 * 24, 92, 24}, "", "", map.SurfacePartsFrequency(), 0.0, 1.0)))
-                        PCGRegenerateSurface(map);
-                    if (map.SurfacePartsOctaves(GuiSliderBar((Rectangle){2 * em + 92, 2 * em + 2 * im + 6 * 24, 92, 24}, "", "", map.SurfacePartsOctaves(), 0.0, 1.0)))
-                        PCGRegenerateSurface(map);
-               }
-
-                ScrollView = GuiScrollPanel(map_view, (Rectangle){0, 0, map_width * camera.zoom, map_height * camera.zoom}, &ScrollOffset);
                 DrawRectangleRec(map_view, {40, 40, 40, 255});
 
                 BeginScissorMode(map_view.x, map_view.y, map_view.width, map_view.height);
                     BeginMode2D(camera);
-                        DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {ScrollOffset.x + map_view_anchor.x * 1 / camera.zoom, ScrollOffset.y + map_view_anchor.y * 1 / camera.zoom}, WHITE);        
+                        DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {-ScrollOffset.x / camera.zoom, -ScrollOffset.y / camera.zoom}, WHITE);        
                     EndMode2D();
                 EndScissorMode();
 
+
+                // DRAW STRUCTURE INFO CLOSE TO MOUSE CURSOR
                 auto mx = GetMouseX();
                 auto my = GetMouseY();
-
                 if ((mx > map_view.x) && (mx < map_view.x + map_view.width) && (my > map_view.y) && (my < map_view.y + map_view.height))
                 {
-                    int x = -ScrollOffset.x + (mx - map_view.x) * 1 / camera.zoom;
-                    int y = -ScrollOffset.y + (my - map_view.y) * 1 / camera.zoom;
+                    int x = ScrollOffset.x + (mx - map_view.x) * 1 / camera.zoom;
+                    int y = ScrollOffset.y + (my - map_view.y) * 1 / camera.zoom;
                     std::string t = "[";
                     t += std::to_string((int)x);
                     t += ":";
@@ -853,23 +864,34 @@ int main(void)
                     } catch (std::out_of_range& e){};
                 }
 
+                StructuresControl.Render();
+                SurfaceControl.Render();
+                SceneControl.Render();
+                
+                // DRAW STATUS BAR
                 if (map.IsGenerating())
                 { 
-                    DrawText(map.GetGenerationMessage().c_str(), em, height, 8, WHITE);
+                    DrawText(map.GetGenerationMessage().c_str(), 8, height + 4, 8, WHITE);
                 }
-                else if (map.HasError()) 
-                { 
-                    auto error = map.Error();
-                    auto error_width = (float) (error.size() * 6 + 2 * em);
-                    if (error_width < 100) error_width = 100;
+                else
+                {
+                    DrawText("DONE...", 8, height + 4, 8, WHITE);
 
-                    if (GuiMessageBox((Rectangle){width / 2 - error_width / 2, height / 2 - 50, error_width, 100}, "ERROR", error.c_str(), "OK") != -1)
-                    {
-                        map.PopError();    
-                    }
-                };
+                    if (map.HasError()) 
+                    { 
+                        auto error = map.Error();
+                        auto error_width = (float) (error.size() * 6 + 2 * 8);
+                        if (error_width < 100) error_width = 100;
+
+                        if (GuiMessageBox((Rectangle){width / 2 - error_width / 2, height / 2 - 50, error_width, 100}, "ERROR", error.c_str(), "OK") != -1)
+                        {
+                            map.PopError();    
+                        }
+                    };
+                }
             } 
-            else // IF NOT, SHOW WARNING
+
+            else // IF PCG.DLL NOT LOADED, SHOW WARNING
             {
                 if (GuiMessageBox((Rectangle){(width / 2) - 100, height / 2 - 100, 200, 100}, "ERROR", "PCG.DLL NOT FOUND", "OK") != -1)
                 {

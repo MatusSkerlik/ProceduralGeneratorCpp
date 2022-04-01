@@ -1,5 +1,8 @@
-#include <functional>
+#ifndef UTILS
+#define UTILS
+
 #include <stdio.h>
+#include <functional>
 #include <mutex>
 #include <memory>
 #include <cmath>
@@ -1102,3 +1105,5 @@ inline void PixelsOfRect(const Rect& rect, PixelArray& array)
 {
     PixelsOfRect(rect.x, rect.y, rect.w, rect.h, array);
 };
+
+#endif

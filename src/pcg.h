@@ -1,20 +1,26 @@
-#include <limits>
+#ifndef PCG
+#define PCG
+
 #include <stdio.h>
-#include <cassert>
-#include <iterator>
-#include <stdlib.h>
-#include <tuple>
 #include <unordered_set>
 #include <unordered_map>
+#include <algorithm>
+#include <iterator>
+#include <cassert>
 #include <utility>
 #include <cstdlib>
+#include <limits>
 #include <string>
-#include <algorithm>
 #include <vector>
-#include "utils.h"
+#include <tuple>
+
 #include "csp.h"
 #include "spline.h"
 #include "polygon.h"
+
+#ifndef UTILS
+#include "utils.h"
+#endif
 
 #define EXPORT __declspec(dllexport)
 
@@ -1614,7 +1620,7 @@ EXPORT inline void GenerateJungleSwamp(Map& map)
 
     int count = 35; // TODO
 
-    for (auto p: *jungle)
+    for (auto& p: *jungle)
     {
         if (p.y == y0 && x0 > p.x) x0 = p.x;
         if (p.y == y1 && x0 > p.x) x0 = p.x;
@@ -1765,5 +1771,5 @@ EXPORT inline void GenerateTrees(Map& map)
     };
 };
 
-
-};
+}; // extern "C"
+#endif // PCG
