@@ -193,6 +193,10 @@ int main(void)
     auto& scene1 = SceneControl.CreateToogleButton(0, 24, 92, 24, "SCENE1"); 
     auto& scene2 = SceneControl.CreateToogleButton(0, 48, 92, 24, "SCENE2"); 
     auto& scene3 = SceneControl.CreateToogleButton(0, 72, 92, 24, "SCENE3"); 
+    auto& scene4 = SceneControl.CreateToogleButton(0, 96, 92, 24, "SCENE4"); 
+    auto& scene5 = SceneControl.CreateToogleButton(0, 120, 92, 24, "SCENE5"); 
+    auto& scene6 = SceneControl.CreateToogleButton(0, 144, 92, 24, "SCENE6"); 
+    auto& scene7 = SceneControl.CreateToogleButton(0, 168, 92, 24, "SCENE7"); 
 
     scene0.SetOnClickListener([&](bool active){
         if (active)
@@ -200,6 +204,10 @@ int main(void)
             scene1.SetOff();
             scene2.SetOff();
             scene3.SetOff();
+            scene4.SetOff();
+            scene5.SetOff();
+            scene6.SetOff();
+            scene7.SetOff();
             scene.reset(new DefaultScene());
             ScheduleGeneration(map);
         }
@@ -211,6 +219,10 @@ int main(void)
             scene0.SetOff();
             scene2.SetOff();
             scene3.SetOff();
+            scene4.SetOff();
+            scene5.SetOff();
+            scene6.SetOff();
+            scene7.SetOff();
             scene.reset(new Scene0());
             ScheduleGeneration(map);
         }
@@ -222,6 +234,12 @@ int main(void)
             scene0.SetOff();
             scene1.SetOff();
             scene3.SetOff();
+            scene4.SetOff();
+            scene5.SetOff();
+            scene6.SetOff();
+            scene7.SetOff();
+            scene.reset(new Scene1());
+            ScheduleGeneration(map);
         }
     });
 
@@ -231,6 +249,72 @@ int main(void)
             scene0.SetOff();
             scene1.SetOff();
             scene2.SetOff();
+            scene4.SetOff();
+            scene5.SetOff();
+            scene6.SetOff();
+            scene7.SetOff();
+            scene.reset(new Scene2());
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene4.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene1.SetOff();
+            scene2.SetOff();
+            scene3.SetOff();
+            scene5.SetOff();
+            scene6.SetOff();
+            scene7.SetOff();
+            scene.reset(new Scene3());
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene5.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene1.SetOff();
+            scene2.SetOff();
+            scene3.SetOff();
+            scene4.SetOff();
+            scene6.SetOff();
+            scene7.SetOff();
+            scene.reset(new Scene4());
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene6.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene1.SetOff();
+            scene2.SetOff();
+            scene3.SetOff();
+            scene4.SetOff();
+            scene5.SetOff();
+            scene7.SetOff();
+            scene.reset(new Scene5());
+            ScheduleGeneration(map);
+        }
+    });
+    
+    scene7.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene1.SetOff();
+            scene2.SetOff();
+            scene3.SetOff();
+            scene4.SetOff();
+            scene5.SetOff();
+            scene6.SetOff();
+            scene.reset(new Scene6());
+            ScheduleGeneration(map);
         }
     });
     SceneControl.Hide();

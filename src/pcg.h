@@ -1621,7 +1621,6 @@ EXPORT inline void GenerateJungleSwamp(Map& map)
 
         auto& water = map.SurfaceStructure(Structures::WATER);
         
-        printf("[%d, %d, %d, %d]\n", rect.x, rect.y, rect.w, rect.h);
         for (auto x = rect.x; x <= rect.x + rect.w; ++x)
             if (((x - rect.x) % step) == 0)
                 CreateWater(rect, water, {x, rect.y}, 1, map); 
