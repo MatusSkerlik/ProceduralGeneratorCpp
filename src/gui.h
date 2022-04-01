@@ -62,6 +62,43 @@ class Label: public Renderable
         };
 };
 
+class ToogleButton: public Renderable
+{
+    private:
+        float x, y;
+        float w, h;
+        bool active;
+        std::string text;
+
+        std::function<void (bool)> on_click;
+
+    public:
+        ToogleButton(float _x, float _y, float _w, float _h, 
+                std::string _text, 
+                std::function<void (bool)> _on_click = [](bool){}, 
+                bool _active = false
+        ):  x{_x}, y{_y}, w{_w}, h{_h}, 
+            active{_active}, 
+            text{_text}, 
+            on_click{_on_click} 
+        {};
+
+        void SetOn() { active = true; };
+        void SetOff() { active = false; };
+        auto IsActive() { return active; };
+
+        void SetOnClickListener(std::function<void (bool)> f) { on_click = f;} ;
+
+        virtual void Render(float ax, float ay) override
+        {
+            auto a = GuiToggle({ax + x, ay + y, w, h}, text.c_str(), active);
+            if (a != active)
+            {
+                active = a;
+                on_click(active);
+            }
+        };
+};
 class SliderBar: public Renderable
 {
     private:
@@ -86,6 +123,9 @@ class SliderBar: public Renderable
             on_change{_on_change}, 
             value{_value}
         {};
+
+        auto GetValue() { return value; };
+        void SetValue(float v) { value = v; } ;
 
         void SetOnChangeListener(std::function<void (float)> f) { on_change = f;} ;
 
@@ -123,22 +163,36 @@ class Layout
 
         void SetBg(Color c){ bg = c; };
 
-        virtual void CreateLabel(float lx, float ly, float w, float h, std::string text)
+        virtual Label& CreateLabel(float lx, float ly, float w, float h, std::string text)
         {
             std::unique_ptr<Renderable> label {new Label(lx, ly, w, h, text)};
             renderables.push_back(std::move(label));
+            return *dynamic_cast<Label*>(renderables.back().get());
         }; 
 
-        virtual void CreateButton(float bx, float by, float w, float h, std::string text, std::function<void ()> on_click = [](){})
-        {
+        virtual Button& CreateButton(float bx, float by, float w, float h, std::string text, 
+                std::function<void ()> on_click = [](){}
+        ){
             std::unique_ptr<Renderable> button {new Button(bx, by, w, h, text, on_click)};
             renderables.push_back(std::move(button));
+            return *dynamic_cast<Button*>(renderables.back().get());
         };
 
-        virtual void CreateSliderBar(float sx, float sy, float w, float h, float value, std::function<void (float)> on_change = [](float){})
-        {
+        virtual ToogleButton& CreateToogleButton(float bx, float by, float w, float h, std::string text, 
+                std::function<void (bool)> on_click = [](bool){}, 
+                bool active = false
+        ){
+            std::unique_ptr<Renderable> button {new ToogleButton(bx, by, w, h, text, on_click, active)};
+            renderables.push_back(std::move(button));
+            return *dynamic_cast<ToogleButton*>(renderables.back().get());
+        };
+
+        virtual SliderBar& CreateSliderBar(float sx, float sy, float w, float h, float value, 
+                std::function<void (float)> on_change = [](float){}
+        ){
             std::unique_ptr<Renderable> slider_bar {new SliderBar(sx, sy, w, h, value, "0", "1", on_change)};
             renderables.push_back(std::move(slider_bar));
+            return *dynamic_cast<SliderBar*>(renderables.back().get());
         };
 
         virtual void Render()

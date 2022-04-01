@@ -640,9 +640,46 @@ int main(void)
     SurfaceControl.Hide();
 
     HeaderLayout SceneControl {400 + 16, 0, 200, 400, "Scenes"};
-    SceneControl.CreateButton(0, 0, 92, 24, "SCENE0"); 
-    SceneControl.CreateButton(0, 24, 92, 24, "SCENE1"); 
-    SceneControl.CreateButton(0, 48, 92, 24, "SCENE2"); 
+    auto& scene0 = SceneControl.CreateToogleButton(0, 0, 92, 24, "DEFAULT", [&](bool){}, true); 
+    auto& scene1 = SceneControl.CreateToogleButton(0, 24, 92, 24, "SCENE1"); 
+    auto& scene2 = SceneControl.CreateToogleButton(0, 48, 92, 24, "SCENE2"); 
+    auto& scene3 = SceneControl.CreateToogleButton(0, 72, 92, 24, "SCENE3"); 
+
+    scene0.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene1.SetOff();
+            scene2.SetOff();
+            scene3.SetOff();
+        }
+    });
+    
+    scene1.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene2.SetOff();
+            scene3.SetOff();
+        }
+    });
+
+    scene2.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene1.SetOff();
+            scene3.SetOff();
+        }
+    });
+
+    scene3.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scene0.SetOff();
+            scene1.SetOff();
+            scene2.SetOff();
+        }
+    });
     SceneControl.Hide();
 
     // CORE LOGIC INIT
