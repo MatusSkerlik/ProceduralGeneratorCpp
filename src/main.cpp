@@ -362,12 +362,6 @@ int main(void)
             EndTextureMode();
             SceneDrawReady = false;
         }
-        // RELOAD DLL
-        if (IsKeyDown(KEY_R) && !map.IsGenerating())
-        {
-            map.ClearAll();
-            ScheduleGeneration(map);
-        }
 
         if (IsKeyPressed(KEY_I))
         {

@@ -819,7 +819,7 @@ namespace Cave
 
                 auto this_alive = cave.at(y * rect.w + x) == 1;
 
-                if (this_alive && alive < 4)
+                if (this_alive && alive < 3)
                     new_cave[y * rect.w + x] = 0;
                 if (!this_alive && alive > 4)
                     new_cave[y * rect.w + x] = 1;
@@ -880,7 +880,7 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
     for (auto p: cave) mask[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 0;
 
     // APPLY SMOOTHSTEP
-    auto smooth_step_count = 4;
+    auto smooth_step_count = 6;
     for (auto i = 0; i < smooth_step_count; ++i)
     {
         mask = Cave::SmoothStep(rect, mask);
