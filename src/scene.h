@@ -3,6 +3,7 @@
 
 #include <future>
 #include <chrono>
+#include <utility>
 
 #ifndef RAYLIB_H
 #include "raylib.h"
@@ -45,7 +46,8 @@ class DefaultScene: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
+            std::vector<std::tuple<std::string, std::string, std::future<void>>> futures_to_wait;
+
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -53,7 +55,18 @@ class DefaultScene: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 1
+            if (!map.ShouldForceStop() && GenerateStage5)
+            {
+                map.ClearStage4();
+                map.SetGenerationMessage("GENERATION OF CAVES...");
+                auto generate_caves_future = std::async(std::launch::async, GenerateCaves, std::ref(map));
+                futures_to_wait.emplace_back(
+                        "GENERATION OF CAVES...", 
+                        "GENERATION OF CAVES INFEASIBLE...", 
+                        std::move(generate_caves_future)
+                );
+            }
+
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage1();
@@ -61,7 +74,6 @@ class DefaultScene: public Scene
                 DefineBiomes(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage2)
             {
                 map.ClearStage2();
@@ -130,12 +142,18 @@ class DefaultScene: public Scene
                     map.Error("DEFINITION OF TREES INFEASIBLE"); 
                 }
             }
-
-            if (!map.ShouldForceStop() && GenerateStage5)
+            
+            for (auto& pair: futures_to_wait)
             {
-                map.ClearStage4();
-                map.SetGenerationMessage("GENERATION OF CAVES...");
-                GenerateCaves(map);
+                auto message = std::get<0>(pair);
+                auto error_message = std::get<1>(pair);
+                auto& future = std::get<2>(pair);
+                map.SetGenerationMessage(message);
+                if (future.wait_for(5s) == std::future_status::timeout)
+                {
+                    map.SetForceStop(true);
+                    map.Error(error_message);
+                }
             }
 
             if (!map.ShouldForceStop())
@@ -173,7 +191,6 @@ class Scene0: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -181,7 +198,6 @@ class Scene0: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
@@ -237,7 +253,6 @@ class Scene1: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -245,7 +260,6 @@ class Scene1: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
@@ -310,7 +324,6 @@ class Scene2: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -318,7 +331,6 @@ class Scene2: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
@@ -386,7 +398,6 @@ class Scene3: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -394,7 +405,6 @@ class Scene3: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
@@ -465,7 +475,6 @@ class Scene4: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -473,7 +482,6 @@ class Scene4: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
@@ -546,7 +554,6 @@ class Scene5: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -554,7 +561,6 @@ class Scene5: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
@@ -631,7 +637,6 @@ class Scene6: public Scene
     public:
         virtual void Run(Map& map) override
         {
-            // STAGE 0
             if (!map.ShouldForceStop() && GenerateStage0)
             {
                 map.ClearStage0();
@@ -639,7 +644,6 @@ class Scene6: public Scene
                 DefineHorizontal(map);
             }
 
-            // STAGE 2
             if (!map.ShouldForceStop() && GenerateStage1)
             {
                 map.ClearStage2();
