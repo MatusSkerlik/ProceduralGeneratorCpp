@@ -188,7 +188,38 @@ int main(void)
     }); 
     SurfaceControl.Hide();
 
-    HeaderLayout SceneControl {400 + 16, 0, 200, 400, "Scenes"};
+    HeaderLayout CaveControl(400 + 16, 0, 200, 400, "Cave Settings");
+    CaveControl.CreateLabel(0, 0, 92, 24, "FREQUENCY");
+    CaveControl.CreateLabel(0, 24 + 4, 92, 24, "STROKE");
+    CaveControl.CreateLabel(0, 48 + 8, 92, 24, "POINTS");
+    CaveControl.CreateLabel(0, 72 + 12, 92, 24, "CURVNESS");
+    CaveControl.CreateSliderBar(92 + 8, 0, 92, 24, map.CaveFrequency(),
+    [&](float fq)
+    {
+        map.CaveFrequency(fq);
+        ScheduleGeneration(map);
+    }); 
+    CaveControl.CreateSliderBar(92 + 8, 24 + 4, 92, 24, map.CaveStrokeSize(),
+    [&](float fq)
+    {
+        map.CaveStrokeSize(fq);
+        ScheduleGeneration(map);
+    }); 
+    CaveControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.CavePointsSize(),
+    [&](float fq)
+    {
+        map.CavePointsSize(fq);
+        ScheduleGeneration(map);
+    }); 
+    CaveControl.CreateSliderBar(92 + 8, 72 + 12, 92, 24, map.CaveCurvness(),
+    [&](float fq)
+    {
+        map.CaveCurvness(fq);
+        ScheduleGeneration(map);
+    }); 
+    CaveControl.Hide();
+
+    HeaderLayout SceneControl {600 + 24, 0, 200, 400, "Scenes"};
     auto& scene0 = SceneControl.CreateToogleButton(0, 0, 92, 24, "DEFAULT", [&](bool){}, true); 
     auto& scene1 = SceneControl.CreateToogleButton(0, 24, 92, 24, "SCENE1"); 
     auto& scene2 = SceneControl.CreateToogleButton(0, 48, 92, 24, "SCENE2"); 
@@ -498,6 +529,7 @@ int main(void)
 
             StructuresControl.Render();
             SurfaceControl.Render();
+            CaveControl.Render();
             SceneControl.Render();
             
             // DRAW STATUS BAR

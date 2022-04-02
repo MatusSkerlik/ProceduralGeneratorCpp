@@ -220,7 +220,8 @@ namespace Structures {
         TREE = 2048,
         CHASM = 4096,
         SAND = 8192,
-        WATER = 16384
+        WATER = 16384,
+        CAVE = 32768 
     }; 
     
     class Structure: public PixelArray 
@@ -313,6 +314,11 @@ class Map {
         float _TREE_FREQUENCY = 0.4;
         float _LAKE_FREQUENCY = 0.5;
 
+        float _CAVE_FREQUENCY = 0.5;
+        float _CAVE_STROKE_SIZE = 0.5;
+        float _CAVE_POINTS_SIZE = 0.5;
+        float _CAVE_CURVNESS = 0.5;
+        
         float _SURFACE_PARTS_COUNT = 0.5;
         float _SURFACE_PARTS_FREQUENCY = 0.5;
         float _SURFACE_PARTS_OCTAVES = 0.25;
@@ -331,6 +337,7 @@ class Map {
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
         std::vector<std::unique_ptr<Structures::Structure>> _structures;
         std::vector<std::unique_ptr<Structures::SurfaceStructure>> _surface_structures;
+        std::vector<std::unique_ptr<Structures::SurfaceStructure>> _underground_structures;
         std::vector<std::string> _errors;
 
         std::unordered_map<Pixel, PixelMetadata, PixelHash, PixelEqual> _pixel_map;
@@ -672,6 +679,74 @@ class Map {
             return false;
         };
 
+        auto CaveFrequency()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _CAVE_FREQUENCY;
+        };
+
+        auto CaveFrequency(float o)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_CAVE_FREQUENCY != o)
+            {
+                _CAVE_FREQUENCY = o;
+                return true;
+            }
+            return false;
+        };
+        
+        auto CavePointsSize()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _CAVE_POINTS_SIZE;
+        };
+
+        auto CavePointsSize(float o)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_CAVE_POINTS_SIZE != o)
+            {
+                _CAVE_POINTS_SIZE = o;
+                return true;
+            }
+            return false;
+        };
+
+        auto CaveStrokeSize()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _CAVE_STROKE_SIZE;
+        };
+
+        auto CaveStrokeSize(float o)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_CAVE_STROKE_SIZE != o)
+            {
+                _CAVE_STROKE_SIZE = o;
+                return true;
+            }
+            return false;
+        };
+
+        auto CaveCurvness()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _CAVE_CURVNESS;
+        };
+
+        auto CaveCurvness(float o)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            if (_CAVE_CURVNESS != o)
+            {
+                _CAVE_CURVNESS = o;
+                return true;
+            }
+            return false;
+        };
+
         auto IsGenerating()
         {
             return _generating.load();
@@ -788,9 +863,9 @@ class Map {
         {
             const std::lock_guard<std::mutex> lock(mutex);
             std::vector<Structures::Structure*> structures;
-            for (auto& biome: _structures)
-                if (biome->GetType() == type)
-                    structures.push_back(biome.get());
+            for (auto& structure: _structures)
+                if (structure->GetType() == type)
+                    structures.push_back(structure.get());
             return structures;
         }
 
@@ -811,9 +886,32 @@ class Map {
         {
             const std::lock_guard<std::mutex> lock(mutex);
             std::vector<Structures::SurfaceStructure*> structures;
-            for (auto& biome: _surface_structures)
-                if (biome->GetType() == type)
-                    structures.push_back(biome.get());
+            for (auto& structure: _surface_structures)
+                if (structure->GetType() == type)
+                    structures.push_back(structure.get());
+            return structures;
+        }
+
+        auto& UndergroundStructures()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            return _surface_structures;
+        }
+
+        auto& UndergroundStructure(Structures::Type type)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _underground_structures.emplace_back(new Structures::SurfaceStructure(*this, type));
+            return *_underground_structures.back();
+        }
+
+        auto GetUndergroundStructures(Structures::Type type)
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            std::vector<Structures::SurfaceStructure*> structures;
+            for (auto& structure: _underground_structures)
+                if (structure->GetType() == type)
+                    structures.push_back(structure.get());
             return structures;
         }
 
@@ -886,6 +984,12 @@ class Map {
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _surface_structures.clear();
+        };
+
+        void ClearStage4()
+        {
+            const std::lock_guard<std::mutex> lock(mutex);
+            _underground_structures.clear();
         };
 
         void ClearAll()

@@ -40,6 +40,7 @@ class DefaultScene: public Scene
         bool GenerateStage2 = true;
         bool GenerateStage3 = true;
         bool GenerateStage4 = true;
+        bool GenerateStage5 = true;
 
     public:
         virtual void Run(Map& map) override
@@ -130,6 +131,13 @@ class DefaultScene: public Scene
                 }
             }
 
+            if (!map.ShouldForceStop() && GenerateStage5)
+            {
+                map.ClearStage4();
+                map.SetGenerationMessage("GENERATION OF CAVES...");
+                GenerateCaves(map);
+            }
+
             if (!map.ShouldForceStop())
             {
                 GenerateStage0 = false;
@@ -137,6 +145,7 @@ class DefaultScene: public Scene
                 GenerateStage2 = true;
                 GenerateStage3 = true;
                 GenerateStage4 = true;
+                GenerateStage5 = true;
             }
         };
 
@@ -148,6 +157,7 @@ class DefaultScene: public Scene
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
+            DrawUnderground(map);
         };
 
 };

@@ -19,19 +19,18 @@
 * DRAW LOGIC
 *
 *************************************************/
-#define DIRT              (Color){151, 107, 75, 255}
-#define MUD               (Color){92, 68, 73, 255}
+#define C_DIRT              (Color){151, 107, 75, 255}
+#define C_MUD               (Color){92, 68, 73, 255}
 #define C_SAND            (Color){255, 218, 56, 255}
-#define ICE               (Color){255, 255, 255, 255}
+#define C_ICE               (Color){255, 255, 255, 255}
 #define C_GRASS           (Color){28, 216, 94, 255}
 #define C_JGRASS          (Color){143, 215, 29, 255}
-#define CAVE_BG           (Color){87, 60, 48, 255}
 #define C_WATER           (Color){65, 88, 151, 255}
 
 #define C_SPACE           (Color){51, 102, 153, 255}
 #define C_SURFACE         (Color){155, 209, 255, 255}
 #define C_UNDERGROUND     (Color){151, 107, 75, 255}
-#define C_CAVERN          (Color){128, 128, 128, 255}
+#define C_STONE          (Color){128, 128, 128, 255}
 
 inline void DrawHorizontal(Map& map)
 {
@@ -48,10 +47,10 @@ inline void DrawHorizontal(Map& map)
                 color = C_SURFACE;
                 break;
             case HorizontalAreas::UNDERGROUND:
-                color = C_CAVERN;
+                color = C_STONE;
                 break;
             case HorizontalAreas::CAVERN:
-                color = C_CAVERN;
+                color = C_STONE;
                 break;
             default:
                 break;
@@ -152,7 +151,7 @@ inline void DrawSurfaceBg(Map& map)
 
             for (auto _y = y; _y < surface_rect.y + surface_rect.h; ++_y)
             {
-                DrawPixel(x, _y, CAVE_BG);
+                DrawPixel(x, _y, (Color){84, 57, 42, 255});
             }
 
         }
@@ -194,18 +193,18 @@ inline void DrawSurface(Map& map)
                         if (meta.surface_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_JGRASS);
                         else
-                            DrawPixel(x, y, MUD);
+                            DrawPixel(x, y, C_MUD);
                     else if (meta.biome->GetType() == Biomes::TUNDRA)
-                        DrawPixel(x, y, ICE);
+                        DrawPixel(x, y, C_ICE);
                     else
                         if (meta.surface_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_GRASS);
                         else
-                            DrawPixel(x, y, DIRT);
+                            DrawPixel(x, y, C_DIRT);
                 }
                 else
                 {
-                    DrawPixel(x, y, DIRT);
+                    DrawPixel(x, y, C_DIRT);
                 }
                 
                 // FOR EVERY SURFACE STRUCTURE
@@ -235,4 +234,42 @@ inline void DrawSurface(Map& map)
     }
     */
 };
+
+
+inline void DrawUnderground(Map& map)
+{
+    auto underground_rect = map.Underground().bbox();
+    auto cavern_rect = map.Cavern().bbox();
+    for (auto x = cavern_rect.x; x <= cavern_rect.x + cavern_rect.w; ++x)
+    {
+        for (auto y = underground_rect.y; y < underground_rect.y + + underground_rect.h + cavern_rect.h; ++y)
+        {
+            auto meta = map.GetMetadata({x, y});
+                // BIOME RELATED
+            if (meta.biome != nullptr)
+            {
+                if (meta.biome->GetType() == Biomes::JUNGLE)
+                        DrawPixel(x, y, C_MUD);
+                else if (meta.biome->GetType() == Biomes::TUNDRA)
+                    DrawPixel(x, y, C_ICE);
+                else
+                    DrawPixel(x, y, C_STONE);
+
+                if (meta.surface_structure != nullptr)
+                {
+                    // FOR EVERY UNDERGROUND STRUCTURE IN BIOME
+                    if (meta.surface_structure->GetType() == Structures::CAVE)
+                    {
+                        if (y < cavern_rect.y)
+                            DrawPixel(x, y, (Color){84, 57, 42, 255});
+                        else 
+                            DrawPixel(x, y, (Color){72, 64, 57, 255});
+                    }
+                }
+            }
+        }
+    }
+};
+
+
 #endif // DRAW

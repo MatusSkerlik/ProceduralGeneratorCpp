@@ -1,6 +1,7 @@
 #ifndef PCG
 #define PCG
 
+#include <stdexcept>
 #include <stdio.h>
 #include <unordered_set>
 #include <unordered_map>
@@ -682,6 +683,219 @@ inline auto CreateWater(const Rect& rect, PixelArray& arr, Pixel s, int count, M
             walls.insert(p);
         }
         new_water_pixels.clear();
+    }
+};
+
+namespace Cave
+{
+    enum Direction {
+        TOP, 
+        LEFT, 
+        BOTTOM, 
+        RIGHT
+    };
+
+    inline void Step(
+            const Rect& rect, 
+            std::unordered_set<Pixel, PixelHash, PixelEqual>& arr, 
+            std::unordered_set<Pixel, PixelHash, PixelEqual>& points,
+            Pixel sp,
+            float stroke_size,
+            float curvness
+    ){
+        if (points.size() < 3)
+            return;
+        
+        auto dist_comparator = [=](Pixel a, Pixel b)
+        {
+            auto dist_a = sqrt(pow(a.x - sp.x, 2) + pow(a.y - sp.y, 2));
+            auto dist_b = sqrt(pow(a.x - sp.x, 2) + pow(a.y - sp.y, 2));
+            return dist_a < dist_b;
+        };
+        std::vector<Pixel> sorted_points; 
+        sorted_points.push_back(sp);
+        for (auto p: points) sorted_points.push_back(p);
+        std::sort(sorted_points.begin(), sorted_points.end(), dist_comparator); 
+
+        // PREPARE FOR SPLINES
+        std::vector<double> X;
+        for (auto p: sorted_points) X.push_back(p.x);
+        std::vector<double> Y;
+        for (auto p: sorted_points) Y.push_back(p.y);
+        std::vector<double> T;
+        for(auto i=0; i < (int)X.size(); ++i) T.push_back(i);
+
+
+        // CREATE SPLINES
+        tk::spline sx(T,X), sy(T,Y);
+
+        // CALCULATE POINTS
+        std::vector<Pixel> queue;
+        for (float t = 0; t < (int)X.back(); t += (0.05 + curvness))
+            queue.push_back({(int)sx(t), (int)sy(t)});
+        std::reverse(queue.begin(), queue.end());
+
+        auto cp = sp;
+        while (queue.size() > 0)
+        {
+            auto target = queue.back();
+            //printf("Next point [%d, %d]\n", target.x, target.y);
+            queue.pop_back();
+
+            if ((target.x < rect.x) || (target.x >= rect.x + rect.w) || 
+                (target.y < rect.y) || (target.y >= rect.y + rect.h))
+                continue;
+
+            // STROKE SIZE
+            auto c_size = 1 + rand() % (2 + (int)(10 * stroke_size));
+
+            // WHILE WE ARE NOT CLOSE ENOUGH TO MOVE TO THE NEXT POINT
+            while (sqrt(pow(target.x - cp.x, 2) + pow(target.y - cp.y, 2)) > 2)
+            {
+                // PICK DIRECTION TOWARDS TARGET
+                Pixel p_v {cp.x - target.x, cp.y - target.y};
+                std::vector<Chasm::Direction> dirs;
+                if (p_v.x > 0) for (auto i = 0; i < p_v.x; ++i) dirs.push_back(Chasm::Direction::LEFT);
+                if (p_v.x < 0) for (auto i = 0; i < -p_v.x; ++i) dirs.push_back(Chasm::Direction::RIGHT);
+                if (p_v.y > 0) for (auto i = 0; i < p_v.y; ++i) dirs.push_back(Chasm::Direction::TOP);
+                if (p_v.y < 0) for (auto i = 0; i < -p_v.y; ++i) dirs.push_back(Chasm::Direction::BOTTOM);
+                auto direction = dirs[rand() % dirs.size()];
+
+                // CHOOSE VALID DIRECTION
+                switch (direction)
+                {
+                    case Chasm::Direction::TOP:
+                        cp = {cp.x, cp.y - 1};
+                        break;
+                    case Chasm::Direction::LEFT:
+                        cp = {cp.x - 1, cp.y};
+                        break;
+                    case Chasm::Direction::BOTTOM:
+                        cp = {cp.x, cp.y + 1};
+                        break;
+                    case Chasm::Direction::RIGHT:
+                        cp = {cp.x + 1, cp.y};
+                        break;
+                }
+
+                // PUSH RESULTS
+                for (auto x = cp.x - c_size; x <= cp.x + c_size; ++x)
+                {
+                    for (auto y = cp.y - c_size; y <= cp.y + c_size; ++y)
+                    {
+                        if ((x >= rect.x) && (x <= rect.x + rect.w) && (y >= rect.y) && (y <= rect.y + rect.h))
+                        {
+                            auto d = sqrt(pow(cp.x - x, 2) + pow(cp.y - y, 2));
+                            if (d <= c_size)
+                            {
+                                arr.insert({x, y});
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    inline auto SmoothStep(const Rect& rect, std::vector<int>& cave)
+    {
+        auto new_cave = cave;
+        for (auto _x= rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+        {
+            for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
+            {
+                auto x = _x - rect.x;
+                auto y = _y - rect.y;
+
+                auto alive = 0;
+                alive += cave.at((y - 1) * rect.w + x);
+                alive += cave.at((y + 1) * rect.w + x);
+                alive += cave.at(y * rect.w + x - 1);
+                alive += cave.at(y * rect.w + x + 1);
+                alive += cave.at((y - 1) * rect.w + x - 1);
+                alive += cave.at((y - 1) * rect.w + x + 1);
+                alive += cave.at((y - 1) * rect.w + x - 1);
+                alive += cave.at((y - 1) * rect.w + x + 1);
+
+                auto this_alive = cave.at(y * rect.w + x) == 1;
+
+                if (this_alive && alive < 4)
+                    new_cave[y * rect.w + x] = 0;
+                if (!this_alive && alive > 4)
+                    new_cave[y * rect.w + x] = 1;
+            }
+        }
+        return new_cave;
+    }
+};
+
+inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points_size, float stroke_size, float curvness)
+{
+    // MINIMAL CAVE SIZE
+    if (rect.w < 50 || rect.h < 50)
+        return;
+
+    auto points_count = 4 + rand() % (2 + (int)(8 * points_size));
+    std::unordered_set<Pixel, PixelHash, PixelEqual> points;
+
+    // SPAWN POINTS 
+    while (points_count > 0)
+    {
+        auto x = rect.x + 10 + rand() % (rect.w - 20);
+        auto y = rect.y + 10 + rand() % (rect.h - 20);
+        auto check = true;
+        for (auto p: points)
+        {
+            auto d = sqrt(pow(p.x - x, 2) + pow(p.y - y, 2));
+            if (d < 5)
+            {
+                check = false; 
+                break;
+            }
+        }
+        if (check)
+        {
+            points.insert({x, y});
+            points_count -= 1;
+        }
+    }
+
+    std::unordered_set<Pixel, PixelHash, PixelEqual> cave;
+    // HOW MANY TIMES TO RUN 
+    auto count = 1;
+    for (auto i = 0; i < count; ++i)
+    {
+        Cave::Step(rect, cave, points, sp, stroke_size, curvness);
+    }
+
+    // PREPARE FOR SMOOTHSTEP 
+    std::vector<int> mask;
+    for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
+    {
+        for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+        {
+            mask.push_back(1);
+        }
+    }
+    for (auto p: cave) mask[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 0;
+
+    // APPLY SMOOTHSTEP
+    auto smooth_step_count = 4;
+    for (auto i = 0; i < smooth_step_count; ++i)
+    {
+        mask = Cave::SmoothStep(rect, mask);
+    }
+
+    // PUSH RESULTS
+    for (auto _x = rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+    {
+        for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
+        {
+            auto x = _x - rect.x;
+            auto y = _y - rect.y;
+            auto is_cave = mask[y * rect.w + x] == 0;
+            if (is_cave) arr.add({_x, _y});
+        }
     }
 };
 
@@ -1752,6 +1966,30 @@ EXPORT inline void GenerateTrees(Map& map)
             --count;
         }
     };
+};
+
+EXPORT inline void GenerateCaves(Map& map)
+{
+    printf("GenerateCaves\n");
+
+    auto count = 200 + (int)(1200 * map.CaveFrequency()); // TODO
+    auto& Cavern = map.Cavern();
+    auto& Underground = map.Underground();
+    auto cavern_rect = Cavern.bbox();
+    auto underground_rect = Underground.bbox();
+
+    for (auto i = 0; i < count; ++i)
+    {
+        auto& cave = map.UndergroundStructure(Structures::CAVE);
+        auto x = cavern_rect.x + rand() % (cavern_rect.w - 131);
+        auto y = underground_rect.y + rand() % (underground_rect.h + cavern_rect.h - 131);
+        auto r = 50 + rand() % 80;
+        auto w = r; 
+        auto h = r;
+        Pixel sp {x + w / 2, y + h / 2};
+
+        CreateCave({x, y, w, h}, cave, sp, map.CavePointsSize(), map.CaveStrokeSize(), map.CaveCurvness());
+    }
 };
 
 }; // extern "C"
