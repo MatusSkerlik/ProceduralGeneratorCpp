@@ -325,6 +325,41 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
                 arr.add({x, y});
 };
 
+
+namespace CellularAutomata
+{
+    inline auto Step(const Rect& rect, std::vector<int>& grid, int death_ratio, int birth_ratio)
+    {
+        auto new_grid = grid;
+        for (auto _x= rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+        {
+            for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
+            {
+                auto x = _x - rect.x;
+                auto y = _y - rect.y;
+
+                auto alive = 0;
+                alive += grid.at((y - 1) * rect.w + x);
+                alive += grid.at((y + 1) * rect.w + x);
+                alive += grid.at(y * rect.w + x - 1);
+                alive += grid.at(y * rect.w + x + 1);
+                alive += grid.at((y - 1) * rect.w + x - 1);
+                alive += grid.at((y - 1) * rect.w + x + 1);
+                alive += grid.at((y - 1) * rect.w + x - 1);
+                alive += grid.at((y - 1) * rect.w + x + 1);
+
+                auto this_alive = grid.at(y * rect.w + x) == 1;
+
+                if (this_alive && alive < death_ratio)
+                    new_grid[y * rect.w + x] = 0;
+                if (!this_alive && alive > birth_ratio)
+                    new_grid[y * rect.w + x] = 1;
+            }
+        }
+        return new_grid;
+    }
+};
+
 /*
  * Namespace for Chasm algorithm related stuff
  */
@@ -447,52 +482,6 @@ namespace Chasm
         for (auto p: acid_removal) acids.erase(p);
         for (auto p: acid_insert) acids.insert(p);
     };
-
-    inline void SmoothStep(const Rect& rect, std::unordered_set<Pixel, PixelHash, PixelEqual>& walls)
-    {
-        std::vector<Pixel> wall_removal;
-
-        for (auto p: walls)
-        {
-            auto x = p.x;
-            auto y = p.y;
-
-            if (x == rect.x)
-                continue;
-            if (x == rect.x + rect.w)
-                continue;
-            if (y == rect.y)
-                continue;
-            if (y == rect.y + rect.h)
-                continue;
-
-            auto alive = 0;        
-
-            Pixel top{x, y - 1};
-            Pixel top_left{x - 1, y - 1};
-            Pixel top_right{x + 1, y - 1};
-            Pixel bottom {x, y + 1};
-            Pixel bottom_left{x - 1, y + 1};
-            Pixel bottom_right {x + 1, y + 1};
-            Pixel left {x - 1, y};
-            Pixel right {x + 1, y};
-
-            if (walls.count(top) > 0) ++alive;
-            if (walls.count(left) > 0) ++alive;
-            if (walls.count(bottom) > 0) ++alive;
-            if (walls.count(right) > 0) ++alive;
-            if (walls.count(top_left) > 0) ++alive;
-            if (walls.count(top_right) > 0) ++alive;
-            if (walls.count(bottom_left) > 0) ++alive;
-            if (walls.count(bottom_right) > 0) ++alive;
-
-            if (alive < 4)
-                wall_removal.push_back(p);
-
-        }
-
-        for (auto p: wall_removal) walls.erase(p);
-    }
 };
 
 inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
@@ -540,11 +529,34 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
         Chasm::Step(rect, walls, acids, points, visited_points);
     }
 
+    // PREPARE FOR SMOOTHSTEP 
+    std::vector<int> mask;
+    for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
+        for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+            mask.push_back(1);
+    for (auto p: walls) mask[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 0;
+
     // APPLY SMOOTH STEP
-    for (auto _ = 0; _ < smooth_steps; ++_) Chasm::SmoothStep(rect, walls);
+    for (auto _ = 0; _ < smooth_steps; ++_) mask = CellularAutomata::Step(rect, mask, 3, 4);
 
     // PUSH RESULTS
-    for (auto& p: walls) arr.add(p);
+    for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+    {
+        for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
+        {
+            // TODO QUICKFIX
+            Pixel p {_x, _y};
+            auto meta = map.GetMetadata(p);
+            if (meta.surface_structure != nullptr)
+            // TODO QUICKFIX
+            {
+                auto x = _x - rect.x;
+                auto y = _y - rect.y;
+                auto is_wall = mask[y * rect.w + x] == 0;
+                if (is_wall) arr.add({_x, _y});
+            }
+        }
+    }
 };
 
 namespace Water
@@ -796,38 +808,8 @@ namespace Cave
             }
         }
     };
-
-    inline auto SmoothStep(const Rect& rect, std::vector<int>& cave)
-    {
-        auto new_cave = cave;
-        for (auto _x= rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
-        {
-            for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
-            {
-                auto x = _x - rect.x;
-                auto y = _y - rect.y;
-
-                auto alive = 0;
-                alive += cave.at((y - 1) * rect.w + x);
-                alive += cave.at((y + 1) * rect.w + x);
-                alive += cave.at(y * rect.w + x - 1);
-                alive += cave.at(y * rect.w + x + 1);
-                alive += cave.at((y - 1) * rect.w + x - 1);
-                alive += cave.at((y - 1) * rect.w + x + 1);
-                alive += cave.at((y - 1) * rect.w + x - 1);
-                alive += cave.at((y - 1) * rect.w + x + 1);
-
-                auto this_alive = cave.at(y * rect.w + x) == 1;
-
-                if (this_alive && alive < 3)
-                    new_cave[y * rect.w + x] = 0;
-                if (!this_alive && alive > 4)
-                    new_cave[y * rect.w + x] = 1;
-            }
-        }
-        return new_cave;
-    }
 };
+
 
 inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points_size, float stroke_size, float curvness)
 {
@@ -883,7 +865,7 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
     auto smooth_step_count = 6;
     for (auto i = 0; i < smooth_step_count; ++i)
     {
-        mask = Cave::SmoothStep(rect, mask);
+        mask = CellularAutomata::Step(rect, mask, 3, 4);
     }
 
     // PUSH RESULTS
