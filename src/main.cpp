@@ -220,7 +220,74 @@ int main(void)
     }); 
     CaveControl.Hide();
 
-    HeaderLayout SceneControl {600 + 24, 0, 200, 400, "Scenes"};
+    HeaderLayout MaterialControl(600 + 24, 0, 350, 400, "Material Control");
+    MaterialControl.CreateLabel(92 + 8, 0, 92, 24, "FREQUENCY");
+    MaterialControl.CreateLabel(184 + 32, 0, 92, 24, "SIZE");
+    MaterialControl.CreateLabel(0, 24 + 4, 92, 24, "COPPER");
+    MaterialControl.CreateLabel(0, 48 + 8, 92, 24, "IRON");
+    MaterialControl.CreateLabel(0, 72 + 16, 92, 24, "SILVER");
+    MaterialControl.CreateLabel(0, 96 + 20, 92, 24, "GOLD");
+
+    MaterialControl.CreateSliderBar(92 + 8, 24 + 4, 92, 24, map.CopperFrequency(),
+    [&](float fq)
+    {
+        map.CopperFrequency(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.IronFrequency(),
+    [&](float fq)
+    {
+        map.IronFrequency(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(92 + 8, 72 + 12, 92, 24, map.SilverFrequency(),
+    [&](float fq)
+    {
+        map.SilverFrequency(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(92 + 8, 96 + 16, 92, 24, map.GoldFrequency(),
+    [&](float fq)
+    {
+        map.GoldFrequency(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(184 + 32, 24 + 4, 92, 24, map.CopperSize(),
+    [&](float fq)
+    {
+        map.CopperSize(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(184 + 32, 48 + 8, 92, 24, map.IronSize(),
+    [&](float fq)
+    {
+        map.IronSize(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(184 + 32, 72 + 12, 92, 24, map.SilverSize(),
+    [&](float fq)
+    {
+        map.SilverSize(fq);
+        ScheduleGeneration(map);
+    }); 
+
+    MaterialControl.CreateSliderBar(184 + 32, 96 + 16, 92, 24, map.GoldSize(),
+    [&](float fq)
+    {
+        map.GoldSize(fq);
+        ScheduleGeneration(map);
+    }); 
+
+
+    MaterialControl.Hide();
+
+    HeaderLayout SceneControl {950 + 32, 0, 200, 400, "Scenes"};
     auto& scene0 = SceneControl.CreateToogleButton(0, 0, 92, 24, "DEFAULT", [&](bool){}, true); 
     auto& scene1 = SceneControl.CreateToogleButton(0, 24, 92, 24, "SCENE1"); 
     auto& scene2 = SceneControl.CreateToogleButton(0, 48, 92, 24, "SCENE2"); 
@@ -527,8 +594,8 @@ int main(void)
                             case Structures::GRASS:
                                 DrawText("GRASS", mx, my - 48, 16, BLUE);
                                 break;
-                            case Structures::ORE:
-                                DrawText("ORE", mx, my - 48, 16, BLUE);
+                            case Structures::COPPER_ORE:
+                                DrawText("COPPER_ORE", mx, my - 48, 16, BLUE);
                                 break;
                             default:
                                 break;
@@ -540,6 +607,7 @@ int main(void)
             StructuresControl.Render();
             SurfaceControl.Render();
             CaveControl.Render();
+            MaterialControl.Render();
             SceneControl.Render();
             
             // DRAW STATUS BAR

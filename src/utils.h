@@ -222,7 +222,10 @@ namespace Structures {
         SAND = 8192,
         WATER = 16384,
         CAVE = 32768,
-        ORE = 32769 // TODO 
+        COPPER_ORE = 32769, // TODO 
+        IRON_ORE = 32770, // TODO 
+        SILVER_ORE = 32771, // TODO 
+        GOLD_ORE = 32772
     }; 
     
     class DefinedStructure: public PixelArray 
@@ -298,14 +301,14 @@ class Map {
         int _WIDTH {4200};
         int _HEIGHT {1200};
 
-        float _COPPER_FREQUENCY = 0.5;
-        float _COPPER_SIZE = 0.5;
-        float _IRON_FREQUENCY = 0.5;
-        float _IRON_SIZE = 0.5;
-        float _SILVER_FREQUENCY = 0.5;
-        float _SILVER_SIZE = 0.5;
-        float _GOLD_FREQUENCY = 0.5;
-        float _GOLD_SIZE = 0.5;
+        float _COPPER_FREQUENCY = 0.0;
+        float _COPPER_SIZE = 0.0;
+        float _IRON_FREQUENCY = 0.0;
+        float _IRON_SIZE = 0.0;
+        float _SILVER_FREQUENCY = 0.0;
+        float _SILVER_SIZE = 0.0;
+        float _GOLD_FREQUENCY = 0.0;
+        float _GOLD_SIZE = 0.0;
 
         float _HILLS_FREQUENCY = 0.5;
         float _HOLES_FREQUENCY = 0.2;

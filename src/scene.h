@@ -143,7 +143,7 @@ class DefaultScene: public Scene
                 }
 
                 map.SetGenerationMessage("GENERATION OF ORES...");
-                GenerateOres(map);
+                GenerateSurfaceOres(map);
             }
             
             for (auto& pair: futures_to_wait)

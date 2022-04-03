@@ -2038,17 +2038,21 @@ EXPORT inline void GenerateCaves(Map& map)
     }
 };
 
-EXPORT inline void GenerateOres(Map& map)
+EXPORT inline void GenerateSurfaceOres(Map& map)
 {
-    printf("GenerateOres\n");
-    auto count = 100;
+    printf("GenerateSurfaceOres\n");
+    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_size_max = 22 + (int)(32 * map.CopperSize());
+
+    auto iron_count = 25 + (int)(200 * map.IronFrequency());
+    auto iron_size_max = 24 + (int)(32 * map.IronSize()); 
 
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
     auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
         Structures::HOLE | Structures::TRANSITION | Structures::HOLE; 
 
-    while (count > 0)
+    while (copper_count > 0)
     {
         auto x = surface_rect.x + rand() % surface_rect.w;
         auto y = surface_rect.y + rand() % surface_rect.h;
@@ -2057,10 +2061,26 @@ EXPORT inline void GenerateOres(Map& map)
         auto meta = map.GetMetadata(p); 
         if (meta.generated_structure != nullptr && (meta.generated_structure->GetType() & A_STRUCTURES) != 0)
         {
-            auto& ore = map.GeneratedStructure(Structures::ORE);
-            Rect rect {x, y, 12, 12};
-            CreateOre(rect, ore, 10, 22, map);
-            count -= 1;
+            auto& ore = map.GeneratedStructure(Structures::COPPER_ORE);
+            Rect rect {x, y, 14, 14};
+            CreateOre(rect, ore, 10, copper_size_max, map);
+            copper_count -= 1;
+        }
+    }
+
+    while (iron_count > 0)
+    {
+        auto x = surface_rect.x + rand() % surface_rect.w;
+        auto y = surface_rect.y + rand() % surface_rect.h;
+
+        Pixel p {x, y};
+        auto meta = map.GetMetadata(p); 
+        if (meta.generated_structure != nullptr && (meta.generated_structure->GetType() & A_STRUCTURES) != 0)
+        {
+            auto& ore = map.GeneratedStructure(Structures::IRON_ORE);
+            Rect rect {x, y, 14, 14};
+            CreateOre(rect, ore, 12, iron_size_max, map);
+            iron_count -= 1;
         }
     }
 };

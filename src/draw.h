@@ -214,8 +214,14 @@ inline void DrawSurface(Map& map)
                     DrawPixel(x, y, C_WATER);
                 if (meta.generated_structure->GetType() == Structures::SAND)
                     DrawPixel(x, y, C_SAND);
-                if (meta.generated_structure->GetType() == Structures::ORE)
+                if (meta.generated_structure->GetType() == Structures::COPPER_ORE)
                     DrawPixel(x, y, (Color){150, 67, 22, 255});
+                if (meta.generated_structure->GetType() == Structures::IRON_ORE)
+                    DrawPixel(x, y, (Color){62, 82, 114, 255});
+                if (meta.generated_structure->GetType() == Structures::SILVER_ORE)
+                    DrawPixel(x, y, (Color){185, 194, 195, 255});
+                if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
+                    DrawPixel(x, y, (Color){185, 164, 23, 255});
                 // DEBUG
                 /*
                 if (meta.generated_structure->GetType() == Structures::TRANSITION)
