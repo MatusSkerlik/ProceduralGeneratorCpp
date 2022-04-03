@@ -17,8 +17,8 @@
 class Map;
 namespace Structures { 
     enum Type: unsigned short; 
-    class Structure; 
-    class SurfaceStructure;
+    class DefinedStructure; 
+    class GeneratedStructure;
 };
 namespace Biomes { class Biome; };
 
@@ -77,8 +77,8 @@ struct PixelEqual
 typedef struct PixelMetadata
 {
     Biomes::Biome* biome { nullptr };
-    Structures::Structure* defined_structure { nullptr };
-    Structures::SurfaceStructure* generated_structure { nullptr };
+    Structures::DefinedStructure* defined_structure { nullptr };
+    Structures::GeneratedStructure* generated_structure { nullptr };
 } PixelMetadata;
 
 
@@ -225,16 +225,16 @@ namespace Structures {
         ORE = 32769 // TODO 
     }; 
     
-    class Structure: public PixelArray 
+    class DefinedStructure: public PixelArray 
     {
         protected:
             Map& map;
             Type type;
 
         public:
-            Structure(Map& _map): PixelArray(), map{_map} {};
-            Structure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
-            ~Structure(){ clear(); };
+            DefinedStructure(Map& _map): PixelArray(), map{_map} {};
+            DefinedStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            ~DefinedStructure(){ clear(); };
             
             auto GetType() const { return type; }
             void add(Pixel pixel) override;
@@ -242,16 +242,16 @@ namespace Structures {
             void clear() override;
     };
 
-    class SurfaceStructure: public PixelArray 
+    class GeneratedStructure: public PixelArray 
     {
         protected:
             Map& map;
             Type type;
 
         public:
-            SurfaceStructure(Map& _map): PixelArray(), map{_map} {};
-            SurfaceStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
-            ~SurfaceStructure(){ clear(); };
+            GeneratedStructure(Map& _map): PixelArray(), map{_map} {};
+            GeneratedStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            ~GeneratedStructure(){ clear(); };
             
             auto GetType() const { return type; }
             void add(Pixel pixel) override;
@@ -260,7 +260,7 @@ namespace Structures {
     };
 
  
-    class SurfacePart: public SurfaceStructure 
+    class SurfacePart: public GeneratedStructure 
     {
         protected:
             int sx {0}; // START X
@@ -271,7 +271,7 @@ namespace Structures {
             std::vector<int> ypsilons;
 
         public:
-            SurfacePart(Map& _map, int _sx, int _ex, SurfacePart* _before, SurfacePart* _next): SurfaceStructure(_map, SURFACE_PART),
+            SurfacePart(Map& _map, int _sx, int _ex, SurfacePart* _before, SurfacePart* _next): GeneratedStructure(_map, SURFACE_PART),
             sx{_sx}, ex{_ex}, 
             before{_before}, next{_next} 
             {};
@@ -336,9 +336,9 @@ class Map {
         HorizontalAreas::Area _cavern {HorizontalAreas::CAVERN};
 
         std::vector<std::unique_ptr<Biomes::Biome>> _biomes;
-        std::vector<std::unique_ptr<Structures::Structure>> _structures;
-        std::vector<std::unique_ptr<Structures::SurfaceStructure>> _generated_structures;
-        std::vector<std::unique_ptr<Structures::SurfaceStructure>> _underground_structures;
+        std::vector<std::unique_ptr<Structures::DefinedStructure>> _structures;
+        std::vector<std::unique_ptr<Structures::GeneratedStructure>> _generated_structures;
+        std::vector<std::unique_ptr<Structures::GeneratedStructure>> _underground_structures;
         std::vector<std::string> _errors;
 
         std::unordered_map<Pixel, PixelMetadata, PixelHash, PixelEqual> _pixel_map;
@@ -847,46 +847,46 @@ class Map {
             return _biomes;
         }
 
-        auto& Structures()
+        auto& DefinedStructures()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _structures;
         }
 
-        auto& Structure(Structures::Type type)
+        auto& DefinedStructure(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _structures.emplace_back(new Structures::Structure(*this, type));
+            _structures.emplace_back(new Structures::DefinedStructure(*this, type));
             return *_structures.back();
         }
 
-        auto GetStructures(Structures::Type type)
+        auto GetDefinedStructures(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            std::vector<Structures::Structure*> structures;
+            std::vector<Structures::DefinedStructure*> structures;
             for (auto& structure: _structures)
                 if (structure->GetType() == type)
                     structures.push_back(structure.get());
             return structures;
         }
 
-        auto& SurfaceStructures()
+        auto& GeneratedStructures()
         {
             const std::lock_guard<std::mutex> lock(mutex);
             return _generated_structures;
         }
 
-        auto& SurfaceStructure(Structures::Type type)
+        auto& GeneratedStructure(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _generated_structures.emplace_back(new Structures::SurfaceStructure(*this, type));
+            _generated_structures.emplace_back(new Structures::GeneratedStructure(*this, type));
             return *_generated_structures.back();
         }
 
-        auto GetSurfaceStructures(Structures::Type type)
+        auto GetGeneratedStructures(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            std::vector<Structures::SurfaceStructure*> structures;
+            std::vector<Structures::GeneratedStructure*> structures;
             for (auto& structure: _generated_structures)
                 if (structure->GetType() == type)
                     structures.push_back(structure.get());
@@ -902,14 +902,14 @@ class Map {
         auto& UndergroundStructure(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            _underground_structures.emplace_back(new Structures::SurfaceStructure(*this, type));
+            _underground_structures.emplace_back(new Structures::GeneratedStructure(*this, type));
             return *_underground_structures.back();
         }
 
         auto GetUndergroundStructures(Structures::Type type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
-            std::vector<Structures::SurfaceStructure*> structures;
+            std::vector<Structures::GeneratedStructure*> structures;
             for (auto& structure: _underground_structures)
                 if (structure->GetType() == type)
                     structures.push_back(structure.get());
@@ -1069,7 +1069,7 @@ inline void Biomes::Biome::clear()
     PixelArray::clear();
 };
 
-inline void Structures::Structure::add(Pixel pixel)
+inline void Structures::DefinedStructure::add(Pixel pixel)
 {
     auto meta = map.GetMetadata(pixel);
     meta.defined_structure = this;
@@ -1077,7 +1077,7 @@ inline void Structures::Structure::add(Pixel pixel)
     PixelArray::add(pixel);
 };
 
-inline void Structures::Structure::remove(Pixel pixel)
+inline void Structures::DefinedStructure::remove(Pixel pixel)
 {
     auto meta = map.GetMetadata(pixel);
     meta.defined_structure = nullptr;
@@ -1086,7 +1086,7 @@ inline void Structures::Structure::remove(Pixel pixel)
 };
 
 
-inline void Structures::Structure::clear()
+inline void Structures::DefinedStructure::clear()
 {
     for (auto& p: _set_pixels)
     {
@@ -1098,7 +1098,7 @@ inline void Structures::Structure::clear()
     PixelArray::clear();
 };
 
-inline void Structures::SurfaceStructure::add(Pixel pixel)
+inline void Structures::GeneratedStructure::add(Pixel pixel)
 {
     auto meta = map.GetMetadata(pixel);
     meta.generated_structure = this;
@@ -1106,7 +1106,7 @@ inline void Structures::SurfaceStructure::add(Pixel pixel)
     PixelArray::add(pixel);
 };
 
-inline void Structures::SurfaceStructure::remove(Pixel pixel)
+inline void Structures::GeneratedStructure::remove(Pixel pixel)
 {
     auto meta = map.GetMetadata(pixel);
     meta.generated_structure = nullptr;
@@ -1115,7 +1115,7 @@ inline void Structures::SurfaceStructure::remove(Pixel pixel)
 };
 
 
-inline void Structures::SurfaceStructure::clear()
+inline void Structures::GeneratedStructure::clear()
 {
     for (auto& p: _set_pixels)
     {

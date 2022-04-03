@@ -91,7 +91,7 @@ inline void DrawBiomes(Map& map)
 
 inline void DrawStructures(Map& map)
 {
-    for (auto& biome: map.Structures())
+    for (auto& biome: map.DefinedStructures())
     {
         for (auto& p: *biome)
         {
@@ -121,7 +121,7 @@ inline void DrawStructures(Map& map)
 
 inline void DrawSurfaceStructures(Map& map)
 {
-    for (auto& biome: map.SurfaceStructures())
+    for (auto& biome: map.GeneratedStructures())
     {
         for (auto& p: *biome)
         {

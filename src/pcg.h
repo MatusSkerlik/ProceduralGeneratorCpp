@@ -1212,7 +1212,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         for (auto& var: holes)
         {
             auto x = result[var];
-            auto& hole = map.Structure(Structures::HOLE);
+            auto& hole = map.DefinedStructure(Structures::HOLE);
             Rect rect ((int) x - hole_width / 2, Surface.y, hole_width, Surface.h);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hole);
         }
@@ -1220,7 +1220,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         for (auto& var: hills)
         {
             auto x = result[var];
-            auto& hill = map.Structure(Structures::HILL);
+            auto& hill = map.DefinedStructure(Structures::HILL);
             Rect rect ((int) x - hill_width / 2, Surface.y, hill_width, Surface.h);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, hill);
         }
@@ -1228,7 +1228,7 @@ EXPORT inline void DefineHillsHolesIslands(Map& map)
         for (auto& var: islands)
         {
             auto x = result[var];
-            auto& island = map.Structure(Structures::FLOATING_ISLAND);
+            auto& island = map.DefinedStructure(Structures::FLOATING_ISLAND);
             Rect rect ((int) x - island_width / 2, Surface.y - rand() % 40, island_width, 50);
             PixelsOfRect(rect.x, rect.y, rect.w, rect.h, island);
         }
@@ -1304,7 +1304,7 @@ EXPORT inline void DefineCabins(Map& map)
             auto x = (int) tundra_rect.x + (v % tundra_rect.w); 
             auto y = (int) tundra_rect.y + (v / tundra_rect.w);
 
-            auto& cabin = map.Structure(Structures::CABIN); 
+            auto& cabin = map.DefinedStructure(Structures::CABIN); 
             PixelsOfRect(x, y, cabin_width, cabin_height, cabin);
         }
     }
@@ -1374,19 +1374,19 @@ EXPORT inline void DefineCastles(Map& map)
         auto forest_v = result["forest_castle"];
         auto f_x = forest_rect.x + (forest_v % forest_rect.w);
         auto f_y = forest_rect.y + (forest_v / forest_rect.w);
-        auto& forest_castle = map.Structure(Structures::CASTLE);
+        auto& forest_castle = map.DefinedStructure(Structures::CASTLE);
         PixelsOfRect(f_x, f_y, castle_width, castle_height, forest_castle);
 
         auto tundra_v = result["tundra_castle"];
         auto t_x = tundra_rect.x + (tundra_v % tundra_rect.w);
         auto t_y = tundra_rect.y + (tundra_v / tundra_rect.w);
-        auto& tundra_castle = map.Structure(Structures::CASTLE);
+        auto& tundra_castle = map.DefinedStructure(Structures::CASTLE);
         PixelsOfRect(t_x, t_y, castle_width, castle_height, tundra_castle);
 
         auto jungle_v = result["jungle_castle"];
         auto j_x = jungle_rect.x + (jungle_v % jungle_rect.w);
         auto j_y = jungle_rect.y + (jungle_v / jungle_rect.w);
-        auto& jungle_castle = map.Structure(Structures::CASTLE);
+        auto& jungle_castle = map.DefinedStructure(Structures::CASTLE);
         PixelsOfRect(j_x, j_y, castle_width, castle_height, jungle_castle);
     }
 };
@@ -1531,7 +1531,7 @@ EXPORT inline void GenerateOceanLeft(Map& map)
     auto m_desert = (float)(ocean_start_y - desert_end_y) / (ocean_rect.w + ocean_desert_rect.w);
 
     // GENERATE SAND IN ONEAN BIOME
-    auto& ocean_sand = map.SurfaceStructure(Structures::SAND);
+    auto& ocean_sand = map.GeneratedStructure(Structures::SAND);
     for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y - (x * m_ocean));
@@ -1556,7 +1556,7 @@ EXPORT inline void GenerateOceanLeft(Map& map)
     }
 
     // GENERATE WATER IN OCEAN
-    auto& ocean_water = map.SurfaceStructure(Structures::WATER);
+    auto& ocean_water = map.GeneratedStructure(Structures::WATER);
     for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y - (x * m_ocean));
@@ -1587,7 +1587,7 @@ EXPORT inline void GenerateOceanRight(Map& map)
     auto m_desert = (float)(desert_start_y - ocean_end_y) / (ocean_rect.w + ocean_desert_rect.w);
 
     // GENERATE SAND IN ONEAN BIOME
-    auto& ocean_sand = map.SurfaceStructure(Structures::SAND);
+    auto& ocean_sand = map.GeneratedStructure(Structures::SAND);
     for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y - ((x - ocean_rect.x) * m_ocean));
@@ -1612,7 +1612,7 @@ EXPORT inline void GenerateOceanRight(Map& map)
     }
 
     // GENERATE WATER IN OCEAN
-    auto& ocean_water = map.SurfaceStructure(Structures::WATER);
+    auto& ocean_water = map.GeneratedStructure(Structures::WATER);
     for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
     {
         auto y0 = (int)(ocean_start_y + ((ocean_rect.x - x) * m_ocean));
@@ -1627,7 +1627,7 @@ EXPORT inline void GenerateHills(Map& map)
 {
     printf("GenerateHills\n");
 
-    auto hills = map.GetStructures(Structures::HILL);
+    auto hills = map.GetDefinedStructures(Structures::HILL);
     for (auto* ref: hills)
     {
         auto& hill = *ref; 
@@ -1642,7 +1642,7 @@ EXPORT inline void GenerateHills(Map& map)
         auto sy = s_part->GetY(sx);
         auto ey = e_part->GetY(ex);
 
-        auto& s_hill = map.SurfaceStructure(Structures::HILL);
+        auto& s_hill = map.GeneratedStructure(Structures::HILL);
         CreateHill(hill_rect, s_hill, sy, ey);
 
         UpdateSurfaceParts(s_hill, map);
@@ -1654,7 +1654,7 @@ EXPORT inline void GenerateHoles(Map& map)
 {
     printf("GenerateHoles\n");
 
-    auto holes = map.GetStructures(Structures::HOLE);
+    auto holes = map.GetDefinedStructures(Structures::HOLE);
     for (auto* ref: holes)
     {
         auto& hole = *ref; 
@@ -1676,7 +1676,7 @@ EXPORT inline void GenerateHoles(Map& map)
             map.SetMetadata(p, meta);
         }
 
-        auto& s_hole = map.SurfaceStructure(Structures::HOLE);
+        auto& s_hole = map.GeneratedStructure(Structures::HOLE);
         CreateHole(hole_rect, s_hole, sy, ey);
 
         UpdateSurfaceParts(s_hole, map);
@@ -1687,11 +1687,11 @@ EXPORT inline void GenerateIslands(Map& map)
 {
     printf("GenerateIslands\n");
 
-    auto islands = map.GetStructures(Structures::FLOATING_ISLAND);
+    auto islands = map.GetDefinedStructures(Structures::FLOATING_ISLAND);
     for (auto* island: islands)
     {
         auto island_rect = island->bbox();
-        auto& s_island = map.SurfaceStructure(Structures::FLOATING_ISLAND);
+        auto& s_island = map.GeneratedStructure(Structures::FLOATING_ISLAND);
         CreateIsland(island_rect, s_island, rand() % 2);
     }
 };
@@ -1730,7 +1730,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 rect.y = p1.y;
             }
 
-            auto& cliff = map.SurfaceStructure(Structures::CLIFF);
+            auto& cliff = map.GeneratedStructure(Structures::CLIFF);
             CreateCliff(rect, cliff, p0, p1);
         }
         else // TRANSITION
@@ -1757,7 +1757,7 @@ EXPORT inline void GenerateCliffsTransitions(Map& map)
                 p = {rect.x, part->GetY(rect.x)};
             }
 
-            auto& transition = map.SurfaceStructure(Structures::TRANSITION);
+            auto& transition = map.GeneratedStructure(Structures::TRANSITION);
             CreateTransition(rect, transition, p); 
 
             UpdateSurfaceParts(transition, map);
@@ -1798,10 +1798,10 @@ EXPORT inline void GenerateChasms(Map& map)
 
         Rect chasm_rect = {x, surface_rect.y + surface_rect.h / 3, w, surface_rect.h / 2}; 
 
-        auto& chasm = map.Structure(Structures::CHASM);
+        auto& chasm = map.DefinedStructure(Structures::CHASM);
         PixelsOfRect(chasm_rect, chasm);
 
-        auto& s_chasm = map.SurfaceStructure(Structures::CHASM);
+        auto& s_chasm = map.GeneratedStructure(Structures::CHASM);
         CreateChasm(chasm_rect, s_chasm, map);
 
         for (auto p: chasm)
@@ -1823,7 +1823,7 @@ EXPORT inline void GenerateLakes(Map& map)
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
 
-    auto holes = map.GetSurfaceStructures(Structures::HOLE);
+    auto holes = map.GetGeneratedStructures(Structures::HOLE);
     if (holes.size() == 0)
         return;
 
@@ -1839,7 +1839,7 @@ EXPORT inline void GenerateLakes(Map& map)
         Pixel s {rect.x + rect.w / 2, rect.y};
         auto h = 5 + rand() % 21;
 
-        auto& water = map.SurfaceStructure(Structures::WATER);
+        auto& water = map.GeneratedStructure(Structures::WATER);
         CreateWater(rect, water, s, h, map); 
 
         --count;
@@ -1879,7 +1879,7 @@ EXPORT inline void GenerateJungleSwamp(Map& map)
         Rect rect = {x0, y0, x1 - x0, y1 - y0};
         int step = rect.w / count;
 
-        auto& water = map.SurfaceStructure(Structures::WATER);
+        auto& water = map.GeneratedStructure(Structures::WATER);
         
         for (auto x = rect.x; x <= rect.x + rect.w; ++x)
             if (((x - rect.x) % step) == 0)
@@ -1897,7 +1897,7 @@ EXPORT inline void GenerateGrass(Map& map)
 
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
-    auto& grass = map.SurfaceStructure(Structures::GRASS);
+    auto& grass = map.GeneratedStructure(Structures::GRASS);
     auto A_STRUCT = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
                 Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL |
                 Structures::CHASM;
@@ -1966,7 +1966,7 @@ EXPORT inline void GenerateTrees(Map& map)
     printf("Generate Trees\n");
     auto count = 100 + (int)(map.TreeFrequency() * 200);
 
-    auto* grass = map.GetSurfaceStructures(Structures::GRASS)[0];
+    auto* grass = map.GetGeneratedStructures(Structures::GRASS)[0];
     auto size = grass->size(); 
 
     auto check_placement = [&](Pixel start, int height) -> bool
@@ -1992,7 +1992,7 @@ EXPORT inline void GenerateTrees(Map& map)
 
         if (check_placement(p, h))
         {
-            auto& tree = map.SurfaceStructure(Structures::TREE);
+            auto& tree = map.GeneratedStructure(Structures::TREE);
             auto _h = 0;
             while (_h < h + 1)
             {
@@ -2057,7 +2057,7 @@ EXPORT inline void GenerateOres(Map& map)
         auto meta = map.GetMetadata(p); 
         if (meta.generated_structure != nullptr && (meta.generated_structure->GetType() & A_STRUCTURES) != 0)
         {
-            auto& ore = map.SurfaceStructure(Structures::ORE);
+            auto& ore = map.GeneratedStructure(Structures::ORE);
             Rect rect {x, y, 12, 12};
             CreateOre(rect, ore, 10, 22, map);
             count -= 1;
