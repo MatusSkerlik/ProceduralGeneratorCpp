@@ -141,6 +141,9 @@ class DefaultScene: public Scene
                     map.SetForceStop(true);
                     map.Error("DEFINITION OF TREES INFEASIBLE"); 
                 }
+
+                map.SetGenerationMessage("GENERATION OF ORES...");
+                GenerateOres(map);
             }
             
             for (auto& pair: futures_to_wait)

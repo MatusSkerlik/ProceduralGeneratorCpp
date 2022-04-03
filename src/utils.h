@@ -221,7 +221,8 @@ namespace Structures {
         CHASM = 4096,
         SAND = 8192,
         WATER = 16384,
-        CAVE = 32768 
+        CAVE = 32768,
+        ORE = 32769 // TODO 
     }; 
     
     class Structure: public PixelArray 

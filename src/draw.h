@@ -214,6 +214,8 @@ inline void DrawSurface(Map& map)
                     DrawPixel(x, y, C_WATER);
                 if (meta.surface_structure->GetType() == Structures::SAND)
                     DrawPixel(x, y, C_SAND);
+                if (meta.surface_structure->GetType() == Structures::ORE)
+                    DrawPixel(x, y, (Color){150, 67, 22, 255});
                 // DEBUG
                 /*
                 if (meta.surface_structure->GetType() == Structures::TRANSITION)

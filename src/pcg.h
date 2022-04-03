@@ -328,6 +328,23 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
 
 namespace CellularAutomata
 {
+    inline auto CountCells(const Rect& rect, std::vector<int>& grid, int of_value)
+    {
+        auto count = 0;
+        for (auto _x= rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+        {
+            for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
+            {
+                auto x = _x - rect.x;
+                auto y = _y - rect.y;
+                
+                if (grid.at(y * rect.w + x) == of_value) count += 1;
+
+            }
+        }
+        return count;
+    }
+
     inline auto Step(const Rect& rect, std::vector<int>& grid, int death_ratio, int birth_ratio)
     {
         auto new_grid = grid;
@@ -877,6 +894,53 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
             auto y = _y - rect.y;
             auto is_cave = mask[y * rect.w + x] == 0;
             if (is_cave) arr.add({_x, _y});
+        }
+    }
+};
+
+inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_size, Map& map)
+{
+    // PREPARE GRID
+    std::vector<int> grid;
+    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+                grid.push_back(0);
+
+    while (CellularAutomata::CountCells(rect, grid, 1) < min_size)
+    {
+        for (auto x = rect.x + 1; x <= rect.x + rect.w - 1; ++x)
+        {
+            for (auto y = rect.y + 1; y <= rect.y + rect.h - 1; ++y)
+            {
+                Pixel p {x, y};
+                auto meta = map.GetMetadata(p);
+                if (meta.surface_structure != nullptr)
+                {
+                    auto prob = rand() % 100;
+                    if (prob > 20) 
+                        grid[(y - rect.y) * rect.w + (x - rect.x)] = 1;
+                    else
+                        grid[(y - rect.y) * rect.w + (x - rect.x)] = 0;
+                }
+            }
+        }
+
+        while (CellularAutomata::CountCells(rect, grid, 1) > max_size)
+        {
+            grid = CellularAutomata::Step(rect, grid, 5, 5);
+        }
+    }
+
+    for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+    {
+        for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
+        {
+            auto x = _x - rect.x;
+            auto y = _y - rect.y;
+            if (grid.at(y * rect.w + x) == 1)
+            {
+                arr.add({_x, _y});
+            }
         }
     }
 };
@@ -1954,7 +2018,7 @@ EXPORT inline void GenerateCaves(Map& map)
 {
     printf("GenerateCaves\n");
 
-    auto count = 200 + (int)(1200 * map.CaveFrequency()); // TODO
+    auto count = 200 + (int)(1200 * map.CaveFrequency());
     auto& Cavern = map.Cavern();
     auto& Underground = map.Underground();
     auto cavern_rect = Cavern.bbox();
@@ -1971,6 +2035,33 @@ EXPORT inline void GenerateCaves(Map& map)
         Pixel sp {x + w / 2, y + h / 2};
 
         CreateCave({x, y, w, h}, cave, sp, map.CavePointsSize(), map.CaveStrokeSize(), map.CaveCurvness());
+    }
+};
+
+EXPORT inline void GenerateOres(Map& map)
+{
+    printf("GenerateOres\n");
+    auto count = 100;
+
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+    auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
+        Structures::HOLE | Structures::TRANSITION | Structures::HOLE; 
+
+    while (count > 0)
+    {
+        auto x = surface_rect.x + rand() % surface_rect.w;
+        auto y = surface_rect.y + rand() % surface_rect.h;
+
+        Pixel p {x, y};
+        auto meta = map.GetMetadata(p); 
+        if (meta.surface_structure != nullptr && (meta.surface_structure->GetType() & A_STRUCTURES) != 0)
+        {
+            auto& ore = map.SurfaceStructure(Structures::ORE);
+            Rect rect {x, y, 12, 12};
+            CreateOre(rect, ore, 10, 22, map);
+            count -= 1;
+        }
     }
 };
 
