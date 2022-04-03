@@ -13,10 +13,10 @@
 #include <tuple>
 #include <limits>
 #include <atomic>
+#include <bitset>
 
 class Map;
 namespace Structures { 
-    enum Type: unsigned short; 
     class DefinedStructure; 
     class GeneratedStructure;
 };
@@ -175,28 +175,26 @@ namespace HorizontalAreas
 
 namespace Biomes {
 
-    enum Type: unsigned short { 
-        FOREST = 1, 
-        JUNGLE = 2, 
-        TUNDRA = 4, 
-        OCEAN_LEFT = 8, 
-        OCEAN_RIGHT = 16,
-        OCEAN_DESERT_LEFT = 32,
-        OCEAN_DESERT_RIGHT = 64
-    };
+    const unsigned long FOREST              = 1 << 0; 
+    const unsigned long TUNDRA              = 1 << 1; 
+    const unsigned long JUNGLE              = 1 << 2; 
+    const unsigned long OCEAN_LEFT          = 1 << 3; 
+    const unsigned long OCEAN_RIGHT         = 1 << 4; 
+    const unsigned long OCEAN_DESERT_LEFT   = 1 << 5; 
+    const unsigned long OCEAN_DESERT_RIGHT  = 1 << 6; 
 
     class Biome: public PixelArray 
     {
         protected:
             Map& map;
-            Type type;
+            std::bitset<32> type;
 
         public:
             Biome(Map& _map): PixelArray(), map{_map} {};
-            Biome(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            Biome(Map& _map, unsigned long _t): PixelArray(), map{_map}, type{_t} {};
             ~Biome() { clear(); };
 
-            auto GetType() const { return type; }
+            auto GetType() const { return type.to_ulong(); }
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
@@ -205,41 +203,39 @@ namespace Biomes {
 
 namespace Structures {
     
-    enum Type: unsigned short { 
-        SURFACE_PART = 1, 
-        HILL = 2, 
-        HOLE = 4, 
-        CABIN = 8, 
-        CLIFF = 16, 
-        TRANSITION = 32, 
-        SURFACE_TUNNEL = 64, 
-        FLOATING_ISLAND = 128, 
-        UNDERGROUND_TUNNEL = 256, 
-        GRASS = 512, 
-        CASTLE = 1024,
-        TREE = 2048,
-        CHASM = 4096,
-        SAND = 8192,
-        WATER = 16384,
-        CAVE = 32768,
-        COPPER_ORE = 32769, // TODO 
-        IRON_ORE = 32770, // TODO 
-        SILVER_ORE = 32771, // TODO 
-        GOLD_ORE = 32772
-    }; 
+    const unsigned long SURFACE_PART         = 1 << 0; 
+    const unsigned long HILL                 = 1 << 1;   
+    const unsigned long HOLE                 = 1 << 2; 
+    const unsigned long CABIN                = 1 << 3;
+    const unsigned long CLIFF                = 1 << 4;
+    const unsigned long TRANSITION           = 1 << 5;
+    const unsigned long SURFACE_TUNNEL       = 1 << 6;
+    const unsigned long FLOATING_ISLAND      = 1 << 7;
+    const unsigned long UNDERGROUND_TUNNEL   = 1 << 8;
+    const unsigned long GRASS                = 1 << 9;
+    const unsigned long CASTLE               = 1 << 10;
+    const unsigned long TREE                 = 1 << 11;
+    const unsigned long CHASM                = 1 << 12;
+    const unsigned long SAND                 = 1 << 13;
+    const unsigned long WATER                = 1 << 14;
+    const unsigned long CAVE                 = 1 << 15;
+    const unsigned long COPPER_ORE           = 1 << 16;
+    const unsigned long IRON_ORE             = 1 << 17;
+    const unsigned long SILVER_ORE           = 1 << 18;
+    const unsigned long GOLD_ORE             = 1 << 19;
     
     class DefinedStructure: public PixelArray 
     {
         protected:
             Map& map;
-            Type type;
+            std::bitset<32> type;
 
         public:
             DefinedStructure(Map& _map): PixelArray(), map{_map} {};
-            DefinedStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            DefinedStructure(Map& _map, unsigned long _t): PixelArray(), map{_map}, type{_t} {};
             ~DefinedStructure(){ clear(); };
             
-            auto GetType() const { return type; }
+            auto GetType() const { return type.to_ulong(); }
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
@@ -249,14 +245,14 @@ namespace Structures {
     {
         protected:
             Map& map;
-            Type type;
+            std::bitset<32> type;
 
         public:
             GeneratedStructure(Map& _map): PixelArray(), map{_map} {};
-            GeneratedStructure(Map& _map, Type _t): PixelArray(), map{_map}, type{_t} {};
+            GeneratedStructure(Map& _map, unsigned long _t): PixelArray(), map{_map}, type{_t} {};
             ~GeneratedStructure(){ clear(); };
             
-            auto GetType() const { return type; }
+            auto GetType() const { return type.to_ulong(); }
             void add(Pixel pixel) override;
             void remove(Pixel pixel) override;
             void clear() override;
@@ -828,14 +824,14 @@ class Map {
             return {&_space, &_surface, &_underground, &_cavern};
         }
 
-        auto& Biome(Biomes::Type type)
+        auto& Biome(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _biomes.emplace_back(new Biomes::Biome(*this, type));
             return *_biomes.back();
         }
 
-        Biomes::Biome* GetBiome(Biomes::Type type)
+        Biomes::Biome* GetBiome(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             for (auto& biome: _biomes)
@@ -856,14 +852,14 @@ class Map {
             return _structures;
         }
 
-        auto& DefinedStructure(Structures::Type type)
+        auto& DefinedStructure(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _structures.emplace_back(new Structures::DefinedStructure(*this, type));
             return *_structures.back();
         }
 
-        auto GetDefinedStructures(Structures::Type type)
+        auto GetDefinedStructures(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             std::vector<Structures::DefinedStructure*> structures;
@@ -879,14 +875,14 @@ class Map {
             return _generated_structures;
         }
 
-        auto& GeneratedStructure(Structures::Type type)
+        auto& GeneratedStructure(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _generated_structures.emplace_back(new Structures::GeneratedStructure(*this, type));
             return *_generated_structures.back();
         }
 
-        auto GetGeneratedStructures(Structures::Type type)
+        auto GetGeneratedStructures(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             std::vector<Structures::GeneratedStructure*> structures;
@@ -902,14 +898,14 @@ class Map {
             return _generated_structures;
         }
 
-        auto& UndergroundStructure(Structures::Type type)
+        auto& UndergroundStructure(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             _underground_structures.emplace_back(new Structures::GeneratedStructure(*this, type));
             return *_underground_structures.back();
         }
 
-        auto GetUndergroundStructures(Structures::Type type)
+        auto GetUndergroundStructures(unsigned long type)
         {
             const std::lock_guard<std::mutex> lock(mutex);
             std::vector<Structures::GeneratedStructure*> structures;
