@@ -517,7 +517,7 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
         {
             Pixel p = {x, y};
             auto meta = map.GetMetadata(p);
-            if (meta.surface_structure != nullptr)
+            if (meta.generated_structure != nullptr)
                 walls.insert(p);
         }
     }
@@ -564,7 +564,7 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
             // TODO QUICKFIX
             Pixel p {_x, _y};
             auto meta = map.GetMetadata(p);
-            if (meta.surface_structure != nullptr)
+            if (meta.generated_structure != nullptr)
             // TODO QUICKFIX
             {
                 auto x = _x - rect.x;
@@ -698,7 +698,7 @@ inline auto CreateWater(const Rect& rect, PixelArray& arr, Pixel s, int count, M
         {
             Pixel p = {x, y};
             auto meta = map.GetMetadata(p);
-            if (meta.surface_structure != nullptr) walls.insert(p);
+            if (meta.generated_structure != nullptr) walls.insert(p);
         }
     }
 
@@ -914,7 +914,7 @@ inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_s
             {
                 Pixel p {x, y};
                 auto meta = map.GetMetadata(p);
-                if (meta.surface_structure != nullptr)
+                if (meta.generated_structure != nullptr)
                 {
                     auto prob = rand() % 100;
                     if (prob > 20) 
@@ -986,7 +986,7 @@ inline void UpdateSurfaceParts(const PixelArray& arr, Map& map)
             {
                 Pixel p {x, y};
                 auto meta = map.GetMetadata(p);
-                if (meta.surface_structure != nullptr && meta.surface_structure->GetType() == Structures::SURFACE_PART)
+                if (meta.generated_structure != nullptr && meta.generated_structure->GetType() == Structures::SURFACE_PART)
                     part->remove({x, y});
             }
         }
@@ -1672,7 +1672,7 @@ EXPORT inline void GenerateHoles(Map& map)
         for (auto p: hole)
         {
             auto meta = map.GetMetadata(p);
-            meta.surface_structure = nullptr;
+            meta.generated_structure = nullptr;
             map.SetMetadata(p, meta);
         }
 
@@ -1809,7 +1809,7 @@ EXPORT inline void GenerateChasms(Map& map)
             if (!s_chasm.contains(p))
             {
                 auto meta = map.GetMetadata(p);
-                meta.surface_structure = nullptr;
+                meta.generated_structure = nullptr;
                 map.SetMetadata(p, meta);
             }
         }
@@ -1925,8 +1925,8 @@ EXPORT inline void GenerateGrass(Map& map)
             auto info_right = map.GetMetadata({p.x + 1, p.y});
 
             if ((info_this.biome != nullptr) && (info_this.biome->GetType() & A_BIOMES) &&
-                (info_this.surface_structure != nullptr) && (info_this.surface_structure->GetType() & A_STRUCT) &&
-                ((info_up.surface_structure == nullptr) || (info_left.surface_structure == nullptr) || (info_right.surface_structure == nullptr)))
+                (info_this.generated_structure != nullptr) && (info_this.generated_structure->GetType() & A_STRUCT) &&
+                ((info_up.generated_structure == nullptr) || (info_left.generated_structure == nullptr) || (info_right.generated_structure == nullptr)))
             {
                 grass.add(p);
 
@@ -1951,7 +1951,7 @@ EXPORT inline void GenerateGrass(Map& map)
         while (!found && (p.y < (surface_rect.y + surface_rect.h - 1))) 
         {
             auto meta = map.GetMetadata(p);
-            if (meta.surface_structure == nullptr)
+            if (meta.generated_structure == nullptr)
                 p.y += 1;
             else
                 found = true;
@@ -1978,7 +1978,7 @@ EXPORT inline void GenerateTrees(Map& map)
             auto info_left = map.GetMetadata({p.x - 1, p.y});
             auto info_right = map.GetMetadata({p.x + 1, p.y});
             
-            if (info_this.surface_structure != nullptr || info_left.surface_structure != nullptr || info_right.surface_structure != nullptr)
+            if (info_this.generated_structure != nullptr || info_left.generated_structure != nullptr || info_right.generated_structure != nullptr)
                 return false;
         };
 
@@ -2055,7 +2055,7 @@ EXPORT inline void GenerateOres(Map& map)
 
         Pixel p {x, y};
         auto meta = map.GetMetadata(p); 
-        if (meta.surface_structure != nullptr && (meta.surface_structure->GetType() & A_STRUCTURES) != 0)
+        if (meta.generated_structure != nullptr && (meta.generated_structure->GetType() & A_STRUCTURES) != 0)
         {
             auto& ore = map.SurfaceStructure(Structures::ORE);
             Rect rect {x, y, 12, 12};

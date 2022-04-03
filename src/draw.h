@@ -167,7 +167,7 @@ inline void DrawSurfaceDebug(Map& map)
         for (auto y = 0; y < surface_rect.y + surface_rect.h; ++y)
         {
             auto meta = map.GetMetadata({x, y});
-            if (meta.structure != nullptr)
+            if (meta.defined_structure != nullptr)
             {
                 DrawPixel(x, y, (Color){255, 0, 0, 16});
             }
@@ -183,21 +183,21 @@ inline void DrawSurface(Map& map)
         for (auto y = 0; y <= surface_rect.y + surface_rect.h + 200; ++y)
         {
             auto meta = map.GetMetadata({x, y});
-            if (meta.surface_structure != nullptr)
+            if (meta.generated_structure != nullptr)
             {
 
                 // BIOME RELATED
                 if (meta.biome != nullptr)
                 {
                     if (meta.biome->GetType() == Biomes::JUNGLE)
-                        if (meta.surface_structure->GetType() == Structures::GRASS)
+                        if (meta.generated_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_JGRASS);
                         else
                             DrawPixel(x, y, C_MUD);
                     else if (meta.biome->GetType() == Biomes::TUNDRA)
                         DrawPixel(x, y, C_ICE);
                     else
-                        if (meta.surface_structure->GetType() == Structures::GRASS)
+                        if (meta.generated_structure->GetType() == Structures::GRASS)
                             DrawPixel(x, y, C_GRASS);
                         else
                             DrawPixel(x, y, C_DIRT);
@@ -208,19 +208,19 @@ inline void DrawSurface(Map& map)
                 }
                 
                 // FOR EVERY SURFACE STRUCTURE
-                if (meta.surface_structure->GetType() == Structures::TREE)
+                if (meta.generated_structure->GetType() == Structures::TREE)
                     DrawPixel(x, y, (Color){191, 143, 111, 255});
-                if (meta.surface_structure->GetType() == Structures::WATER)
+                if (meta.generated_structure->GetType() == Structures::WATER)
                     DrawPixel(x, y, C_WATER);
-                if (meta.surface_structure->GetType() == Structures::SAND)
+                if (meta.generated_structure->GetType() == Structures::SAND)
                     DrawPixel(x, y, C_SAND);
-                if (meta.surface_structure->GetType() == Structures::ORE)
+                if (meta.generated_structure->GetType() == Structures::ORE)
                     DrawPixel(x, y, (Color){150, 67, 22, 255});
                 // DEBUG
                 /*
-                if (meta.surface_structure->GetType() == Structures::TRANSITION)
+                if (meta.generated_structure->GetType() == Structures::TRANSITION)
                     DrawPixel(x, y, RED);
-                if (meta.surface_structure->GetType() == Structures::HILL)
+                if (meta.generated_structure->GetType() == Structures::HILL)
                     DrawPixel(x, y, BLUE);
                 */
             }
@@ -257,10 +257,10 @@ inline void DrawUnderground(Map& map)
                 else
                     DrawPixel(x, y, C_STONE);
 
-                if (meta.surface_structure != nullptr)
+                if (meta.generated_structure != nullptr)
                 {
                     // FOR EVERY UNDERGROUND STRUCTURE IN BIOME
-                    if (meta.surface_structure->GetType() == Structures::CAVE)
+                    if (meta.generated_structure->GetType() == Structures::CAVE)
                     {
                         if (y < cavern_rect.y)
                             DrawPixel(x, y, (Color){84, 57, 42, 255});

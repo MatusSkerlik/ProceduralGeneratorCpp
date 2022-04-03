@@ -11,6 +11,7 @@
 #include <random>
 
 #include "raylib.h"
+#include "utils.h"
 #define RAYGUI_IMPLEMENTATION
 #pragma GCC diagnostic push 
 #pragma GCC diagnostic ignored "-Wenum-compare"
@@ -483,9 +484,9 @@ int main(void)
                                 break;
                         }
                     }
-                    if (info.surface_structure != nullptr)
+                    if (info.generated_structure != nullptr)
                     {
-                        switch (info.surface_structure->GetType())
+                        switch (info.generated_structure->GetType())
                         {
                             case Structures::HILL:
                                 DrawText("HILL", mx, my - 48, 16, BLUE);
@@ -513,6 +514,21 @@ int main(void)
                                 break;
                             case Structures::FLOATING_ISLAND:
                                 DrawText("ISLAND", mx, my - 48, 16, BLUE);
+                                break;
+                            case Structures::CAVE:
+                                DrawText("CAVE", mx, my - 48, 16, BLUE);
+                                break;
+                            case Structures::WATER:
+                                DrawText("WATER", mx, my - 48, 16, BLUE);
+                                break;
+                            case Structures::TREE:
+                                DrawText("TREE", mx, my - 48, 16, BLUE);
+                                break;
+                            case Structures::GRASS:
+                                DrawText("GRASS", mx, my - 48, 16, BLUE);
+                                break;
+                            case Structures::ORE:
+                                DrawText("ORE", mx, my - 48, 16, BLUE);
                                 break;
                             default:
                                 break;
