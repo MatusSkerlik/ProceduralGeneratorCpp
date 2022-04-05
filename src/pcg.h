@@ -225,12 +225,12 @@ inline void CreateCliff(const Rect& rect, PixelArray& arr, Pixel s, Pixel e)
     if (s.y < e.y) // RIGHT
     {
         X = {(double)s.x, (double)rect.x + rect.w * 0.75, (double)rect.x + rect.w, (double)s.x};
-        Y = {(double)s.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.3), (double)e.y};
+        Y = {(double)s.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.h * 0.25), (double)e.y};
     }
     else // LEFT
     {
         X = {(double)e.x, (double)rect.x + rect.w * 0.25, (double)rect.x, (double)e.x};
-        Y = {(double)e.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.w * 0.3), (double)s.y};
+        Y = {(double)e.y, (double)rect.y, (double) rect.y + rand() % (int)(rect.h * 0.25), (double)s.y};
     }
 
     std::vector<double> T { 0.0 };
@@ -1963,7 +1963,7 @@ EXPORT inline void GenerateGrass(Map& map)
 
 EXPORT inline void GenerateTrees(Map& map)
 {
-    printf("Generate Trees\n");
+    printf("GenerateTrees\n");
     auto count = 100 + (int)(map.TreeFrequency() * 200);
 
     auto* grass = map.GetGeneratedStructures(Structures::GRASS)[0];
@@ -2038,6 +2038,108 @@ EXPORT inline void GenerateCaves(Map& map)
     }
 };
 
+EXPORT inline void GenerateUndergroundStone(Map& map)
+{
+    printf("GenerateUndergroundStone\n");
+
+    auto rect = map.Underground().bbox();
+
+    std::vector<int> grid;
+    for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+        for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+                grid.push_back(0);
+
+    for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+    {
+        for (auto _y = rect.y + 1; _y <= rect.y + rect.h; ++_y)
+        {
+            Pixel p {_x, _y};
+            auto meta = map.GetMetadata(p);
+            if (meta.generated_structure == nullptr && (rand() % 2) == 1){
+                auto x = _x - rect.x;
+                auto y = _y - rect.y;
+                grid[y * rect.w + x] = 1;
+            }
+        }
+    }
+
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+
+    auto& stone = map.UndergroundStructure(Structures::STONE);
+    for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+    {
+        for (auto _y = rect.y; _y < rect.y + rect.h; ++_y)
+        {
+            auto x = _x - rect.x;
+            auto y = _y - rect.y;
+
+            if (grid.at(y * rect.w + x) == 1)
+                stone.add({_x, _y});
+        }
+    }
+};
+
+EXPORT inline void GenerateCavernDirt(Map& map)
+{
+    printf("GenerateCavernDirt\n");
+
+    auto rect = map.Cavern().bbox();
+
+    std::vector<int> grid;
+    for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+        for (auto x = rect.x; x < rect.x + rect.w; ++x)
+                grid.push_back(0);
+
+    for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+    {
+        for (auto _y = rect.y + 1; _y < rect.y + rect.h; ++_y)
+        {
+            Pixel p {_x, _y};
+            auto meta = map.GetMetadata(p);
+            if (meta.generated_structure == nullptr && (rand() % 2) == 1){
+                auto x = _x - rect.x;
+                auto y = _y - rect.y;
+                grid[y * rect.w + x] = 1;
+            }
+        }
+    }
+
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 5, 5);
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+    grid = CellularAutomata::Step(rect, grid, 4, 4);
+
+    auto& dirt = map.UndergroundStructure(Structures::DIRT);
+    for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
+    {
+        for (auto _y = rect.y; _y < rect.y + rect.h; ++_y)
+        {
+            auto x = _x - rect.x;
+            auto y = _y - rect.y;
+
+            if (grid.at(y * rect.w + x) == 1)
+                dirt.add({_x, _y});
+        }
+    }
+};
+
 EXPORT inline void GenerateSurfaceOres(Map& map)
 {
     printf("GenerateSurfaceOres\n");
@@ -2052,7 +2154,7 @@ EXPORT inline void GenerateSurfaceOres(Map& map)
     auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
         Structures::HOLE | Structures::TRANSITION | Structures::HOLE |
         Structures::COPPER_ORE | Structures::IRON_ORE | Structures::SILVER_ORE |
-        Structures::GOLD_ORE; 
+        Structures::GOLD_ORE | Structures::CHASM; 
 
     while (copper_count > 0)
     {

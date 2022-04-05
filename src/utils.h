@@ -223,6 +223,8 @@ namespace Structures {
     const unsigned long IRON_ORE             = 1 << 17;
     const unsigned long SILVER_ORE           = 1 << 18;
     const unsigned long GOLD_ORE             = 1 << 19;
+    const unsigned long STONE                = 1 << 20;
+    const unsigned long DIRT                 = 1 << 21;
     
     class DefinedStructure: public PixelArray 
     {
@@ -352,7 +354,7 @@ class Map {
         {
             for (auto x = 0; x <= this->Width(); ++x)
                 for (auto y = 0; y <= this->Height(); ++y) 
-                    _pixel_map.emplace(std::make_pair((Pixel){x, y}, PixelMetadata()));
+                    _pixel_map.insert({{x, y}, PixelMetadata()});
             _initialized = true;
         };
 

@@ -58,7 +58,16 @@ class DefaultScene: public Scene
             if (!map.ShouldForceStop() && GenerateStage5)
             {
                 map.ClearStage4();
-                map.SetGenerationMessage("GENERATION OF CAVES...");
+
+                /*
+                auto generate_stone_future = std::async(std::launch::async, GenerateUndergroundStone, std::ref(map));
+                futures_to_wait.emplace_back(
+                        "GENERATION OF STONE IN UNDERGROUND...", 
+                        "GENERATION OF STONE IN UNDERGROUND INFEASIBLE...", 
+                        std::move(generate_stone_future)
+                );
+                */
+
                 auto generate_caves_future = std::async(std::launch::async, GenerateCaves, std::ref(map));
                 futures_to_wait.emplace_back(
                         "GENERATION OF CAVES...", 
@@ -157,6 +166,15 @@ class DefaultScene: public Scene
                     map.SetForceStop(true);
                     map.Error(error_message);
                 }
+            }
+
+
+            if (!map.ShouldForceStop() && GenerateStage5)
+            {
+                map.SetGenerationMessage("GENERATION OF UNDERGROUND STONE...");
+                GenerateUndergroundStone(map);
+                map.SetGenerationMessage("GENERATION OF CAVERN DIRT...");
+                GenerateCavernDirt(map);
             }
 
             if (!map.ShouldForceStop())
