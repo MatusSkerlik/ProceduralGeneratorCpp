@@ -899,10 +899,10 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
     }
 };
 
-inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size, float curvness, Map& map)
+inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size, float curvness, Map& map, unsigned long A_STRUCTURES)
 {
     // MINIMAL MATERIAL SIZE
-    if (rect.w < 30 || rect.h < 30)
+    if (rect.w < 20 || rect.h < 20)
         return;
 
     auto points_count = 3;
@@ -911,8 +911,8 @@ inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size,
     // SPAWN POINTS 
     while (points_count > 0)
     {
-        auto x = rect.x + 10 + rand() % (rect.w - 20);
-        auto y = rect.y + 10 + rand() % (rect.h - 20);
+        auto x = rect.x + 6 + rand() % (rect.w - 12);
+        auto y = rect.y + 6 + rand() % (rect.h - 12);
         auto check = true;
         for (auto p: points)
         {
@@ -944,18 +944,19 @@ inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size,
                 sp = p;
         }
     }
-    auto stroke = (5 + rand() % 6) * stroke_size;
+    auto stroke = (3 + rand() % 4) * stroke_size;
     auto material = SplineAgent::Paint(rect, points, sp, [=](float t, float t_size){ return 1 + stroke * ((t_size - t - 1) / t_size); }, curvness);
 
     // PUSH RESULTS
     for (auto p: material) 
     {
         auto meta = map.GetMetadata(p);
-        if (meta.generated_structure == nullptr) arr.add(p);
+        if (meta.generated_structure == nullptr || meta.generated_structure->GetType() & A_STRUCTURES)
+            arr.add(p);
     }
 };
 
-inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_size, Map& map)
+inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_size, Map& map, unsigned long A_STRUCTURES)
 {
     // PREPARE GRID
     std::vector<int> grid;
@@ -971,7 +972,7 @@ inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_s
             {
                 Pixel p {x, y};
                 auto meta = map.GetMetadata(p);
-                if (meta.generated_structure != nullptr)
+                if (meta.generated_structure == nullptr || meta.generated_structure->GetType() & A_STRUCTURES)
                 {
                     auto prob = rand() % 100;
                     if (prob > 20) 
@@ -2109,7 +2110,8 @@ EXPORT inline void GenerateSurfaceOres(Map& map)
     auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
         Structures::HOLE | Structures::TRANSITION | Structures::HOLE |
         Structures::COPPER_ORE | Structures::IRON_ORE | Structures::SILVER_ORE |
-        Structures::GOLD_ORE; 
+        Structures::GOLD_ORE | Structures::S_MATERIAL_BASE | Structures::S_MATERIAL_SEC | 
+        Structures::S_MATERIAL_TER; 
 
     while (copper_count > 0)
     {
@@ -2122,7 +2124,7 @@ EXPORT inline void GenerateSurfaceOres(Map& map)
         {
             auto& ore = map.GeneratedStructure(Structures::COPPER_ORE);
             Rect rect {x, y, 14, 14};
-            CreateOre(rect, ore, 10, copper_size_max, map);
+            CreateOre(rect, ore, 10, copper_size_max, map, A_STRUCTURES);
             copper_count -= 1;
         }
     }
@@ -2138,8 +2140,76 @@ EXPORT inline void GenerateSurfaceOres(Map& map)
         {
             auto& ore = map.GeneratedStructure(Structures::IRON_ORE);
             Rect rect {x, y, 14, 14};
-            CreateOre(rect, ore, 12, iron_size_max, map);
+            CreateOre(rect, ore, 12, iron_size_max, map, A_STRUCTURES);
             iron_count -= 1;
+        }
+    }
+};
+
+EXPORT inline void GenerateMaterialSurface(Map& map)
+{
+    printf("GenerateMaterialSurface\n");
+
+    auto rect = map.Surface().bbox();
+    auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
+        Structures::HOLE | Structures::TRANSITION | Structures::HOLE;
+
+    auto base_material_count = 100;
+    while (base_material_count > 0)
+    {
+        auto w = 20 + rand() % 15;
+        auto h = 20 + rand() % 15;
+        auto x = rect.x + rand() % (rect.w - w);
+        auto y = rect.y + rand() % (rect.h - h);
+        
+        auto meta0 = map.GetMetadata({x, y});
+        auto meta1 = map.GetMetadata({x + w, y + h});
+
+        if (meta0.generated_structure != nullptr && meta0.generated_structure->GetType() & A_STRUCTURES && 
+            meta1.generated_structure != nullptr && meta1.generated_structure->GetType() & A_STRUCTURES)
+        {
+            auto& material = map.GeneratedStructure(Structures::S_MATERIAL_BASE);
+            Rect rect {x, y, w, h};
+            CreateMaterial(rect, material, 1.0, 0.2, map, A_STRUCTURES);
+            base_material_count -= 1;
+        }
+    }
+
+    auto secondary_material_count = 80;
+    while (secondary_material_count > 0)
+    {
+        auto w = 30 + rand() % 15;
+        auto h = 30 + rand() % 15;
+        auto x = rect.x + rand() % (rect.w - w);
+        auto y = rect.y + rand() % (rect.h - h);
+        
+        auto meta0 = map.GetMetadata({x, y});
+        auto meta1 = map.GetMetadata({x + w, y + h});
+
+        if (meta0.generated_structure != nullptr && meta0.generated_structure->GetType() & A_STRUCTURES && 
+            meta1.generated_structure != nullptr && meta1.generated_structure->GetType() & A_STRUCTURES)
+        {
+            auto& material = map.GeneratedStructure(Structures::S_MATERIAL_SEC);
+            Rect rect {x, y, w, h};
+            CreateMaterial(rect, material, 1.0, 0.2, map, A_STRUCTURES);
+            secondary_material_count -= 1;
+        }
+    }
+
+    auto grass_count = 1000;
+    auto& grass = map.GeneratedStructure(Structures::GRASS);
+
+    while (grass_count > 0)
+    {
+        auto x = rect.x + rand() % rect.w;
+        auto y = rect.y + rand() % rect.h;
+        
+        auto meta = map.GetMetadata({x, y});
+        if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES &&
+            meta.biome != nullptr && meta.biome->GetType() & (Biomes::FOREST | Biomes::JUNGLE))
+        {
+            grass.add({x, y});
+            grass_count -= 1;
         }
     }
 };
@@ -2150,21 +2220,69 @@ EXPORT inline void GenerateMaterialUnderground(Map& map)
 
     auto rect = map.Underground().bbox();
 
-    auto stone_count = 1200;
-    while (stone_count > 0)
+    auto base_material_count = 700;
+    while (base_material_count > 0)
+    {
+        auto w = 20 + rand() % 20;
+        auto h = 20 + rand() % 20;
+        auto x = rect.x + rand() % (rect.w - w);
+        auto y = rect.y + rand() % rect.h;
+
+        auto& material = map.UndergroundStructure(Structures::U_MATERIAL_BASE);
+        Rect rect {x, y, w, h};
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        base_material_count -= 1;
+    }
+
+    auto secondary_material_count = 100;
+    while (secondary_material_count > 0)
     {
         auto w = 30 + rand() % 20;
         auto h = 30 + rand() % 20;
         auto x = rect.x + rand() % (rect.w - w);
-        auto y = rect.y + rand() % (rect.h - h);
+        auto y = rect.y + rand() % rect.h;
 
-        auto& material = map.GeneratedStructure(Structures::STONE);
+        auto& material = map.UndergroundStructure(Structures::U_MATERIAL_SEC);
         Rect rect {x, y, w, h};
-        CreateMaterial(rect, material, 1.0, 0.2, map);
-        stone_count -= 1;
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        secondary_material_count -= 1;
     }
 };
 
+EXPORT inline void GenerateMaterialCavern(Map& map)
+{
+    printf("GenerateMaterialCavern\n");
+
+    auto rect = map.Cavern().bbox();
+
+    auto base_material_count = 1600;
+    while (base_material_count > 0)
+    {
+        auto w = 20 + rand() % 30;
+        auto h = 20 + rand() % 30;
+        auto x = rect.x + rand() % (rect.w - w);
+        auto y = (rect.y - 30) + rand() % (rect.h - h + 30);
+
+        auto& material = map.UndergroundStructure(Structures::C_MATERIAL_BASE);
+        Rect rect {x, y, w, h};
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        base_material_count -= 1;
+    }
+
+    auto secondary_material_count = 200;
+    while (secondary_material_count > 0)
+    {
+        auto w = 20 + rand() % 40;
+        auto h = 20 + rand() % 40;
+        auto x = rect.x + rand() % (rect.w - w);
+        auto y = (rect.y - 30) + rand() % (rect.h - h + 30);
+
+        auto& material = map.UndergroundStructure(Structures::C_MATERIAL_SEC);
+        Rect rect {x, y, w, h};
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        secondary_material_count -= 1;
+    }
+};
 
 }; // extern "C"
 #endif // PCG
