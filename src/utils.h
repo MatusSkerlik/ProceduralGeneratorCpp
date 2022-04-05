@@ -223,6 +223,8 @@ namespace Structures {
     const unsigned long IRON_ORE             = 1 << 17;
     const unsigned long SILVER_ORE           = 1 << 18;
     const unsigned long GOLD_ORE             = 1 << 19;
+    const unsigned long STONE                = 1 << 20;
+    const unsigned long DIRT                 = 1 << 21;
     
     class DefinedStructure: public PixelArray 
     {

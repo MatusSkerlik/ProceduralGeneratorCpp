@@ -47,7 +47,7 @@ inline void DrawHorizontal(Map& map)
                 color = C_SURFACE;
                 break;
             case HorizontalAreas::UNDERGROUND:
-                color = C_STONE;
+                color = C_DIRT;
                 break;
             case HorizontalAreas::CAVERN:
                 color = C_STONE;
@@ -261,7 +261,10 @@ inline void DrawUnderground(Map& map)
                 else if (meta.biome->GetType() == Biomes::TUNDRA)
                     DrawPixel(x, y, C_ICE);
                 else
-                    DrawPixel(x, y, C_STONE);
+                    if (y < cavern_rect.y)
+                        DrawPixel(x, y, C_DIRT);
+                    else
+                        DrawPixel(x, y, C_STONE);
 
                 if (meta.generated_structure != nullptr)
                 {
@@ -272,7 +275,9 @@ inline void DrawUnderground(Map& map)
                             DrawPixel(x, y, (Color){84, 57, 42, 255});
                         else 
                             DrawPixel(x, y, (Color){72, 64, 57, 255});
-                    }
+                    } 
+                    else if (meta.generated_structure->GetType() == Structures::STONE)
+                        DrawPixel(x, y, C_STONE); 
                 }
             }
         }

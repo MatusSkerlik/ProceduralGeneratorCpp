@@ -715,7 +715,7 @@ inline auto CreateWater(const Rect& rect, PixelArray& arr, Pixel s, int count, M
     }
 };
 
-namespace Cave
+namespace SplineAgent 
 {
     enum Direction {
         TOP, 
@@ -724,16 +724,18 @@ namespace Cave
         RIGHT
     };
 
-    inline void Step(
+    
+    inline std::unordered_set<Pixel, PixelHash, PixelEqual> Paint(
             const Rect& rect, 
-            std::unordered_set<Pixel, PixelHash, PixelEqual>& arr, 
             std::unordered_set<Pixel, PixelHash, PixelEqual>& points,
             Pixel sp,
-            float stroke_size,
+            std::function<int(float, float)> stroke,
             float curvness
     ){
         if (points.size() < 3)
-            return;
+            return {};
+
+        std::unordered_set<Pixel, PixelHash, PixelEqual> result; 
         
         auto dist_comparator = [=](Pixel a, Pixel b)
         {
@@ -760,15 +762,16 @@ namespace Cave
 
         // CALCULATE POINTS
         std::vector<Pixel> queue;
-        for (float t = 0; t < (int)X.back(); t += (0.05 + curvness))
+        for (float t = 0; t < (int)X.size(); t += (0.01 + curvness))
             queue.push_back({(int)sx(t), (int)sy(t)});
         std::reverse(queue.begin(), queue.end());
 
         auto cp = sp;
+        auto t = 0;
+        auto total_points = queue.size();
         while (queue.size() > 0)
         {
             auto target = queue.back();
-            //printf("Next point [%d, %d]\n", target.x, target.y);
             queue.pop_back();
 
             if ((target.x < rect.x) || (target.x >= rect.x + rect.w) || 
@@ -776,10 +779,10 @@ namespace Cave
                 continue;
 
             // STROKE SIZE
-            auto c_size = 1 + rand() % (2 + (int)(10 * stroke_size));
+            auto c_size = stroke(t, total_points);
 
             // WHILE WE ARE NOT CLOSE ENOUGH TO MOVE TO THE NEXT POINT
-            while (sqrt(pow(target.x - cp.x, 2) + pow(target.y - cp.y, 2)) > 2)
+            while (sqrt(pow(target.x - cp.x, 2) + pow(target.y - cp.y, 2)) > 1)
             {
                 // PICK DIRECTION TOWARDS TARGET
                 Pixel p_v {cp.x - target.x, cp.y - target.y};
@@ -808,22 +811,25 @@ namespace Cave
                 }
 
                 // PUSH RESULTS
-                for (auto x = cp.x - c_size; x <= cp.x + c_size; ++x)
+                int s = c_size / 2;
+                for (auto x = cp.x - s; x <= cp.x + s; ++x)
                 {
-                    for (auto y = cp.y - c_size; y <= cp.y + c_size; ++y)
+                    for (auto y = cp.y - s; y <= cp.y + s; ++y)
                     {
                         if ((x >= rect.x) && (x <= rect.x + rect.w) && (y >= rect.y) && (y <= rect.y + rect.h))
                         {
                             auto d = sqrt(pow(cp.x - x, 2) + pow(cp.y - y, 2));
-                            if (d <= c_size)
+                            if (d <= s)
                             {
-                                arr.insert({x, y});
+                                result.insert({x, y});
                             }
                         }
                     }
                 }
             }
+            t += 1;
         }
+        return result;
     };
 };
 
@@ -859,13 +865,8 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
         }
     }
 
-    std::unordered_set<Pixel, PixelHash, PixelEqual> cave;
     // HOW MANY TIMES TO RUN 
-    auto count = 1;
-    for (auto i = 0; i < count; ++i)
-    {
-        Cave::Step(rect, cave, points, sp, stroke_size, curvness);
-    }
+    auto cave = SplineAgent::Paint(rect, points, sp, [=](float, float){ return  2 + rand() % (2 + (int)(20 * stroke_size));}, curvness );
 
     // PREPARE FOR SMOOTHSTEP 
     std::vector<int> mask;
@@ -895,6 +896,62 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
             auto is_cave = mask[y * rect.w + x] == 0;
             if (is_cave) arr.add({_x, _y});
         }
+    }
+};
+
+inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size, float curvness, Map& map)
+{
+    // MINIMAL MATERIAL SIZE
+    if (rect.w < 30 || rect.h < 30)
+        return;
+
+    auto points_count = 3;
+    std::unordered_set<Pixel, PixelHash, PixelEqual> points;
+
+    // SPAWN POINTS 
+    while (points_count > 0)
+    {
+        auto x = rect.x + 10 + rand() % (rect.w - 20);
+        auto y = rect.y + 10 + rand() % (rect.h - 20);
+        auto check = true;
+        for (auto p: points)
+        {
+            auto d = sqrt(pow(p.x - x, 2) + pow(p.y - y, 2));
+            if (d < 1)
+            {
+                check = false; 
+                break;
+            }
+        }
+        if (check)
+        {
+            points.insert({x, y});
+            points_count -= 1;
+        }
+    }
+
+    // FIND STARTING POINT (CLOSEST TO TOP LEFT CORNER OF RECT)
+    Pixel sp {-1, -1};
+    for (auto p: points)
+    {
+        if (sp.x == -1 || sp.y == -1)
+        {
+            sp = p;
+        }
+        else
+        {
+            if (sqrt(pow(sp.x, 2) + pow(sp.y, 2)) > sqrt(pow(p.x, 2) + pow(p.y, 2)))
+                sp = p;
+        }
+    }
+    auto stroke = (5 + rand() % 6) * stroke_size;
+    auto material = SplineAgent::Paint(rect, points, sp, [=](float t, float t_size){ return 1 + stroke * ((t_size - t - 1) / t_size); }, curvness);
+
+    // PUSH RESULTS
+    for (auto p: material) 
+    {
+        auto meta = map.GetMetadata(p);
+        if (meta.generated_structure == nullptr) arr.add(p);
     }
 };
 
@@ -1963,7 +2020,7 @@ EXPORT inline void GenerateGrass(Map& map)
 
 EXPORT inline void GenerateTrees(Map& map)
 {
-    printf("Generate Trees\n");
+    printf("GenerateTrees\n");
     auto count = 100 + (int)(map.TreeFrequency() * 200);
 
     auto* grass = map.GetGeneratedStructures(Structures::GRASS)[0];
@@ -2086,6 +2143,28 @@ EXPORT inline void GenerateSurfaceOres(Map& map)
         }
     }
 };
+
+EXPORT inline void GenerateMaterialUnderground(Map& map)
+{
+    printf("GenerateMaterialUnderground\n");
+
+    auto rect = map.Underground().bbox();
+
+    auto stone_count = 1200;
+    while (stone_count > 0)
+    {
+        auto w = 30 + rand() % 20;
+        auto h = 30 + rand() % 20;
+        auto x = rect.x + rand() % (rect.w - w);
+        auto y = rect.y + rand() % (rect.h - h);
+
+        auto& material = map.GeneratedStructure(Structures::STONE);
+        Rect rect {x, y, w, h};
+        CreateMaterial(rect, material, 1.0, 0.2, map);
+        stone_count -= 1;
+    }
+};
+
 
 }; // extern "C"
 #endif // PCG
