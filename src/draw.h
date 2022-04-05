@@ -29,6 +29,10 @@
 #define C_GRASS             (Color){28, 216, 94, 255}
 #define C_JGRASS            (Color){143, 215, 29, 255}
 #define C_WATER             (Color){65, 88, 151, 255}
+#define C_GOLD              (Color){185, 164, 23, 255}
+#define C_SILVER            (Color){185, 194, 195, 255}
+#define C_IRON              (Color){62, 82, 114, 255}
+#define C_COPPER            (Color){150, 67, 22, 255} 
 
 #define C_SPACE             (Color){51, 102, 153, 255}
 #define C_SURFACE           (Color){155, 209, 255, 255}
@@ -232,13 +236,13 @@ inline void DrawSurface(Map& map)
                 if (meta.generated_structure->GetType() == Structures::SAND)
                     DrawPixel(x, y, C_SAND);
                 if (meta.generated_structure->GetType() == Structures::COPPER_ORE)
-                    DrawPixel(x, y, (Color){150, 67, 22, 255});
+                    DrawPixel(x, y, C_COPPER); 
                 if (meta.generated_structure->GetType() == Structures::IRON_ORE)
-                    DrawPixel(x, y, (Color){62, 82, 114, 255});
+                    DrawPixel(x, y, C_IRON); 
                 if (meta.generated_structure->GetType() == Structures::SILVER_ORE)
-                    DrawPixel(x, y, (Color){185, 194, 195, 255});
+                    DrawPixel(x, y, C_SILVER); 
                 if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
-                    DrawPixel(x, y, (Color){185, 164, 23, 255});
+                    DrawPixel(x, y, C_GOLD); 
                 // DEBUG
                 /*
                 if (meta.generated_structure->GetType() == Structures::TRANSITION)
@@ -329,6 +333,14 @@ inline void DrawUnderground(Map& map)
                         else
                             DrawPixel(x, y, C_SILT); 
                     }
+                    else if (meta.generated_structure->GetType() == Structures::COPPER_ORE)
+                        DrawPixel(x, y, C_COPPER);
+                    else if (meta.generated_structure->GetType() == Structures::IRON_ORE)
+                        DrawPixel(x, y, C_IRON);
+                    else if (meta.generated_structure->GetType() == Structures::SILVER_ORE)
+                        DrawPixel(x, y, C_SILVER);
+                    else if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
+                        DrawPixel(x, y, C_GOLD);
                 }
             }
         }

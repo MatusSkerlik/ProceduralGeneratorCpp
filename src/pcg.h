@@ -899,7 +899,7 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
     }
 };
 
-inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size, float curvness, Map& map, unsigned long A_STRUCTURES)
+inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size, float curvness, Map& map, unsigned long A_STRUCTURES, bool can_be_empty)
 {
     // MINIMAL MATERIAL SIZE
     if (rect.w < 20 || rect.h < 20)
@@ -951,12 +951,15 @@ inline auto CreateMaterial(const Rect& rect, PixelArray& arr, float stroke_size,
     for (auto p: material) 
     {
         auto meta = map.GetMetadata(p);
-        if (meta.generated_structure == nullptr || meta.generated_structure->GetType() & A_STRUCTURES)
+        if ((can_be_empty && meta.generated_structure == nullptr) || 
+            (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES))
+        {
             arr.add(p);
+        }
     }
 };
 
-inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_size, Map& map, unsigned long A_STRUCTURES)
+inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_size, Map& map, unsigned long A_STRUCTURES, bool can_be_empty)
 {
     // PREPARE GRID
     std::vector<int> grid;
@@ -972,7 +975,8 @@ inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_s
             {
                 Pixel p {x, y};
                 auto meta = map.GetMetadata(p);
-                if (meta.generated_structure == nullptr || meta.generated_structure->GetType() & A_STRUCTURES)
+                if ((can_be_empty && meta.generated_structure == nullptr) || 
+                    (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES))
                 {
                     auto prob = rand() % 100;
                     if (prob > 20) 
@@ -982,6 +986,10 @@ inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_s
                 }
             }
         }
+
+        // INFEASIBLE
+        if (CellularAutomata::CountCells(rect, grid, 1) < min_size)
+            break;
 
         while (CellularAutomata::CountCells(rect, grid, 1) > max_size)
         {
@@ -997,7 +1005,12 @@ inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_s
             auto y = _y - rect.y;
             if (grid.at(y * rect.w + x) == 1)
             {
-                arr.add({_x, _y});
+                auto meta = map.GetMetadata({_x, _y});
+                if ((can_be_empty && meta.generated_structure == nullptr) || 
+                    (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES))
+                {
+                    arr.add({_x, _y});
+                }
             }
         }
     }
@@ -2096,63 +2109,14 @@ EXPORT inline void GenerateCaves(Map& map)
     }
 };
 
-EXPORT inline void GenerateSurfaceOres(Map& map)
+EXPORT inline void GenerateSurfaceMaterials(Map& map)
 {
-    printf("GenerateSurfaceOres\n");
-    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
-    auto copper_size_max = 22 + (int)(32 * map.CopperSize());
-
-    auto iron_count = 25 + (int)(200 * map.IronFrequency());
-    auto iron_size_max = 24 + (int)(32 * map.IronSize()); 
-
-    auto& Surface = map.Surface();
-    auto surface_rect = Surface.bbox();
-    auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
-        Structures::HOLE | Structures::TRANSITION | Structures::HOLE |
-        Structures::COPPER_ORE | Structures::IRON_ORE | Structures::SILVER_ORE |
-        Structures::GOLD_ORE | Structures::S_MATERIAL_BASE | Structures::S_MATERIAL_SEC | 
-        Structures::S_MATERIAL_TER; 
-
-    while (copper_count > 0)
-    {
-        auto x = surface_rect.x + rand() % (surface_rect.w - 14);
-        auto y = surface_rect.y + rand() % (surface_rect.h - 14);
-
-        Pixel p {x, y};
-        auto meta = map.GetMetadata(p); 
-        if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES)
-        {
-            auto& ore = map.GeneratedStructure(Structures::COPPER_ORE);
-            Rect rect {x, y, 14, 14};
-            CreateOre(rect, ore, 10, copper_size_max, map, A_STRUCTURES);
-            copper_count -= 1;
-        }
-    }
-
-    while (iron_count > 0)
-    {
-        auto x = surface_rect.x + rand() % (surface_rect.w - 14);
-        auto y = surface_rect.y + rand() % (surface_rect.h - 14);
- 
-        Pixel p {x, y};
-        auto meta = map.GetMetadata(p); 
-        if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES)
-        {
-            auto& ore = map.GeneratedStructure(Structures::IRON_ORE);
-            Rect rect {x, y, 14, 14};
-            CreateOre(rect, ore, 12, iron_size_max, map, A_STRUCTURES);
-            iron_count -= 1;
-        }
-    }
-};
-
-EXPORT inline void GenerateMaterialSurface(Map& map)
-{
-    printf("GenerateMaterialSurface\n");
+    printf("GenerateSurfaceMaterials\n");
 
     auto rect = map.Surface().bbox();
     auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
-        Structures::HOLE | Structures::TRANSITION | Structures::HOLE;
+        Structures::HOLE | Structures::TRANSITION | Structures::HOLE |
+        Structures::CHASM | Structures::CLIFF;
 
     auto base_material_count = 100;
     while (base_material_count > 0)
@@ -2170,7 +2134,7 @@ EXPORT inline void GenerateMaterialSurface(Map& map)
         {
             auto& material = map.GeneratedStructure(Structures::S_MATERIAL_BASE);
             Rect rect {x, y, w, h};
-            CreateMaterial(rect, material, 1.0, 0.2, map, A_STRUCTURES);
+            CreateMaterial(rect, material, 1.0, 0.2, map, A_STRUCTURES, false);
             base_material_count -= 1;
         }
     }
@@ -2191,7 +2155,7 @@ EXPORT inline void GenerateMaterialSurface(Map& map)
         {
             auto& material = map.GeneratedStructure(Structures::S_MATERIAL_SEC);
             Rect rect {x, y, w, h};
-            CreateMaterial(rect, material, 1.0, 0.2, map, A_STRUCTURES);
+            CreateMaterial(rect, material, 1.0, 0.2, map, A_STRUCTURES, false);
             secondary_material_count -= 1;
         }
     }
@@ -2214,9 +2178,59 @@ EXPORT inline void GenerateMaterialSurface(Map& map)
     }
 };
 
-EXPORT inline void GenerateMaterialUnderground(Map& map)
+EXPORT inline void GenerateSurfaceOres(Map& map)
 {
-    printf("GenerateMaterialUnderground\n");
+    printf("GenerateSurfaceOres\n");
+    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_size_max = 7 + (int)(22 * map.CopperSize());
+
+    auto iron_count = 25 + (int)(200 * map.IronFrequency());
+    auto iron_size_max = 12 + (int)(32 * map.IronSize()); 
+
+    auto& Surface = map.Surface();
+    auto surface_rect = Surface.bbox();
+    auto A_STRUCTURES = Structures::SURFACE_PART | Structures::HILL | 
+        Structures::HOLE | Structures::TRANSITION | Structures::CHASM | Structures::CLIFF |
+        Structures::COPPER_ORE | Structures::IRON_ORE | Structures::SILVER_ORE |
+        Structures::GOLD_ORE | Structures::S_MATERIAL_BASE | Structures::S_MATERIAL_SEC | 
+        Structures::S_MATERIAL_TER; 
+
+    while (copper_count > 0)
+    {
+        auto x = surface_rect.x + rand() % (surface_rect.w - 12);
+        auto y = surface_rect.y + rand() % (surface_rect.h - 12);
+
+        Pixel p {x, y};
+        auto meta = map.GetMetadata(p); 
+        if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES)
+        {
+            auto& ore = map.GeneratedStructure(Structures::COPPER_ORE);
+            Rect rect {x, y, 12, 12};
+            CreateOre(rect, ore, 7, copper_size_max, map, A_STRUCTURES, false);
+            copper_count -= 1;
+        }
+    }
+
+    while (iron_count > 0)
+    {
+        auto x = surface_rect.x + rand() % (surface_rect.w - 14);
+        auto y = surface_rect.y + rand() % (surface_rect.h - 14);
+ 
+        Pixel p {x, y};
+        auto meta = map.GetMetadata(p); 
+        if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES)
+        {
+            auto& ore = map.GeneratedStructure(Structures::IRON_ORE);
+            Rect rect {x, y, 14, 14};
+            CreateOre(rect, ore, 9, iron_size_max, map, A_STRUCTURES, false);
+            iron_count -= 1;
+        }
+    }
+};
+
+EXPORT inline void GenerateUndergroudMaterials(Map& map)
+{
+    printf("GenerateUndergroudMaterials\n");
 
     auto rect = map.Underground().bbox();
 
@@ -2230,7 +2244,7 @@ EXPORT inline void GenerateMaterialUnderground(Map& map)
 
         auto& material = map.UndergroundStructure(Structures::U_MATERIAL_BASE);
         Rect rect {x, y, w, h};
-        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0, true);
         base_material_count -= 1;
     }
 
@@ -2244,14 +2258,65 @@ EXPORT inline void GenerateMaterialUnderground(Map& map)
 
         auto& material = map.UndergroundStructure(Structures::U_MATERIAL_SEC);
         Rect rect {x, y, w, h};
-        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0, true);
         secondary_material_count -= 1;
     }
 };
 
-EXPORT inline void GenerateMaterialCavern(Map& map)
+EXPORT inline void GenerateUndergroundOres(Map& map)
 {
-    printf("GenerateMaterialCavern\n");
+    printf("GenerateUndergroundOres\n");
+
+    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_size_max = 10 + (int)(22 * map.CopperSize());
+
+    auto iron_count = 100 + (int)(200 * map.IronFrequency());
+    auto iron_size_max = 12 + (int)(32 * map.IronSize()); 
+
+    auto silver_count = 100 + (int)(200 * map.SilverFrequency());
+    auto silver_size_max = 28 + (int)(42 * map.SilverSize());
+
+    auto rect = map.Underground().bbox();
+    auto A_STRUCTURES = Structures::U_MATERIAL_BASE | Structures::U_MATERIAL_SEC | Structures::U_MATERIAL_TER; 
+
+    while (copper_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 12);
+        auto y = rect.y + rand() % (rect.h - 12);
+
+        auto& ore = map.UndergroundStructure(Structures::COPPER_ORE);
+        Rect rect {x, y, 12, 12};
+        CreateOre(rect, ore, 7, copper_size_max, map, A_STRUCTURES, true);
+        copper_count -= 1;
+    }
+
+    while (iron_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 14);
+        auto y = rect.y + rand() % (rect.h - 14);
+ 
+        auto& ore = map.UndergroundStructure(Structures::IRON_ORE);
+        Rect rect {x, y, 14, 14};
+        CreateOre(rect, ore, 9, iron_size_max, map, A_STRUCTURES, true);
+        iron_count -= 1;
+    }
+
+    while (silver_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 14);
+        auto y = rect.y + rand() % (rect.h - 14);
+ 
+        Pixel p {x, y};
+        auto& ore = map.UndergroundStructure(Structures::SILVER_ORE);
+        Rect rect {x, y, 14, 14};
+        CreateOre(rect, ore, 12, silver_size_max, map, A_STRUCTURES, true);
+        silver_count -= 1;
+    }
+};
+
+EXPORT inline void GenerateCavernMaterials(Map& map)
+{
+    printf("GenerateCavernMaterials\n");
 
     auto rect = map.Cavern().bbox();
 
@@ -2265,7 +2330,7 @@ EXPORT inline void GenerateMaterialCavern(Map& map)
 
         auto& material = map.UndergroundStructure(Structures::C_MATERIAL_BASE);
         Rect rect {x, y, w, h};
-        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0, true);
         base_material_count -= 1;
     }
 
@@ -2279,8 +2344,72 @@ EXPORT inline void GenerateMaterialCavern(Map& map)
 
         auto& material = map.UndergroundStructure(Structures::C_MATERIAL_SEC);
         Rect rect {x, y, w, h};
-        CreateMaterial(rect, material, 1.0, 0.2, map, 0);
+        CreateMaterial(rect, material, 1.0, 0.2, map, 0, true);
         secondary_material_count -= 1;
+    }
+};
+
+EXPORT inline void GenerateCavernOres(Map& map)
+{
+    printf("GenerateCavernOres\n");
+
+    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_size_max = 10 + (int)(22 * map.CopperSize());
+
+    auto iron_count = 200 + (int)(200 * map.IronFrequency());
+    auto iron_size_max = 12 + (int)(32 * map.IronSize()); 
+
+    auto silver_count = 200 + (int)(200 * map.SilverFrequency());
+    auto silver_size_max = 18 + (int)(42 * map.SilverSize());
+
+    auto gold_count = 200 + (int)(200 * map.GoldFrequency());
+    auto gold_size_max = 20 + (int)(52 * map.GoldSize());
+
+    auto rect = map.Cavern().bbox();
+    auto A_STRUCTURES = Structures::C_MATERIAL_BASE | Structures::C_MATERIAL_SEC | Structures::C_MATERIAL_TER; 
+
+    while (copper_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 12);
+        auto y = rect.y + rand() % (rect.h - 12);
+
+        auto& ore = map.UndergroundStructure(Structures::COPPER_ORE);
+        Rect rect {x, y, 12, 12};
+        CreateOre(rect, ore, 7, copper_size_max, map, A_STRUCTURES, true);
+        copper_count -= 1;
+    }
+
+    while (iron_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 14);
+        auto y = rect.y + rand() % (rect.h - 14);
+ 
+        auto& ore = map.UndergroundStructure(Structures::IRON_ORE);
+        Rect rect {x, y, 14, 14};
+        CreateOre(rect, ore, 9, iron_size_max, map, A_STRUCTURES, true);
+        iron_count -= 1;
+    }
+
+    while (silver_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 16);
+        auto y = rect.y + rand() % (rect.h - 16);
+ 
+        auto& ore = map.UndergroundStructure(Structures::SILVER_ORE);
+        Rect rect {x, y, 16, 16};
+        CreateOre(rect, ore, 12, silver_size_max, map, A_STRUCTURES, true);
+        silver_count -= 1;
+    }
+
+    while (gold_count > 0)
+    {
+        auto x = rect.x + rand() % (rect.w - 17);
+        auto y = rect.y + rand() % (rect.h - 17);
+ 
+        auto& ore = map.UndergroundStructure(Structures::GOLD_ORE);
+        Rect rect {x, y, 17, 17};
+        CreateOre(rect, ore, 14, gold_size_max, map, A_STRUCTURES, true);
+        gold_count -= 1;
     }
 };
 

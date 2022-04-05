@@ -143,13 +143,17 @@ class DefaultScene: public Scene
                 }
 
                 map.SetGenerationMessage("GENERATION OF SURFACE MATERIALS...");
-                GenerateMaterialSurface(map);
-                map.SetGenerationMessage("GENERATION OF ORES...");
+                GenerateSurfaceMaterials(map);
+                map.SetGenerationMessage("GENERATION OF SURFACE ORES...");
                 GenerateSurfaceOres(map);
                 map.SetGenerationMessage("GENERATION OF UNDERGROUND MATERIALS...");
-                GenerateMaterialUnderground(map);
+                GenerateUndergroudMaterials(map);
+                map.SetGenerationMessage("GENERATION OF UNDERGROUND ORES...");
+                GenerateUndergroundOres(map);
                 map.SetGenerationMessage("GENERATION OF CAVERN MATERIALS...");
-                GenerateMaterialCavern(map);
+                GenerateCavernMaterials(map);
+                map.SetGenerationMessage("GENERATION OF CAVERN ORES...");
+                GenerateCavernOres(map);
             }
             
             for (auto& pair: futures_to_wait)
