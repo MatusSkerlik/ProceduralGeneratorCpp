@@ -223,6 +223,15 @@ namespace Structures {
     const unsigned long IRON_ORE             = 1 << 17;
     const unsigned long SILVER_ORE           = 1 << 18;
     const unsigned long GOLD_ORE             = 1 << 19;
+    const unsigned long S_MATERIAL_BASE      = 1 << 20;
+    const unsigned long S_MATERIAL_SEC       = 1 << 21;
+    const unsigned long S_MATERIAL_TER       = 1 << 22;
+    const unsigned long U_MATERIAL_BASE      = 1 << 23;
+    const unsigned long U_MATERIAL_SEC       = 1 << 24;
+    const unsigned long U_MATERIAL_TER       = 1 << 25;
+    const unsigned long C_MATERIAL_BASE      = 1 << 26;
+    const unsigned long C_MATERIAL_SEC       = 1 << 27;
+    const unsigned long C_MATERIAL_TER       = 1 << 28;
     
     class DefinedStructure: public PixelArray 
     {

@@ -142,8 +142,18 @@ class DefaultScene: public Scene
                     map.Error("DEFINITION OF TREES INFEASIBLE"); 
                 }
 
-                map.SetGenerationMessage("GENERATION OF ORES...");
+                map.SetGenerationMessage("GENERATION OF SURFACE MATERIALS...");
+                GenerateSurfaceMaterials(map);
+                map.SetGenerationMessage("GENERATION OF SURFACE ORES...");
                 GenerateSurfaceOres(map);
+                map.SetGenerationMessage("GENERATION OF UNDERGROUND MATERIALS...");
+                GenerateUndergroudMaterials(map);
+                map.SetGenerationMessage("GENERATION OF UNDERGROUND ORES...");
+                GenerateUndergroundOres(map);
+                map.SetGenerationMessage("GENERATION OF CAVERN MATERIALS...");
+                GenerateCavernMaterials(map);
+                map.SetGenerationMessage("GENERATION OF CAVERN ORES...");
+                GenerateCavernOres(map);
             }
             
             for (auto& pair: futures_to_wait)
