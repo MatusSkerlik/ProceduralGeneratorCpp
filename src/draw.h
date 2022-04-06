@@ -346,6 +346,8 @@ inline void DrawUnderground(Map& map)
                         DrawPixel(x, y, C_WATER);
                     else if (meta.generated_structure->GetType() == Structures::LAVA)
                         DrawPixel(x, y, C_LAVA);
+                    else if (meta.generated_structure->GetType() == Structures::SAND)
+                        DrawPixel(x, y, C_SAND);
                 }
             }
         }

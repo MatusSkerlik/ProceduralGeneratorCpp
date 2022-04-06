@@ -1653,6 +1653,12 @@ EXPORT inline void GenerateOceanLeft(Map& map)
     auto m_ocean = (float)(ocean_start_y - ocean_end_y) / ocean_rect.w;
     auto m_desert = (float)(ocean_start_y - desert_end_y) / (ocean_rect.w + ocean_desert_rect.w);
 
+    // CREATE DIRT LAYER FIRST
+    auto& dirt = map.GeneratedStructure(Structures::SURFACE_PART);
+    for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
+        for (auto y = ocean_end_y; y <= ocean_start_y; ++y)
+            dirt.add({x, y});
+
     // GENERATE SAND IN ONEAN BIOME
     auto& ocean_sand = map.GeneratedStructure(Structures::SAND);
     for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
@@ -1709,6 +1715,12 @@ EXPORT inline void GenerateOceanRight(Map& map)
     auto m_ocean = (float)(ocean_start_y - ocean_end_y) / ocean_rect.w;
     auto m_desert = (float)(desert_start_y - ocean_end_y) / (ocean_rect.w + ocean_desert_rect.w);
 
+    // CREATE DIRT LAYER FIRST
+    auto& dirt = map.GeneratedStructure(Structures::SURFACE_PART);
+    for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
+        for (auto y = ocean_start_y; y <= ocean_end_y; ++y)
+            dirt.add({x, y});
+    
     // GENERATE SAND IN ONEAN BIOME
     auto& ocean_sand = map.GeneratedStructure(Structures::SAND);
     for (auto x = ocean_rect.x; x <= ocean_rect.x + ocean_rect.w; ++x)
