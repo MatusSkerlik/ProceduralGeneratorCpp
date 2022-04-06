@@ -232,6 +232,7 @@ namespace Structures {
     const unsigned long C_MATERIAL_BASE      = 1 << 26;
     const unsigned long C_MATERIAL_SEC       = 1 << 27;
     const unsigned long C_MATERIAL_TER       = 1 << 28;
+    const unsigned long LAVA                 = 1 << 29;
     
     class DefinedStructure: public PixelArray 
     {

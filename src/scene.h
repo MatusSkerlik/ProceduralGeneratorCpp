@@ -154,6 +154,8 @@ class DefaultScene: public Scene
                 GenerateCavernMaterials(map);
                 map.SetGenerationMessage("GENERATION OF CAVERN ORES...");
                 GenerateCavernOres(map);
+                map.SetGenerationMessage("GENERATION OF CAVE LAKES...");
+                GenerateCaveLakes(map);
             }
             
             for (auto& pair: futures_to_wait)

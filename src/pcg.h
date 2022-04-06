@@ -325,6 +325,53 @@ inline void CreateIsland(const Rect& rect, PixelArray& arr, int type)
                 arr.add({x, y});
 };
 
+namespace Grid
+{
+    inline auto FloodFill(Pixel sp, unsigned long A_STRUCTURES, Map& map)
+    {
+        PixelArray result;
+        std::unordered_set<Pixel, PixelHash, PixelEqual> visited;
+        std::unordered_set<Pixel, PixelHash, PixelEqual> queue;
+        queue.insert(sp);
+
+        auto width = map.Width();
+        auto height = map.Height();
+
+        while (!queue.empty())
+        {
+            Pixel p = *queue.begin();
+            queue.erase(queue.begin());
+
+            auto meta = map.GetMetadata(p);
+            if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES)
+            {
+                result.add(p);
+                if (p.x > 0 && visited.count({p.x - 1, p.y}) == 0)
+                {
+                    visited.insert({p.x - 1, p.y});
+                    queue.insert({p.x - 1, p.y});
+                }
+                if (p.y > 0 && visited.count({p.x, p.y - 1}) == 0)
+                {
+                    visited.insert({p.x, p.y - 1});
+                    queue.insert({p.x, p.y - 1});
+                }
+                if (p.x < width - 1 && visited.count({p.x + 1, p.y}) == 0)
+                {
+                    visited.insert({p.x + 1, p.y});
+                    queue.insert({p.x + 1, p.y});
+                }
+                if (p.y < height - 1 && visited.count({p.x, p.y + 1}) == 0)
+                {
+                    visited.insert({p.x, p.y + 1});
+                    queue.insert({p.x, p.y + 1});
+                }
+            }
+        }
+        return result;
+    };
+};
+
 
 namespace CellularAutomata
 {
@@ -576,14 +623,14 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
     }
 };
 
-namespace Water
+namespace Liquid 
 {
     inline void Step(
             const Rect& rect, 
             Pixel p, 
             std::unordered_set<Pixel, PixelHash, PixelEqual>& walls, 
             PixelArray& arr,
-            bool leak = true 
+            bool break_on_leak = true 
     ){
         std::unordered_set<Pixel, PixelHash, PixelEqual> queue;
 
@@ -605,7 +652,7 @@ namespace Water
                 // WATER LEAK
                 if (point.x < rect.x)
                 {
-                    if (leak)
+                    if (break_on_leak)
                         return;
 
                     left_end = true;
@@ -616,7 +663,7 @@ namespace Water
                 // WATER LEAK
                 if (point.x >= rect.x + rect.w)
                 {
-                    if (leak)
+                    if (break_on_leak)
                         return;
 
                     right_end = true;
@@ -672,7 +719,7 @@ namespace Water
 
             // ENSURE WE ARE ALLWAYS AT BOTTOM
             auto bottom_empty = walls.count({p.x, p.y + 1}) == 0;
-            while (bottom_empty)
+            while (bottom_empty && (p.y < rect.y + rect.h))
             {
                 p = {p.x, p.y + 1};
                 bottom_empty = walls.count({p.x, p.y + 1}) == 0;
@@ -688,7 +735,7 @@ namespace Water
  * Create water
  * It will create water count lines at lowest point available inside rect with start from s
  */
-inline auto CreateWater(const Rect& rect, PixelArray& arr, Pixel s, int count, Map& map)
+inline auto CreateLiquid(const Rect& rect, PixelArray& arr, Pixel s, int count, Map& map, unsigned long WALL_MASK, bool wall_is_empty)
 {
 
     std::unordered_set<Pixel, PixelHash, PixelEqual> walls;
@@ -698,14 +745,19 @@ inline auto CreateWater(const Rect& rect, PixelArray& arr, Pixel s, int count, M
         {
             Pixel p = {x, y};
             auto meta = map.GetMetadata(p);
-            if (meta.generated_structure != nullptr) walls.insert(p);
+            if ((wall_is_empty && meta.generated_structure == nullptr) || (meta.generated_structure != nullptr && meta.generated_structure->GetType() & WALL_MASK))
+                walls.insert(p);
         }
     }
+
 
     PixelArray new_water_pixels;
     for (auto i = 0; i < count; ++i)
     {
-        Water::Step(rect, s, walls, new_water_pixels);   
+        if (walls.count(s) > 0)
+            return;
+
+        Liquid::Step(rect, s, walls, new_water_pixels);   
         for (auto p: new_water_pixels)
         {
             arr.add(p);
@@ -1893,6 +1945,9 @@ EXPORT inline void GenerateLakes(Map& map)
 
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
+    auto WALL_MASK = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
+                Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL |
+                Structures::CHASM | Structures::WATER | Structures::TREE | Structures:: GRASS;
 
     auto holes = map.GetGeneratedStructures(Structures::HOLE);
     if (holes.size() == 0)
@@ -1911,7 +1966,7 @@ EXPORT inline void GenerateLakes(Map& map)
         auto h = 5 + rand() % 21;
 
         auto& water = map.GeneratedStructure(Structures::WATER);
-        CreateWater(rect, water, s, h, map); 
+        CreateLiquid(rect, water, s, h, map, WALL_MASK, false); 
 
         --count;
     }
@@ -1923,6 +1978,9 @@ EXPORT inline void GenerateJungleSwamp(Map& map)
 
     auto& Surface = map.Surface();
     auto surface_rect = Surface.bbox();
+    auto WALL_MASK = Structures::SURFACE_PART | Structures::HILL | Structures::HOLE | 
+                Structures::CLIFF | Structures::TRANSITION | Structures::SURFACE_TUNNEL |
+                Structures::CHASM | Structures::WATER | Structures::TREE | Structures:: GRASS;
 
     auto jungle = map.GetBiome(Biomes::JUNGLE);
     if (jungle == nullptr)
@@ -1954,7 +2012,7 @@ EXPORT inline void GenerateJungleSwamp(Map& map)
         
         for (auto x = rect.x; x <= rect.x + rect.w; ++x)
             if (((x - rect.x) % step) == 0)
-                CreateWater(rect, water, {x, rect.y}, 1, map); 
+                CreateLiquid(rect, water, {x, rect.y}, 1, map, WALL_MASK, false); 
     }
     else
     {
@@ -2410,6 +2468,86 @@ EXPORT inline void GenerateCavernOres(Map& map)
         Rect rect {x, y, 17, 17};
         CreateOre(rect, ore, 14, gold_size_max, map, A_STRUCTURES, true);
         gold_count -= 1;
+    }
+};
+
+EXPORT inline void GenerateCaveLakes(Map& map)
+{
+    auto cavern_rect = map.Cavern().bbox();
+    auto caves = map.GetUndergroundStructures(Structures::CAVE);
+    auto count = (int)(0.4 * caves.size()); 
+    auto WALL_MASK = Structures::COPPER_ORE | Structures::IRON_ORE | Structures::SILVER_ORE |
+                     Structures::GOLD_ORE | Structures::C_MATERIAL_BASE | Structures::C_MATERIAL_SEC |
+                     Structures::C_MATERIAL_TER | Structures::U_MATERIAL_BASE | Structures::U_MATERIAL_SEC |
+                     Structures::U_MATERIAL_TER;
+
+    std::unordered_set<Structures::GeneratedStructure*> visited_caves;
+    auto it = caves.begin();
+    while (count > 0 && it != caves.end())
+    {
+        auto* cave = *(it++); 
+        if (visited_caves.count(cave) > 0)
+        {
+            count -= 1;
+            continue;
+        }
+
+        auto rect = cave->bbox();
+
+        Pixel p = {-1, -1};
+        for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+        {
+            for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+            {
+                auto meta = map.GetMetadata({x, y});
+                if (meta.generated_structure == cave)
+                {
+                    p = {x, y};
+                    goto point_found;
+                }
+            }
+        }
+        if (p.x != -1 || p.y != -1)
+        {
+point_found:
+            auto cave_pixels = Grid::FloodFill(p, Structures::CAVE, map);
+            rect = cave_pixels.bbox();
+            for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+            {
+                for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+                {
+                    if (cave_pixels.contains({x, y}))
+                    {
+                        p = {x, y};
+                        goto found_first_highest_point;
+                    }
+                }
+            }
+found_first_highest_point:
+
+
+            if ((rect.y + rect.h) < (cavern_rect.y + cavern_rect.h * 0.75))
+            {
+                auto drops_count = 20 + rand() % rect.h;
+                auto& water = map.UndergroundStructure(Structures::WATER);
+                CreateLiquid(rect, water, p, drops_count, map, WALL_MASK, true);
+            }
+            else
+            {
+                auto drops_count = 10 + rand() % (int)(rect.h / 2);
+                auto& lava = map.UndergroundStructure(Structures::LAVA);
+                CreateLiquid(rect, lava, p, drops_count, map, WALL_MASK, true);
+            } 
+
+            // UPDATE VISITED POINTS SO WE DONT CREATE WATER IN THE SAME CAVE
+            for (auto p: cave_pixels)
+            {
+                auto meta = map.GetMetadata(p);
+                if (meta.generated_structure->GetType() & Structures::CAVE)
+                    visited_caves.insert(meta.generated_structure);
+            }
+            count -= 1;
+        }
     }
 };
 

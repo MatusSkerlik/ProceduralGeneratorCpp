@@ -588,6 +588,9 @@ int main(void)
                             case Structures::WATER:
                                 DrawText("WATER", mx, my - 48, 16, BLUE);
                                 break;
+                            case Structures::LAVA:
+                                DrawText("LAVA", mx, my - 48, 16, BLUE);
+                                break;
                             case Structures::TREE:
                                 DrawText("TREE", mx, my - 48, 16, BLUE);
                                 break;

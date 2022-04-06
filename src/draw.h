@@ -29,6 +29,7 @@
 #define C_GRASS             (Color){28, 216, 94, 255}
 #define C_JGRASS            (Color){143, 215, 29, 255}
 #define C_WATER             (Color){65, 88, 151, 255}
+#define C_LAVA              (Color){218, 30, 4, 255}
 #define C_GOLD              (Color){185, 164, 23, 255}
 #define C_SILVER            (Color){185, 194, 195, 255}
 #define C_IRON              (Color){62, 82, 114, 255}
@@ -341,6 +342,10 @@ inline void DrawUnderground(Map& map)
                         DrawPixel(x, y, C_SILVER);
                     else if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
                         DrawPixel(x, y, C_GOLD);
+                    else if (meta.generated_structure->GetType() == Structures::WATER)
+                        DrawPixel(x, y, C_WATER);
+                    else if (meta.generated_structure->GetType() == Structures::LAVA)
+                        DrawPixel(x, y, C_LAVA);
                 }
             }
         }
