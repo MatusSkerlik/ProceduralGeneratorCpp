@@ -40,6 +40,9 @@
 #define C_UNDERGROUND       (Color){151, 107, 75, 255}
 #define C_STONE             (Color){128, 128, 128, 255}
 
+#define C_CAVE_BG_U         (Color){84, 57, 42, 255}
+#define C_CAVE_BG_C         (Color){72, 64, 57, 255}
+
 inline void DrawHorizontal(Map& map)
 {
     for (auto* area: map.HorizontalAreas())
@@ -183,176 +186,116 @@ inline void DrawSurfaceDebug(Map& map)
     }
 };
 
-inline void DrawSurface(Map& map)
+inline void Draw(Map& map)
 {
-    auto surface_rect = map.Surface().bbox();
-    for (auto x = surface_rect.x; x <= surface_rect.x + surface_rect.w; ++x)
+    auto width = map.Width();
+    auto height = map.Height();
+    //auto surface_rect = map.Surface().bbox();
+    auto underground_rect = map.Underground().bbox();
+    auto cavern_rect = map.Cavern().bbox();
+
+    for (auto x = 0; x < width; ++x)
     {
-        for (auto y = surface_rect.y; y <= surface_rect.y + surface_rect.h; ++y)
+        for (auto y = 0; y < height; ++y) 
         {
             auto meta = map.GetMetadata({x, y});
-            if (meta.generated_structure != nullptr)
+            if (meta.generated_structure != nullptr && meta.biome != nullptr)
             {
-                if (meta.biome != nullptr)
-                // BIOME RELATED
+                if (meta.biome->GetType() == Biomes::JUNGLE)
                 {
-                    if (meta.biome->GetType() == Biomes::JUNGLE)
-                    {
-                        if (meta.generated_structure->GetType() == Structures::S_MATERIAL_BASE)
-                            DrawPixel(x, y, C_STONE);
-                        else if (meta.generated_structure->GetType() == Structures::S_MATERIAL_SEC)
-                            DrawPixel(x, y, C_CLAY);
-                        else if (meta.generated_structure->GetType() == Structures::GRASS)
-                            DrawPixel(x, y, C_JGRASS);
-                        else
-                            DrawPixel(x, y, C_MUD);
-                    }
-                    else if (meta.biome->GetType() == Biomes::TUNDRA)
-                    {
-                        if (meta.generated_structure->GetType() == Structures::S_MATERIAL_BASE)
-                            DrawPixel(x, y, C_ICE);
-                        else if (meta.generated_structure->GetType() == Structures::S_MATERIAL_SEC)
-                            DrawPixel(x, y, C_ICE);
-                        else
-                            DrawPixel(x, y, C_SNOW);
-                    }
+                    if (meta.generated_structure->GetType() == Structures::S_MATERIAL_BASE)
+                        DrawPixel(x, y, C_STONE);
+                    else if (meta.generated_structure->GetType() == Structures::S_MATERIAL_SEC)
+                        DrawPixel(x, y, C_CLAY);
+                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_BASE)
+                        DrawPixel(x, y, C_STONE);
+                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_SEC)
+                        DrawPixel(x, y, C_CLAY);
+                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_BASE)
+                        DrawPixel(x, y, C_STONE);
+                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_SEC)
+                        DrawPixel(x, y, C_SILT);
+                    else if (meta.generated_structure->GetType() == Structures::GRASS)
+                        DrawPixel(x, y, C_JGRASS);
                     else
-                    {
-                        if (meta.generated_structure->GetType() == Structures::S_MATERIAL_BASE)
-                            DrawPixel(x, y, C_STONE);
-                        else if (meta.generated_structure->GetType() == Structures::S_MATERIAL_SEC)
-                            DrawPixel(x, y, C_CLAY);
-                        else if (meta.generated_structure->GetType() == Structures::GRASS)
-                            DrawPixel(x, y, C_GRASS);
-                        else
-                            DrawPixel(x, y, C_DIRT);
-                    }
+                        DrawPixel(x, y, C_MUD);
+                }
+                else if (meta.biome->GetType() == Biomes::TUNDRA)
+                {
+                    if (meta.generated_structure->GetType() == Structures::S_MATERIAL_BASE)
+                        DrawPixel(x, y, C_ICE);
+                    else if (meta.generated_structure->GetType() == Structures::S_MATERIAL_SEC)
+                        DrawPixel(x, y, C_ICE);
+                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_BASE)
+                        DrawPixel(x, y, C_ICE);
+                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_SEC)
+                        DrawPixel(x, y, C_ICE);
+                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_BASE)
+                        DrawPixel(x, y, C_ICE);
+                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_SEC)
+                        DrawPixel(x, y, C_ICE);
+                    else
+                        DrawPixel(x, y, C_SNOW);
+                }
+                else
+                {
+                    if (meta.generated_structure->GetType() == Structures::S_MATERIAL_BASE)
+                        DrawPixel(x, y, C_STONE);
+                    else if (meta.generated_structure->GetType() == Structures::S_MATERIAL_SEC)
+                        DrawPixel(x, y, C_CLAY);
+                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_BASE)
+                        DrawPixel(x, y, C_STONE);
+                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_SEC)
+                        DrawPixel(x, y, C_CLAY);
+                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_BASE)
+                        DrawPixel(x, y, C_STONE);
+                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_SEC)
+                        DrawPixel(x, y, C_SILT);
+                    else if (meta.generated_structure->GetType() == Structures::GRASS)
+                        DrawPixel(x, y, C_GRASS);
+                    else
+                        DrawPixel(x, y, C_DIRT);
                 }
 
                 // FOR EVERY SURFACE STRUCTURE
-                if (meta.generated_structure->GetType() == Structures::TREE)
-                    DrawPixel(x, y, (Color){191, 143, 111, 255});
-                if (meta.generated_structure->GetType() == Structures::WATER)
-                    DrawPixel(x, y, C_WATER);
-                if (meta.generated_structure->GetType() == Structures::SAND)
-                    DrawPixel(x, y, C_SAND);
-                if (meta.generated_structure->GetType() == Structures::COPPER_ORE)
-                    DrawPixel(x, y, C_COPPER); 
-                if (meta.generated_structure->GetType() == Structures::IRON_ORE)
-                    DrawPixel(x, y, C_IRON); 
-                if (meta.generated_structure->GetType() == Structures::SILVER_ORE)
-                    DrawPixel(x, y, C_SILVER); 
-                if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
-                    DrawPixel(x, y, C_GOLD); 
-                // DEBUG
-                /*
-                if (meta.generated_structure->GetType() == Structures::TRANSITION)
-                    DrawPixel(x, y, RED);
-                if (meta.generated_structure->GetType() == Structures::HILL)
-                    DrawPixel(x, y, BLUE);
-                */
-            }
-        }
-    }
-
-    // DEBUG SURFACE Y
-    /*
-    for (auto x = surface_rect.x; x <= surface_rect.x + surface_rect.w; ++x)
-    {
-        auto* part = map.GetSurfacePart(x);
-        if (part != nullptr) DrawPixel(x, part->GetY(x), ORANGE);
-    }
-    */
-};
-
-
-inline void DrawUnderground(Map& map)
-{
-    auto underground_rect = map.Underground().bbox();
-    auto cavern_rect = map.Cavern().bbox();
-    for (auto x = cavern_rect.x; x <= cavern_rect.x + cavern_rect.w; ++x)
-    {
-        for (auto y = underground_rect.y; y < underground_rect.y + + underground_rect.h + cavern_rect.h; ++y)
-        {
-            auto meta = map.GetMetadata({x, y});
-                // BIOME RELATED
-            if (meta.biome != nullptr)
-            {
-                if (meta.biome->GetType() == Biomes::JUNGLE)
-                        DrawPixel(x, y, C_MUD);
-                else if (meta.biome->GetType() == Biomes::TUNDRA)
-                    DrawPixel(x, y, C_SNOW);
-                else
-                    if (y < cavern_rect.y)
-                        DrawPixel(x, y, C_DIRT);
-                    else
-                        DrawPixel(x, y, C_STONE);
-
-                if (meta.generated_structure != nullptr)
+                if (meta.generated_structure->GetType() == Structures::CAVE)
                 {
-                    // FOR EVERY UNDERGROUND STRUCTURE IN BIOME
-                    if (meta.generated_structure->GetType() == Structures::CAVE)
-                    {
-                        if (y < cavern_rect.y)
-                            DrawPixel(x, y, (Color){84, 57, 42, 255});
-                        else 
-                            DrawPixel(x, y, (Color){72, 64, 57, 255});
-                    } 
-                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_BASE)
-                    {
-                        if (meta.biome->GetType() == Biomes::JUNGLE)
-                            DrawPixel(x, y, C_STONE); 
-                        else if (meta.biome->GetType() == Biomes::TUNDRA)
-                            DrawPixel(x, y, C_ICE); 
-                        else
-                            DrawPixel(x, y, C_STONE); 
-                    }
-                    else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_SEC)
-                    {
-                        if (meta.biome->GetType() == Biomes::JUNGLE)
-                            DrawPixel(x, y, C_CLAY); 
-                        else if (meta.biome->GetType() == Biomes::TUNDRA)
-                            DrawPixel(x, y, C_ICE); 
-                        else
-                            DrawPixel(x, y, C_CLAY); 
-                    }
-                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_BASE)
-                    {
-                        if (meta.biome->GetType() == Biomes::JUNGLE)
-                            DrawPixel(x, y, C_STONE); 
-                        else if (meta.biome->GetType() == Biomes::TUNDRA)
-                            DrawPixel(x, y, C_ICE); 
-                        else
-                            DrawPixel(x, y, C_DIRT); 
-                    }
-                    else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_SEC)
-                    {
-                        if (meta.biome->GetType() == Biomes::JUNGLE)
-                            DrawPixel(x, y, C_SILT); 
-                        else if (meta.biome->GetType() == Biomes::TUNDRA)
-                            DrawPixel(x, y, C_ICE); 
-                        else
-                            DrawPixel(x, y, C_SILT); 
-                    }
-                    else if (meta.generated_structure->GetType() == Structures::COPPER_ORE)
-                        DrawPixel(x, y, C_COPPER);
-                    else if (meta.generated_structure->GetType() == Structures::IRON_ORE)
-                        DrawPixel(x, y, C_IRON);
-                    else if (meta.generated_structure->GetType() == Structures::SILVER_ORE)
-                        DrawPixel(x, y, C_SILVER);
-                    else if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
-                        DrawPixel(x, y, C_GOLD);
-                    else if (meta.generated_structure->GetType() == Structures::WATER)
-                        DrawPixel(x, y, C_WATER);
-                    else if (meta.generated_structure->GetType() == Structures::LAVA)
-                        DrawPixel(x, y, C_LAVA);
-                    else if (meta.generated_structure->GetType() == Structures::SAND)
-                        DrawPixel(x, y, C_SAND);
+                    if (y < cavern_rect.y)
+                        DrawPixel(x, y, C_CAVE_BG_U);
+                    else
+                        DrawPixel(x, y, C_CAVE_BG_C);
+                }
+                if (meta.generated_structure->GetType() == Structures::FLOATING_ISLAND)
+                    DrawPixel(x, y, C_DIRT);
+                else if (meta.generated_structure->GetType() == Structures::TREE)
+                    DrawPixel(x, y, (Color){191, 143, 111, 255});
+                else if (meta.generated_structure->GetType() == Structures::WATER)
+                    DrawPixel(x, y, C_WATER);
+                else if (meta.generated_structure->GetType() == Structures::LAVA)
+                    DrawPixel(x, y, C_LAVA);
+                else if (meta.generated_structure->GetType() == Structures::SAND)
+                    DrawPixel(x, y, C_SAND);
+                else if (meta.generated_structure->GetType() == Structures::COPPER_ORE)
+                    DrawPixel(x, y, C_COPPER); 
+                else if (meta.generated_structure->GetType() == Structures::IRON_ORE)
+                    DrawPixel(x, y, C_IRON); 
+                else if (meta.generated_structure->GetType() == Structures::SILVER_ORE)
+                    DrawPixel(x, y, C_SILVER); 
+                else if (meta.generated_structure->GetType() == Structures::GOLD_ORE)
+                    DrawPixel(x, y, C_GOLD); 
+            }
+            else if (meta.generated_structure == nullptr && meta.biome != nullptr)
+            {
+                if (y >= underground_rect.y)
+                {
+                    if (meta.biome->GetType() == Biomes::JUNGLE)
+                        DrawPixel(x, y, C_MUD); 
+                    else if (meta.biome->GetType() == Biomes::TUNDRA)
+                        DrawPixel(x, y, C_SNOW); 
                 }
             }
         }
     }
 };
-
 
 #endif // DRAW

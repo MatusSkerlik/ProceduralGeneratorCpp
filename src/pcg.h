@@ -31,6 +31,84 @@ inline float cerp(float v0, float v1, float t)
     return v0 * (1 - mu2) + v1 * mu2;
 };
 
+inline void UnitedPixelArea(const PixelArray& pixels, int x, int y, PixelArray& fill)
+{
+    std::vector<Pixel> queue;
+    queue.push_back({x, y});
+    
+    while (queue.size() > 0)
+    {
+        auto p = queue.back(); 
+        queue.pop_back();
+
+        if (pixels.contains(p))
+        {
+            fill.add(p);
+            
+            Pixel p0 = {p.x - 1, p.y};
+            Pixel p1 = {p.x + 1, p.y};
+            Pixel p2 = {p.x, p.y - 1};
+            Pixel p3 = {p.x, p.y + 1};
+
+            if (!fill.contains(p0))
+                queue.push_back(p0);
+            if (!fill.contains(p1))
+                queue.push_back(p1);
+            if (!fill.contains(p2))
+                queue.push_back(p2);
+            if (!fill.contains(p3))
+                queue.push_back(p3);
+        }
+    }
+};
+
+inline void PixelsAroundCircle(int x, int y, float radius, PixelArray& array)
+{
+    auto center = Vector2D(x, y);
+    auto from = Vector2D(0, 0);
+
+    int minx = x - radius;
+    int maxx = x + radius;
+    int miny = y - radius;
+    int maxy = y + radius;
+
+    for (int i = minx; i <= maxx; ++i)
+    {
+        for (int j = miny; j <= maxy; ++j)
+        {
+            from.x = i;
+            from.y = j;
+
+            if (center.dist(from) < radius)
+                array.add(i, j);
+        }
+    }
+};
+
+inline void PixelsAroundRect(int x, int y, int w, int h, PixelArray& array)
+{
+    int minx = x - w / 2;
+    int maxx = x + w / 2;
+    int miny = y - h / 2;
+    int maxy = y + h / 2;
+
+    for (int i = minx; i <= maxx; ++i)
+        for (int j = miny; j <= maxy; ++j)
+            array.add(i, j);
+};
+
+inline void PixelsOfRect(int x, int y, int w, int h, PixelArray& array)
+{
+   for (int i = x; i <= x + w; ++i)
+        for (int j = y; j <= y + h; ++j)
+            array.add(i, j);
+};
+
+inline void PixelsOfRect(const Rect& rect, PixelArray& array)
+{
+    PixelsOfRect(rect.x, rect.y, rect.w, rect.h, array);
+};
+
 template <typename V, typename D>
 class DistanceConstraint: public Constraint<V, D>
 {
@@ -331,40 +409,45 @@ namespace Grid
     {
         PixelArray result;
         std::unordered_set<Pixel, PixelHash, PixelEqual> visited;
-        std::unordered_set<Pixel, PixelHash, PixelEqual> queue;
-        queue.insert(sp);
+        std::vector<Pixel> queue;
+        queue.push_back(sp);
 
         auto width = map.Width();
         auto height = map.Height();
 
         while (!queue.empty())
         {
-            Pixel p = *queue.begin();
-            queue.erase(queue.begin());
+            Pixel p = queue.back(); 
+            queue.pop_back();
+
+            Pixel p0 = {p.x - 1, p.y};
+            Pixel p1 = {p.x, p.y - 1};
+            Pixel p2 = {p.x + 1, p.y};
+            Pixel p3 = {p.x, p.y + 1};
 
             auto meta = map.GetMetadata(p);
             if (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES)
             {
                 result.add(p);
-                if (p.x > 0 && visited.count({p.x - 1, p.y}) == 0)
+                if (p.x > 0 && visited.count(p0) == 0)
                 {
-                    visited.insert({p.x - 1, p.y});
-                    queue.insert({p.x - 1, p.y});
+                    visited.insert(p0);
+                    queue.push_back(p0);
                 }
-                if (p.y > 0 && visited.count({p.x, p.y - 1}) == 0)
+                if (p.y > 0 && visited.count(p1) == 0)
                 {
-                    visited.insert({p.x, p.y - 1});
-                    queue.insert({p.x, p.y - 1});
+                    visited.insert(p1);
+                    queue.push_back(p1);
                 }
-                if (p.x < width - 1 && visited.count({p.x + 1, p.y}) == 0)
+                if (p.x < width - 1 && visited.count(p2) == 0)
                 {
-                    visited.insert({p.x + 1, p.y});
-                    queue.insert({p.x + 1, p.y});
+                    visited.insert(p2);
+                    queue.push_back(p2);
                 }
-                if (p.y < height - 1 && visited.count({p.x, p.y + 1}) == 0)
+                if (p.y < height - 1 && visited.count(p3) == 0)
                 {
-                    visited.insert({p.x, p.y + 1});
-                    queue.insert({p.x, p.y + 1});
+                    visited.insert(p3);
+                    queue.push_back(p3);
                 }
             }
         }
@@ -1149,6 +1232,7 @@ EXPORT inline void DefineBiomes(Map& map)
     printf("DefineBiomes\n");
 
     auto width = map.Width();
+    auto height = map.Height();
     auto ocean_width = 250;
     auto ocean_desert_width = 100; 
     auto tundra_width = 500;
@@ -1224,7 +1308,7 @@ EXPORT inline void DefineBiomes(Map& map)
 
         // DEFINITION OF FORESTS
         PixelArray forests;
-        Rect forests_rect {0, surface_rect.y, width, cavern_rect.y + cavern_rect.h - 1 - surface_rect.y};
+        Rect forests_rect {0, 0, width, height}; 
         PixelsOfRect(forests_rect, forests);
         
         // REMOVE PIXELS WHICH DON'T BELONG TO ANOTHER BIOMES 

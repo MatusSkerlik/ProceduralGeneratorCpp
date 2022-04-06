@@ -186,11 +186,10 @@ class DefaultScene: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
-            DrawUnderground(map);
         };
 
 };
@@ -249,7 +248,7 @@ class Scene0: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
@@ -319,7 +318,7 @@ class Scene1: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
@@ -392,7 +391,7 @@ class Scene2: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
@@ -470,7 +469,7 @@ class Scene3: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
@@ -549,7 +548,7 @@ class Scene4: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
@@ -632,7 +631,7 @@ class Scene5: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
@@ -717,7 +716,7 @@ class Scene6: public Scene
         {
             DrawHorizontal(map);
             DrawSurfaceBg(map);
-            DrawSurface(map);
+            Draw(map);
 #ifdef DEBUG
             DrawSurfaceDebug(map);
 #endif
