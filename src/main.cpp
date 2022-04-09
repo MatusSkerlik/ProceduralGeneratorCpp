@@ -46,6 +46,7 @@ void _PCGGen(Map& map)
     }
     map.SetGenerationMessage("");
     map.SetGenerating(false);
+    GenerationDone(map);
 };
 
 void PCGGen(Map& map)
@@ -131,36 +132,42 @@ int main(void)
     [&](float fq)
     { 
         map.HillsFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     StructuresControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.HolesFrequency(),
     [&](float fq)
     {
         map.HolesFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     StructuresControl.CreateSliderBar(92 + 8, 72 + 12, 92, 24, map.IslandsFrequency(), 
     [&](float fq)
     {
         map.IslandsFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     StructuresControl.CreateSliderBar(92 + 8, 96 + 16, 92, 24, map.ChasmFrequency(), 
     [&](float fq)
     {
         map.ChasmFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     StructuresControl.CreateSliderBar(92 + 8, 120 + 20, 92, 24, map.LakeFrequency(), 
     [&](float fq)
     {
         map.LakeFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     StructuresControl.CreateSliderBar(92 + 8, 144 + 24, 92, 24, map.TreeFrequency(), 
     [&](float fq)
     {
         map.TreeFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     StructuresControl.Hide();
@@ -173,18 +180,21 @@ int main(void)
     [&](float fq)
     {
         map.SurfacePartsCount(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     SurfaceControl.CreateSliderBar(92 + 8, 24 + 4, 92, 24, map.SurfacePartsFrequency(),
     [&](float fq)
     {
         map.SurfacePartsFrequency(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     SurfaceControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.SurfacePartsOctaves(),
     [&](float fq)
     {
         map.SurfacePartsOctaves(fq);
+        GenerateSurface(map);
         ScheduleGeneration(map);
     }); 
     SurfaceControl.Hide();
@@ -198,24 +208,28 @@ int main(void)
     [&](float fq)
     {
         map.CaveFrequency(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
     CaveControl.CreateSliderBar(92 + 8, 24 + 4, 92, 24, map.CaveStrokeSize(),
     [&](float fq)
     {
         map.CaveStrokeSize(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
     CaveControl.CreateSliderBar(92 + 8, 48 + 8, 92, 24, map.CavePointsSize(),
     [&](float fq)
     {
         map.CavePointsSize(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
     CaveControl.CreateSliderBar(92 + 8, 72 + 12, 92, 24, map.CaveCurvness(),
     [&](float fq)
     {
         map.CaveCurvness(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
     CaveControl.Hide();
@@ -232,6 +246,8 @@ int main(void)
     [&](float fq)
     {
         map.CopperFrequency(fq);
+        GenerateSurface(map);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -239,6 +255,8 @@ int main(void)
     [&](float fq)
     {
         map.IronFrequency(fq);
+        GenerateSurface(map);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -246,6 +264,7 @@ int main(void)
     [&](float fq)
     {
         map.SilverFrequency(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -253,6 +272,7 @@ int main(void)
     [&](float fq)
     {
         map.GoldFrequency(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -260,6 +280,8 @@ int main(void)
     [&](float fq)
     {
         map.CopperSize(fq);
+        GenerateSurface(map);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -267,6 +289,8 @@ int main(void)
     [&](float fq)
     {
         map.IronSize(fq);
+        GenerateSurface(map);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -274,6 +298,7 @@ int main(void)
     [&](float fq)
     {
         map.SilverSize(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -281,6 +306,7 @@ int main(void)
     [&](float fq)
     {
         map.GoldSize(fq);
+        GenerateUnderground(map);
         ScheduleGeneration(map);
     }); 
 
@@ -296,18 +322,34 @@ int main(void)
     auto& scene5 = SceneControl.CreateToogleButton(0, 120, 92, 24, "SCENE5"); 
     auto& scene6 = SceneControl.CreateToogleButton(0, 144, 92, 24, "SCENE6"); 
     auto& scene7 = SceneControl.CreateToogleButton(0, 168, 92, 24, "SCENE7"); 
+    auto& scene8 = SceneControl.CreateToogleButton(0, 192, 92, 24, "SCENE8"); 
+    auto& scene9 = SceneControl.CreateToogleButton(0, 216, 92, 24, "SCENE9"); 
+    auto& scene10 = SceneControl.CreateToogleButton(0, 240, 92, 24, "SCENE10"); 
+    auto& scene11 = SceneControl.CreateToogleButton(0, 264, 92, 24, "SCENE11"); 
+
+    auto scenes_off = [&](){
+        scene0.SetOff();
+        scene1.SetOff();
+        scene2.SetOff();
+        scene3.SetOff();
+        scene4.SetOff();
+        scene5.SetOff();
+        scene6.SetOff();
+        scene7.SetOff();
+        scene8.SetOff();
+        scene9.SetOff();
+        scene10.SetOff();
+        scene11.SetOff();
+    };
 
     scene0.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene1.SetOff();
-            scene2.SetOff();
-            scene3.SetOff();
-            scene4.SetOff();
-            scene5.SetOff();
-            scene6.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene0.SetOn();
             scene.reset(new DefaultScene());
+            GenerateSurface(map);
+            GenerateUnderground(map);
             ScheduleGeneration(map);
         }
     });
@@ -315,14 +357,10 @@ int main(void)
     scene1.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene2.SetOff();
-            scene3.SetOff();
-            scene4.SetOff();
-            scene5.SetOff();
-            scene6.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene1.SetOn();
             scene.reset(new Scene0());
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -330,14 +368,10 @@ int main(void)
     scene2.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene1.SetOff();
-            scene3.SetOff();
-            scene4.SetOff();
-            scene5.SetOff();
-            scene6.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene2.SetOn();
             scene.reset(new Scene1());
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -345,14 +379,10 @@ int main(void)
     scene3.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene1.SetOff();
-            scene2.SetOff();
-            scene4.SetOff();
-            scene5.SetOff();
-            scene6.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene3.SetOn();
             scene.reset(new Scene2());
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -360,14 +390,10 @@ int main(void)
     scene4.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene1.SetOff();
-            scene2.SetOff();
-            scene3.SetOff();
-            scene5.SetOff();
-            scene6.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene4.SetOn();
             scene.reset(new Scene3());
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -375,14 +401,10 @@ int main(void)
     scene5.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene1.SetOff();
-            scene2.SetOff();
-            scene3.SetOff();
-            scene4.SetOff();
-            scene6.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene5.SetOn();
             scene.reset(new Scene4());
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -390,14 +412,10 @@ int main(void)
     scene6.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene1.SetOff();
-            scene2.SetOff();
-            scene3.SetOff();
-            scene4.SetOff();
-            scene5.SetOff();
-            scene7.SetOff();
+            scenes_off();
+            scene6.SetOn();
             scene.reset(new Scene5());
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -405,14 +423,54 @@ int main(void)
     scene7.SetOnClickListener([&](bool active){
         if (active)
         {
-            scene0.SetOff();
-            scene1.SetOff();
-            scene2.SetOff();
-            scene3.SetOff();
-            scene4.SetOff();
-            scene5.SetOff();
-            scene6.SetOff();
+            scenes_off();
+            scene7.SetOn();
             scene.reset(new Scene6());
+            GenerateSurface(map);
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene8.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scenes_off();
+            scene8.SetOn();
+            scene.reset(new Scene7());
+            GenerateSurface(map);
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene9.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scenes_off();
+            scene9.SetOn();
+            scene.reset(new Scene8());
+            GenerateUnderground(map);
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene10.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scenes_off();
+            scene10.SetOn();
+            scene.reset(new Scene9());
+            GenerateUnderground(map);
+            ScheduleGeneration(map);
+        }
+    });
+
+    scene11.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scenes_off();
+            scene11.SetOn();
+            scene.reset(new Scene10());
+            GenerateUnderground(map);
             ScheduleGeneration(map);
         }
     });
@@ -441,11 +499,11 @@ int main(void)
 
         if (IsKeyDown(KEY_Q))
         {
-            camera.zoom *= 0.95;
+            camera.zoom *= 0.975;
         }
         if (IsKeyDown(KEY_E))
         {
-            camera.zoom *= 1.05;
+            camera.zoom *= 1.025;
         }
 
         if ((map_width * camera.zoom) < width || (map_height * camera.zoom) < height)
@@ -461,13 +519,13 @@ int main(void)
         }
 
         if (IsKeyDown(KEY_A))
-            ScrollOffset.x -= 20 * camera.zoom;
+            ScrollOffset.x -= 13 * camera.zoom;
         if (IsKeyDown(KEY_D))
-            ScrollOffset.x += 20 * camera.zoom;
+            ScrollOffset.x += 13 * camera.zoom;
         if (IsKeyDown(KEY_W))
-            ScrollOffset.y -= 20 * camera.zoom;
+            ScrollOffset.y -= 13 * camera.zoom;
         if (IsKeyDown(KEY_S))
-            ScrollOffset.y += 20 * camera.zoom;
+            ScrollOffset.y += 13 * camera.zoom;
 
         if (ScrollOffset.x < 0)
             ScrollOffset.x = 0;
