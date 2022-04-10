@@ -744,8 +744,6 @@ class Scene7: public Scene
                 GenerateJungleSwamp(map);
                 map.SetGenerationMessage("GENERATION OF GRASS...");
                 GenerateGrass(map);
-                map.SetGenerationMessage("GENERATION OF ISLANDS...");
-                GenerateIslands(map);
 
                 auto generate_trees_future = std::async(std::launch::async, GenerateTrees, std::ref(map));
                 map.SetGenerationMessage("GENERATION OF TREES...");
@@ -754,6 +752,107 @@ class Scene7: public Scene
                     map.SetForceStop(true);
                     map.Error("DEFINITION OF TREES INFEASIBLE"); 
                 }
+                map.SetGenerationMessage("GENERATION OF ISLANDS...");
+                GenerateIslands(map);
+            }
+            
+            for (auto& pair: futures_to_wait)
+            {
+                auto message = std::get<0>(pair);
+                auto error_message = std::get<1>(pair);
+                auto& future = std::get<2>(pair);
+                map.SetGenerationMessage(message);
+                if (future.wait_for(5s) == std::future_status::timeout)
+                {
+                    map.SetForceStop(true);
+                    map.Error(error_message);
+                }
+            }
+        };
+
+        virtual void Render(Map& map) override
+        {
+            DrawHorizontal(map);
+            DrawSurfaceBg(map);
+            Draw(map);
+#ifdef DEBUG
+            DrawSurfaceDebug(map);
+#endif
+        };
+
+};
+
+class Scene8: public Scene
+{
+    public:
+        virtual void Run(Map& map) override
+        {
+            std::vector<std::tuple<std::string, std::string, std::future<void>>> futures_to_wait;
+
+            map.ClearStage4();
+
+            if (!map.ShouldForceStop() && GenerateStage0)
+            {
+                map.ClearStage0();
+                map.SetGenerationMessage("DEFINITION OF HORIZONTAL AREAS...");
+                DefineHorizontal(map);
+            }
+
+            if (!map.ShouldForceStop() && GenerateStage1)
+            {
+                map.ClearStage1();
+                map.SetGenerationMessage("DEFINITION OF BIOMES...");
+                DefineBiomes(map);
+            }
+
+            if (!map.ShouldForceStop() && GenerateStage2)
+            {
+                map.ClearStage2();
+                auto define_structures_future = std::async(std::launch::async, DefineHillsHolesIslands, std::ref(map));
+                auto define_cabins_future = std::async(std::launch::async, DefineCabins, std::ref(map));
+                auto define_castles_future = std::async(std::launch::async, DefineCastles, std::ref(map));
+
+                map.SetGenerationMessage("DEFINITION OF HILLS, HOLES, ISLANDS...");
+                if (define_structures_future.wait_for(5s) == std::future_status::timeout)
+                {
+                    map.SetForceStop(true);
+                    map.Error("DEFINITION OF HILLS, HOLES, ISLANDS INFEASIBLE");
+                }
+            }
+
+            if (!map.ShouldForceStop() && GenerateStage3)
+            {
+                map.ClearStage3();
+                map.SetGenerationMessage("DEFINITION OF SURFACE...");
+                DefineSurface(map);
+                map.SetGenerationMessage("GENERATION OF HILLS...");
+                GenerateHills(map);
+                map.SetGenerationMessage("GENERATION OF HOLES...");
+                GenerateHoles(map);
+                map.SetGenerationMessage("GENERATION OF CLIFFS AND TRANSITIONS...");
+                GenerateCliffsTransitions(map);
+                map.SetGenerationMessage("GENERATION OF LEFT OCEAN...");
+                GenerateOceanLeft(map);
+                map.SetGenerationMessage("GENERATION OF RIGHT OCEAN...");
+                GenerateOceanRight(map);
+                map.SetGenerationMessage("GENERATION OF CHASMS...");
+                GenerateChasms(map);
+                map.SetGenerationMessage("GENERATION OF LAKES...");
+                GenerateLakes(map);
+                map.SetGenerationMessage("GENERATION OF JUNGLE SWAMP...");
+                GenerateJungleSwamp(map);
+                map.SetGenerationMessage("GENERATION OF GRASS...");
+                GenerateGrass(map);
+
+                auto generate_trees_future = std::async(std::launch::async, GenerateTrees, std::ref(map));
+                map.SetGenerationMessage("GENERATION OF TREES...");
+                if (generate_trees_future.wait_for(2s) == std::future_status::timeout)
+                {
+                    map.SetForceStop(true);
+                    map.Error("DEFINITION OF TREES INFEASIBLE"); 
+                }
+                map.SetGenerationMessage("GENERATION OF ISLANDS...");
+                GenerateIslands(map);
 
                 map.SetGenerationMessage("GENERATION OF SURFACE MATERIALS...");
                 GenerateSurfaceMaterials(map);
@@ -787,8 +886,7 @@ class Scene7: public Scene
 
 };
 
-
-class Scene8: public Scene
+class Scene9: public Scene
 {
     public:
         virtual void Run(Map& map) override
@@ -851,7 +949,7 @@ class Scene8: public Scene
 };
 
 
-class Scene9: public Scene
+class Scene10: public Scene
 {
     public:
         virtual void Run(Map& map) override
@@ -926,7 +1024,7 @@ class Scene9: public Scene
 
 };
 
-class Scene10: public Scene
+class Scene11: public Scene
 {
     public:
         virtual void Run(Map& map) override

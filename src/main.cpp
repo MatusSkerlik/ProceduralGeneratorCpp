@@ -46,7 +46,8 @@ void _PCGGen(Map& map)
     }
     map.SetGenerationMessage("");
     map.SetGenerating(false);
-    GenerationDone(map);
+    if (!map.ShouldForceStop())
+        GenerationDone(map);
 };
 
 void PCGGen(Map& map)
@@ -114,9 +115,6 @@ int main(void)
    
     // RAYGUI RELATED
     camera.zoom = width / map_width;
-
-    Rectangle map_view {0, 0, width, height};
-    Vector2 ScrollOffset = {0, 0};
 
     Map map;
     // GUI
@@ -326,6 +324,7 @@ int main(void)
     auto& scene9 = SceneControl.CreateToogleButton(0, 216, 92, 24, "SCENE9"); 
     auto& scene10 = SceneControl.CreateToogleButton(0, 240, 92, 24, "SCENE10"); 
     auto& scene11 = SceneControl.CreateToogleButton(0, 264, 92, 24, "SCENE11"); 
+    auto& scene12 = SceneControl.CreateToogleButton(0, 288, 92, 24, "SCENE12"); 
 
     auto scenes_off = [&](){
         scene0.SetOff();
@@ -340,6 +339,7 @@ int main(void)
         scene9.SetOff();
         scene10.SetOff();
         scene11.SetOff();
+        scene12.SetOff();
     };
 
     scene0.SetOnClickListener([&](bool active){
@@ -448,7 +448,7 @@ int main(void)
             scenes_off();
             scene9.SetOn();
             scene.reset(new Scene8());
-            GenerateUnderground(map);
+            GenerateSurface(map);
             ScheduleGeneration(map);
         }
     });
@@ -474,10 +474,26 @@ int main(void)
             ScheduleGeneration(map);
         }
     });
+
+    scene12.SetOnClickListener([&](bool active){
+        if (active)
+        {
+            scenes_off();
+            scene12.SetOn();
+            scene.reset(new Scene11());
+            GenerateUnderground(map);
+            ScheduleGeneration(map);
+        }
+    });
     SceneControl.Hide();
 
     // CORE LOGIC INIT
     ScheduleGeneration(map);
+
+    auto drag_x = 0;
+    auto drag_y = 0;
+    auto dragging = false;
+    const auto min_zoom = (width / (1.5 * map_width));
 
     while (!WindowShouldClose()) // Detect window close button or ESC key
     {
@@ -497,82 +513,67 @@ int main(void)
             ExportImage(image, filename.c_str()); 
         }
 
-        if (IsKeyDown(KEY_Q))
-        {
-            camera.zoom *= 0.975;
-        }
-        if (IsKeyDown(KEY_E))
-        {
-            camera.zoom *= 1.025;
-        }
+        auto mx = (float)GetMouseX();
+        auto my = (float)GetMouseY();
+        auto dx = mx - camera.offset.x;
+        auto dy = my - camera.offset.y;
+        auto x = camera.target.x + dx / camera.zoom; 
+        auto y = camera.target.y + dy / camera.zoom; 
 
-        if ((map_width * camera.zoom) < width || (map_height * camera.zoom) < height)
+        camera.zoom += GetMouseWheelMove() * 0.075 * camera.zoom;
+
+        if (camera.zoom < min_zoom)
+            camera.zoom = min_zoom;
+
+        if ((map_width * camera.zoom) < width && (map_height * camera.zoom) < height)
         {
             camera.offset = {0, 0};
             camera.target = {0, 0};
         }
         else
         {
-            // TODO
-            camera.offset = {0, 0}; 
-            camera.target = {0 ,0};
+            if (GetMouseWheelMove() != 0.0)
+            {
+                camera.offset = {mx, my}; 
+                camera.target = {x, y};
+            }
         }
 
-        if (IsKeyDown(KEY_A))
-            ScrollOffset.x -= 13 * camera.zoom;
-        if (IsKeyDown(KEY_D))
-            ScrollOffset.x += 13 * camera.zoom;
-        if (IsKeyDown(KEY_W))
-            ScrollOffset.y -= 13 * camera.zoom;
-        if (IsKeyDown(KEY_S))
-            ScrollOffset.y += 13 * camera.zoom;
-
-        if (ScrollOffset.x < 0)
-            ScrollOffset.x = 0;
-
-        if ((map_width * camera.zoom) > width)
+        if (IsMouseButtonPressed(2))
         {
-            if (ScrollOffset.x > ((map_width * camera.zoom) - width))
-                ScrollOffset.x = ((map_width * camera.zoom) - width);
-        }
-        else
-        {
-            ScrollOffset.x = 0;
+            dragging = true;
+            camera.offset = {mx, my}; 
+            camera.target = {x, y};
+            drag_x = mx;
+            drag_y = mx;
         }
 
-        if (ScrollOffset.y < 0)
-            ScrollOffset.y = 0;
-
-        if ((map_height * camera.zoom) > height)
+        if (IsMouseButtonReleased(2))
         {
-            if (ScrollOffset.y > ((map_height * camera.zoom) - height))
-                ScrollOffset.y = ((map_height * camera.zoom) - height);
+            dragging = false;
         }
-        else
+
+        if (dragging)
         {
-            ScrollOffset.y = 0;
+            camera.offset = {drag_x + mx - drag_x, drag_y + my - drag_y}; 
         }
 
         // DRAW LOGIC
         BeginDrawing();
             ClearBackground((Color){60, 56, 54, 255});
 
-            DrawRectangleRec(map_view, {40, 40, 40, 255});
+            DrawRectangleRec({0, 0, width, height}, {40, 40, 40, 255});
 
-            BeginScissorMode(map_view.x, map_view.y, map_view.width, map_view.height);
+            BeginScissorMode(0, 0, width, height);
                 BeginMode2D(camera);
-                    DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {-ScrollOffset.x / camera.zoom, -ScrollOffset.y / camera.zoom}, WHITE);        
+                    DrawTextureRec(canvas.texture, (Rectangle) { 0, 0, map_width, -map_height}, {0, 0}, WHITE);        
                 EndMode2D();
             EndScissorMode();
 
 
             // DRAW STRUCTURE INFO CLOSE TO MOUSE CURSOR
-            auto mx = GetMouseX();
-            auto my = GetMouseY();
-            if ((mx > map_view.x) && (mx < map_view.x + map_view.width) && (my > map_view.y) && (my < map_view.y + map_view.height))
+            if (map.IsInitialized() && x >= 0 && x < map_width && y >= 0 && y < map_height)
             {
-                int x = ScrollOffset.x / camera.zoom + (mx - map_view.x) * 1 / camera.zoom;
-                int y = ScrollOffset.y / camera.zoom + (my - map_view.y) * 1 / camera.zoom;
                 std::string t = "[";
                 t += std::to_string((int)x);
                 t += ":";
@@ -580,89 +581,96 @@ int main(void)
                 t += "]";
                 DrawText(t.c_str(), mx, my - 16, 16, WHITE);
 
-                try {
-                    auto info = map.GetMetadata({x, y});
-                    if (info.biome != nullptr)
+                auto info = map.GetMetadata({(int)x, (int)y});
+                if (info.biome != nullptr)
+                {
+                    switch (info.biome->GetType())
                     {
-                        switch (info.biome->GetType())
-                        {
-                            case Biomes::FOREST:
-                                DrawText("FOREST", mx, my - 32, 16, RED);
-                                break;
-                            case Biomes::JUNGLE:
-                                DrawText("JUNGLE", mx, my - 32, 16, RED);
-                                break;
-                            case Biomes::TUNDRA:
-                                DrawText("TUNDRA", mx, my - 32, 16, RED);
-                                break;
-                            case Biomes::OCEAN_LEFT:
-                                DrawText("OCEAN", mx, my - 32, 16, RED);
-                                break;
-                            case Biomes::OCEAN_RIGHT:
-                                DrawText("OCEAN", mx, my - 32, 16, RED);
-                                break;
-                            case Biomes::OCEAN_DESERT_LEFT:
-                                DrawText("DESERT", mx, my - 32, 16, RED);
-                                break;
-                            case Biomes::OCEAN_DESERT_RIGHT:
-                                DrawText("DESERT", mx, my - 32, 16, RED);
-                                break;
-                        }
+                        case Biomes::FOREST:
+                            DrawText("FOREST", mx, my - 32, 16, RED);
+                            break;
+                        case Biomes::JUNGLE:
+                            DrawText("JUNGLE", mx, my - 32, 16, RED);
+                            break;
+                        case Biomes::TUNDRA:
+                            DrawText("TUNDRA", mx, my - 32, 16, RED);
+                            break;
+                        case Biomes::OCEAN_LEFT:
+                            DrawText("OCEAN", mx, my - 32, 16, RED);
+                            break;
+                        case Biomes::OCEAN_RIGHT:
+                            DrawText("OCEAN", mx, my - 32, 16, RED);
+                            break;
+                        case Biomes::OCEAN_DESERT_LEFT:
+                            DrawText("DESERT", mx, my - 32, 16, RED);
+                            break;
+                        case Biomes::OCEAN_DESERT_RIGHT:
+                            DrawText("DESERT", mx, my - 32, 16, RED);
+                            break;
                     }
-                    if (info.generated_structure != nullptr)
+                }
+                if (info.generated_structure != nullptr)
+                {
+                    switch (info.generated_structure->GetType())
                     {
-                        switch (info.generated_structure->GetType())
-                        {
-                            case Structures::HILL:
-                                DrawText("HILL", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::HOLE:
-                                DrawText("HOLE", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::CABIN:
-                                DrawText("CABIN", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::CASTLE:
-                                DrawText("CASTLE", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::SURFACE_PART:
-                                DrawText("SUTFACE_PART", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::CHASM:
-                                DrawText("CHASM", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::CLIFF:
-                                DrawText("CLIFF", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::TRANSITION:
-                                DrawText("TRANSITION", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::FLOATING_ISLAND:
-                                DrawText("ISLAND", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::CAVE:
-                                DrawText("CAVE", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::WATER:
-                                DrawText("WATER", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::LAVA:
-                                DrawText("LAVA", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::TREE:
-                                DrawText("TREE", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::GRASS:
-                                DrawText("GRASS", mx, my - 48, 16, BLUE);
-                                break;
-                            case Structures::COPPER_ORE:
-                                DrawText("COPPER_ORE", mx, my - 48, 16, BLUE);
-                                break;
-                            default:
-                                break;
-                        }
+                        case Structures::HILL:
+                            DrawText("HILL", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::HOLE:
+                            DrawText("HOLE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::CABIN:
+                            DrawText("CABIN", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::CASTLE:
+                            DrawText("CASTLE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::SURFACE_PART:
+                            DrawText("SUTFACE_PART", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::CHASM:
+                            DrawText("CHASM", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::CLIFF:
+                            DrawText("CLIFF", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::TRANSITION:
+                            DrawText("TRANSITION", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::FLOATING_ISLAND:
+                            DrawText("ISLAND", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::CAVE:
+                            DrawText("CAVE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::WATER:
+                            DrawText("WATER", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::LAVA:
+                            DrawText("LAVA", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::TREE:
+                            DrawText("TREE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::GRASS:
+                            DrawText("GRASS", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::COPPER_ORE:
+                            DrawText("COPPER_ORE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::IRON_ORE:
+                            DrawText("IRON_ORE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::SILVER_ORE:
+                            DrawText("SILVER_ORE", mx, my - 48, 16, BLUE);
+                            break;
+                        case Structures::GOLD_ORE:
+                            DrawText("GOLD_ORE", mx, my - 48, 16, BLUE);
+                            break;
+                        default:
+                            break;
                     }
-                } catch (std::out_of_range& e){};
+                }
             }
 
             StructuresControl.Render();

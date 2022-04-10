@@ -2335,10 +2335,10 @@ EXPORT inline void GenerateSurfaceMaterials(Map& map)
 EXPORT inline void GenerateSurfaceOres(Map& map)
 {
     printf("GenerateSurfaceOres\n");
-    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_count = 100 + (int)(300 * map.CopperFrequency());
     auto copper_size_max = 7 + (int)(22 * map.CopperSize());
 
-    auto iron_count = 25 + (int)(200 * map.IronFrequency());
+    auto iron_count = 50 + (int)(200 * map.IronFrequency());
     auto iron_size_max = 12 + (int)(32 * map.IronSize()); 
 
     auto& Surface = map.Surface();
@@ -2421,13 +2421,13 @@ EXPORT inline void GenerateUndergroundOres(Map& map)
 {
     printf("GenerateUndergroundOres\n");
 
-    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_count = 100 + (int)(300 * map.CopperFrequency());
     auto copper_size_max = 10 + (int)(22 * map.CopperSize());
 
-    auto iron_count = 100 + (int)(200 * map.IronFrequency());
+    auto iron_count = 200 + (int)(200 * map.IronFrequency());
     auto iron_size_max = 12 + (int)(32 * map.IronSize()); 
 
-    auto silver_count = 100 + (int)(200 * map.SilverFrequency());
+    auto silver_count = 150 + (int)(200 * map.SilverFrequency());
     auto silver_size_max = 28 + (int)(42 * map.SilverSize());
 
     auto rect = map.Underground().bbox();
@@ -2507,13 +2507,13 @@ EXPORT inline void GenerateCavernOres(Map& map)
 {
     printf("GenerateCavernOres\n");
 
-    auto copper_count = 50 + (int)(300 * map.CopperFrequency());
+    auto copper_count = 100 + (int)(300 * map.CopperFrequency());
     auto copper_size_max = 10 + (int)(22 * map.CopperSize());
 
     auto iron_count = 200 + (int)(200 * map.IronFrequency());
     auto iron_size_max = 12 + (int)(32 * map.IronSize()); 
 
-    auto silver_count = 200 + (int)(200 * map.SilverFrequency());
+    auto silver_count = 300 + (int)(200 * map.SilverFrequency());
     auto silver_size_max = 18 + (int)(42 * map.SilverSize());
 
     auto gold_count = 200 + (int)(200 * map.GoldFrequency());
