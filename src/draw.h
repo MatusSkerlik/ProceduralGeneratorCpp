@@ -170,7 +170,7 @@ inline void Draw(Map& map)
                     else if (meta.generated_structure->GetType() == Structures::U_MATERIAL_SEC)
                         DrawPixel(x, y, C_CLAY);
                     else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_BASE)
-                        DrawPixel(x, y, C_STONE);
+                        DrawPixel(x, y, C_DIRT);
                     else if (meta.generated_structure->GetType() == Structures::C_MATERIAL_SEC)
                         DrawPixel(x, y, C_SILT);
                     else if (meta.generated_structure->GetType() == Structures::GRASS)

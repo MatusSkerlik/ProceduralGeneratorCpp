@@ -112,6 +112,9 @@ class PixelArray
 {
     protected:
         std::unordered_set<Pixel, PixelHash, PixelEqual> _set_pixels;
+        Rect _bounding_box;
+        bool _invalidated = true;
+
     public:
         PixelArray(){};
         
@@ -131,28 +134,34 @@ class PixelArray
         auto end() const { return this->_set_pixels.end(); };
         auto size() const { return this->_set_pixels.size(); };
         auto contains(Pixel pixel) const { return (bool)_set_pixels.count(pixel); };
-        virtual void add(Pixel pixel) { _set_pixels.insert(pixel); };
+        virtual void add(Pixel pixel) { _set_pixels.insert(pixel); _invalidated = true; };
         virtual void add(int x, int y) { add((Pixel){x, y}); };
-        virtual void remove(Pixel pixel) { _set_pixels.erase(pixel); };
+        virtual void remove(Pixel pixel) { _set_pixels.erase(pixel); _invalidated = true; };
         virtual void remove(int x, int y) { remove((Pixel){x, y}); };
         virtual void clear() { _set_pixels.clear(); };
 
-        Rect bbox() const 
+        Rect bbox()
         {
-            int minx = std::numeric_limits<int>::max();
-            int miny = std::numeric_limits<int>::max();
-            int maxx = std::numeric_limits<int>::min();
-            int maxy = std::numeric_limits<int>::min();
-
-            for (auto pixel: _set_pixels)
+            if (_invalidated)
             {
-                if (pixel.x < minx) minx = pixel.x;
-                if (pixel.x > maxx) maxx = pixel.x;
-                if (pixel.y < miny) miny = pixel.y;
-                if (pixel.y > maxy) maxy = pixel.y;
+                int minx = std::numeric_limits<int>::max();
+                int miny = std::numeric_limits<int>::max();
+                int maxx = std::numeric_limits<int>::min();
+                int maxy = std::numeric_limits<int>::min();
+
+                for (auto pixel: _set_pixels)
+                {
+                    if (pixel.x < minx) minx = pixel.x;
+                    if (pixel.x > maxx) maxx = pixel.x;
+                    if (pixel.y < miny) miny = pixel.y;
+                    if (pixel.y > maxy) maxy = pixel.y;
+                }
+
+                _bounding_box = {minx, miny, maxx - minx, maxy - miny};
+                _invalidated = false;
             }
 
-            return {minx, miny, maxx - minx, maxy - miny};
+            return _bounding_box;
         };
 };
 

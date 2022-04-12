@@ -460,47 +460,83 @@ namespace CellularAutomata
 {
     inline auto CountCells(const Rect& rect, std::vector<int>& grid, int of_value)
     {
-        auto count = 0;
-        for (auto _x= rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+        auto encode_coords = [=](int x, int y) 
         {
-            for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
-            {
-                auto x = _x - rect.x;
-                auto y = _y - rect.y;
-                
-                if (grid.at(y * rect.w + x) == of_value) count += 1;
+            return (y - rect.y) * rect.w + (x - rect.x);    
+        };
 
+        auto count = 0;
+        for (auto x = rect.x + 1; x <= rect.x + rect.w - 1; ++x)
+        {
+            for (auto y = rect.y + 1; y <= rect.y + rect.h - 1; ++y)
+            {
+                if (grid[encode_coords(x, y)] == of_value)
+                    count += 1;
             }
         }
         return count;
     }
 
-    inline auto Step(const Rect& rect, std::vector<int>& grid, int death_ratio, int birth_ratio)
+    inline auto Step(const Rect& rect, std::vector<int>& grid, int death_ratio, int birth_ratio, bool alive_at_interface = false)
     {
-        auto new_grid = grid;
-        for (auto _x= rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+        auto encode_coords = [=](int x, int y) 
         {
-            for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
+            return (y - rect.y) * rect.w + (x - rect.x);    
+        };
+
+        auto new_grid = grid;
+        for (auto x= rect.x; x <= rect.x + rect.w; ++x)
+        {
+            for (auto y = rect.y; y <= rect.y + rect.h; ++y)
             {
-                auto x = _x - rect.x;
-                auto y = _y - rect.y;
-
                 auto alive = 0;
-                alive += grid.at((y - 1) * rect.w + x);
-                alive += grid.at((y + 1) * rect.w + x);
-                alive += grid.at(y * rect.w + x - 1);
-                alive += grid.at(y * rect.w + x + 1);
-                alive += grid.at((y - 1) * rect.w + x - 1);
-                alive += grid.at((y - 1) * rect.w + x + 1);
-                alive += grid.at((y - 1) * rect.w + x - 1);
-                alive += grid.at((y - 1) * rect.w + x + 1);
 
-                auto this_alive = grid.at(y * rect.w + x) == 1;
+                if (x > rect.x)
+                    alive += grid[encode_coords(x - 1, y)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (x < rect.x + rect.w)
+                    alive += grid[encode_coords(x + 1, y)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (y > rect.y)
+                    alive += grid[encode_coords(x, y - 1)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (y < rect.y + rect.h)
+                    alive += grid[encode_coords(x, y + 1)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (x > rect.x && y > rect.y)
+                    alive += grid[encode_coords(x - 1, y - 1)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (x < rect.x + rect.w && y < rect.y + rect.h)
+                    alive += grid[encode_coords(x + 1, y + 1)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (x > rect.x && y < rect.y + rect.h)
+                    alive += grid[encode_coords(x - 1, y + 1)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                if (x < rect.x + rect.w && y > rect.y)
+                    alive += grid[encode_coords(x + 1, y - 1)];
+                else if (alive_at_interface)
+                    alive += 1;
+
+                auto this_alive = grid[encode_coords(x, y)];
 
                 if (this_alive && alive < death_ratio)
-                    new_grid[y * rect.w + x] = 0;
+                    new_grid[encode_coords(x, y)] = 0;
                 if (!this_alive && alive > birth_ratio)
-                    new_grid[y * rect.w + x] = 1;
+                    new_grid[encode_coords(x, y)] = 1;
             }
         }
         return new_grid;
@@ -677,29 +713,27 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
     }
 
     // PREPARE FOR SMOOTHSTEP 
-    std::vector<int> mask;
-    for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
-        for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
-            mask.push_back(1);
-    for (auto p: walls) mask[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 0;
+    std::vector<int> grid;
+    for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+        for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+            grid.push_back(0);
+    for (auto p: walls) grid[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 1;
 
     // APPLY SMOOTH STEP
-    for (auto _ = 0; _ < smooth_steps; ++_) mask = CellularAutomata::Step(rect, mask, 3, 4);
+    for (auto _ = 0; _ < smooth_steps; ++_) grid = CellularAutomata::Step(rect, grid, 3, 4, true);
 
     // PUSH RESULTS
     for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
     {
         for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
         {
-            // TODO QUICKFIX
             Pixel p {_x, _y};
             auto meta = map.GetMetadata(p);
             if (meta.generated_structure != nullptr)
-            // TODO QUICKFIX
             {
                 auto x = _x - rect.x;
                 auto y = _y - rect.y;
-                auto is_wall = mask[y * rect.w + x] == 0;
+                auto is_wall = grid[y * rect.w + x] == 1;
                 if (is_wall) arr.add({_x, _y});
             }
         }
@@ -708,14 +742,19 @@ inline void CreateChasm(const Rect& rect, PixelArray& arr, Map& map)
 
 namespace Liquid 
 {
-    inline void Step(
+    inline auto Step(
             const Rect& rect, 
+            std::vector<int>& grid,
             Pixel p, 
-            std::unordered_set<Pixel, PixelHash, PixelEqual>& walls, 
-            PixelArray& arr,
             bool break_on_leak = true 
     ){
+        auto encode_coords = [=](int x, int y) 
+        {
+            return (y - rect.y) * rect.w + (x - rect.x);    
+        };
+
         std::unordered_set<Pixel, PixelHash, PixelEqual> queue;
+        std::unordered_set<Pixel, PixelHash, PixelEqual> result;
 
         auto left_end = false;
         Pixel left_p {0, 0};
@@ -733,10 +772,10 @@ namespace Liquid
                 queue.erase(queue.begin());
                 
                 // WATER LEAK
-                if (point.x < rect.x)
+                if (point.x <= rect.x)
                 {
                     if (break_on_leak)
-                        return;
+                        return result;
 
                     left_end = true;
                     left_p = {point.x + 1, point.y};
@@ -747,15 +786,14 @@ namespace Liquid
                 if (point.x >= rect.x + rect.w)
                 {
                     if (break_on_leak)
-                        return;
+                        return result;
 
                     right_end = true;
                     right_p = {point.x - 1, point.y};
                     continue;
                 }
 
-                auto bottom_empty = walls.count({point.x, point.y + 1}) == 0; 
-                if (bottom_empty)
+                if ((point.y < rect.y + rect.h) && grid[encode_coords(point.x, point.y + 1)] == 0)
                 {
                     p = {point.x, point.y + 1};
                     queue.clear();
@@ -766,7 +804,7 @@ namespace Liquid
 
                 if (point.x < p.x) // POINT ON THE LEFT
                 {
-                    auto left_empty = walls.count({point.x - 1, point.y}) == 0;
+                    auto left_empty = grid[encode_coords(point.x - 1, point.y)] == 0;
                     if (left_empty)
                     {
                         queue.insert({point.x - 1, point.y});
@@ -779,7 +817,7 @@ namespace Liquid
                 }
                 else
                 {
-                    auto right_empty = walls.count({point.x + 1, point.y}) == 0;
+                    auto right_empty = grid[encode_coords(point.x + 1, point.y)] == 0;
                     if (right_empty)
                     {
                         queue.insert({point.x + 1, point.y});
@@ -796,18 +834,16 @@ namespace Liquid
             // APPEND LINE TO ARRAY
             if (left_end && right_end)
             {
-                for (auto x = left_p.x; x <= right_p.x; ++x) arr.add({x, p.y});
-                break;
+                for (auto x = left_p.x; x <= right_p.x; ++x)
+                    result.insert({x, p.y});
+                return result;
             }
 
             // ENSURE WE ARE ALLWAYS AT BOTTOM
-            auto bottom_empty = walls.count({p.x, p.y + 1}) == 0;
-            while (bottom_empty && (p.y < rect.y + rect.h))
+            while ((p.y < rect.y + rect.h) && grid[encode_coords(p.x, p.y + 1)] == 0)
             {
                 p = {p.x, p.y + 1};
-                bottom_empty = walls.count({p.x, p.y + 1}) == 0;
             };
-
             queue.insert({p.x - 1, p.y});
             queue.insert({p.x + 1, p.y});
         }
@@ -821,32 +857,38 @@ namespace Liquid
 inline auto CreateLiquid(const Rect& rect, PixelArray& arr, Pixel s, int count, Map& map, unsigned long WALL_MASK, bool wall_is_empty)
 {
 
-    std::unordered_set<Pixel, PixelHash, PixelEqual> walls;
-    for (auto x = rect.x; x <= rect.x + rect.w; ++x)
+    auto encode_coords = [=](int x, int y) 
     {
-        for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+        return ((y - rect.y) * rect.w) + (x - rect.x);    
+    };
+
+    std::vector<int> grid;
+    grid.resize((rect.w + 1)* (rect.h + 1));
+
+    for (auto y = rect.y; y <= rect.y + rect.h; ++y)
+    {
+        for (auto x = rect.x; x <= rect.x + rect.w; ++x)
         {
             Pixel p = {x, y};
             auto meta = map.GetMetadata(p);
             if ((wall_is_empty && meta.generated_structure == nullptr) || (meta.generated_structure != nullptr && meta.generated_structure->GetType() & WALL_MASK))
-                walls.insert(p);
+                grid[encode_coords(x, y)] = 1; 
+            else
+                grid[encode_coords(x, y)] = 0; 
         }
     }
 
-
-    PixelArray new_water_pixels;
     for (auto i = 0; i < count; ++i)
     {
-        if (walls.count(s) > 0)
+        if (grid[encode_coords(s.x, s.y)] == 1)
             return;
 
-        Liquid::Step(rect, s, walls, new_water_pixels);   
+        auto new_water_pixels = Liquid::Step(rect, grid, s);   
         for (auto p: new_water_pixels)
         {
             arr.add(p);
-            walls.insert(p);
+            grid[encode_coords(p.x, p.y)] = 1;
         }
-        new_water_pixels.clear();
     }
 };
 
@@ -1004,31 +1046,27 @@ inline auto CreateCave(const Rect& rect, PixelArray& arr, Pixel sp, float points
     auto cave = SplineAgent::Paint(rect, points, sp, [=](float, float){ return  2 + rand() % (2 + (int)(20 * stroke_size));}, curvness );
 
     // PREPARE FOR SMOOTHSTEP 
-    std::vector<int> mask;
+    std::vector<int> grid;
     for (auto _y = rect.y; _y <= rect.y + rect.h; ++_y)
-    {
         for (auto _x = rect.x; _x <= rect.x + rect.w; ++_x)
-        {
-            mask.push_back(1);
-        }
-    }
-    for (auto p: cave) mask[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 0;
+            grid.push_back(1);
+    for (auto p: cave) grid[(p.y - rect.y) * rect.w + (p.x - rect.x)] = 0;
 
     // APPLY SMOOTHSTEP
-    auto smooth_step_count = 6;
+    auto smooth_step_count = 3;
     for (auto i = 0; i < smooth_step_count; ++i)
     {
-        mask = CellularAutomata::Step(rect, mask, 3, 4);
+        grid = CellularAutomata::Step(rect, grid, 3, 4, true);
     }
 
     // PUSH RESULTS
-    for (auto _x = rect.x + 1; _x <= rect.x + rect.w - 1; ++_x)
+    for (auto _x = rect.x + 1; _x <= rect.x + rect.w; ++_x)
     {
-        for (auto _y = rect.y + 1; _y <= rect.y + rect.h - 1; ++_y)
+        for (auto _y = rect.y + 1; _y <= rect.y + rect.h; ++_y)
         {
             auto x = _x - rect.x;
             auto y = _y - rect.y;
-            auto is_cave = mask[y * rect.w + x] == 0;
+            auto is_cave = grid[y * rect.w + x] == 0;
             if (is_cave) arr.add({_x, _y});
         }
     }
@@ -1105,22 +1143,11 @@ inline void CreateOre(const Rect& rect, PixelArray& arr, int min_size, int max_s
     while (CellularAutomata::CountCells(rect, grid, 1) < min_size)
     {
         for (auto x = rect.x + 1; x <= rect.x + rect.w - 1; ++x)
-        {
             for (auto y = rect.y + 1; y <= rect.y + rect.h - 1; ++y)
-            {
-                Pixel p {x, y};
-                auto meta = map.GetMetadata(p);
-                if ((can_be_empty && meta.generated_structure == nullptr) || 
-                    (meta.generated_structure != nullptr && meta.generated_structure->GetType() & A_STRUCTURES))
-                {
-                    auto prob = rand() % 100;
-                    if (prob > 20) 
-                        grid[(y - rect.y) * rect.w + (x - rect.x)] = 1;
-                    else
-                        grid[(y - rect.y) * rect.w + (x - rect.x)] = 0;
-                }
-            }
-        }
+                if ((rand() % 100) > 20) 
+                    grid[(y - rect.y) * rect.w + (x - rect.x)] = 1;
+                else
+                    grid[(y - rect.y) * rect.w + (x - rect.x)] = 0;
 
         // INFEASIBLE
         if (CellularAutomata::CountCells(rect, grid, 1) < min_size)
@@ -1163,7 +1190,7 @@ inline auto DomainInsidePixelArray(const Rect& rect, const PixelArray& arr, int 
     return domain;
 };
 
-inline void UpdateSurfaceParts(const PixelArray& arr, Map& map)
+inline void UpdateSurfaceParts(PixelArray& arr, Map& map)
 {
     auto rect = arr.bbox();
     std::unordered_set<Structures::SurfacePart*> invalid_parts;
@@ -2571,7 +2598,7 @@ EXPORT inline void GenerateCaveLakes(Map& map)
 {
     auto cavern_rect = map.Cavern().bbox();
     auto caves = map.GetUndergroundStructures(Structures::CAVE);
-    auto count = (int)(0.4 * caves.size()); 
+    auto count = (int)(0.2 * caves.size()); 
     auto WALL_MASK = Structures::COPPER_ORE | Structures::IRON_ORE | Structures::SILVER_ORE |
                      Structures::GOLD_ORE | Structures::C_MATERIAL_BASE | Structures::C_MATERIAL_SEC |
                      Structures::C_MATERIAL_TER | Structures::U_MATERIAL_BASE | Structures::U_MATERIAL_SEC |

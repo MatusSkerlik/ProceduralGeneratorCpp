@@ -122,6 +122,7 @@ class DefaultScene: public Scene
                     map.Error("DEFINITION OF HILLS, HOLES, ISLANDS INFEASIBLE");
                 }
                 
+                /*
                 map.SetGenerationMessage("DEFINITION OF UNDERGROUND CABINS...");
                 if (define_cabins_future.wait_for(5s) == std::future_status::timeout)
                 {
@@ -135,6 +136,7 @@ class DefaultScene: public Scene
                     map.SetForceStop(true);
                     map.Error("DEFINITION OF UNDERGROUND CASTLES INFEASIBLE");
                 }
+                */
             }
 
             if (!map.ShouldForceStop() && GenerateStage3)
