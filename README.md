@@ -3,7 +3,7 @@
 Generation of terrain can be modified based on control parameters.
 
 ## Build
-Follow instructions for [link](https://github.com/raysan5/raylib raylib).
+Follow instructions for [raylib](https://github.com/raysan5/raylib).
 
 You need to have raylib installed at `$PATH`, after which you can execute `make` (see Makefile).
 
